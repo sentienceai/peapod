@@ -95,12 +95,22 @@ export function subsidyNote(subsidy, now = new Date()) {
  * @param {Pool[]} pools
  */
 export function headline(pools) {
+  const total = pools.length;
   const share = pools[0]?.share_of_chain_executable_pct ?? 0;
-  if (share >= 72.5) return { text: 'One pool holds three quarters of it.', share };
-  if (share >= 58) return { text: 'One pool holds two thirds of it.', share };
-  if (share >= 45) return { text: 'One pool holds half of it.', share };
-  if (share >= 30) return { text: 'One pool holds a third of it.', share };
-  return { text: `The deepest pool holds ${share.toFixed(1)}% of it.`, share };
+  const fraction =
+    share >= 72.5 ? 'three quarters'
+      : share >= 58 ? 'two thirds'
+        : share >= 45 ? 'half'
+          : share >= 30 ? 'a third'
+            : null;
+  const amount = fraction ?? `${share.toFixed(1)}%`;
+  const subject = fraction ? 'one holds' : 'the deepest holds';
+  return {
+    text: `Of the ${total} tokenized-stock pools on Robinhood Chain, ${subject} ${amount} of everything you could actually trade.`,
+    share,
+    fraction,
+    total,
+  };
 }
 
 /**

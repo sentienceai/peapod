@@ -84,6 +84,11 @@ class Node {
     return this.descendants().filter((n) => n.className.split(/\s+/).includes(cls));
   }
 
+  /** Direct element children, with text nodes filtered out. @returns {Node[]} */
+  elements() {
+    return /** @type {Node[]} */ (this.children.filter((c) => typeof c !== 'string'));
+  }
+
   /** @param {string} tag */
   byTag(tag) {
     return this.descendants().filter((n) => n.tag === tag);

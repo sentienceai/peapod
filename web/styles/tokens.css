@@ -1,113 +1,88 @@
 /* peapod design tokens.
  *
- * TWO RULES GOVERN COLOUR, AND NOTHING ELSE USES IT.
- *   hue    carries SIGN      — oxblood below a 7-day median, teal above it
- *   density carries MAGNITUDE — one ink, mixed toward the ground
- * There is no third hue and no decorative colour anywhere. A bar, a band segment and a
- * table rule are the same material at different strengths, so a reader can compare two
- * marks anywhere on the page without learning a legend.
+ * One material: ink on paper. Geometry carries the argument.
  *
- * On refusing red and green: they are the default in market interfaces and they fail for
- * the ~8% of men with red-green colour blindness. Oxblood and deep teal hold the same
- * polarity, separate under protanopia and deuteranopia, and sit in the ink's tonal
- * register instead of shouting over it. Signed figures also carry an arrow, so colour is
- * never the only channel.
+ * COLOUR. Six values, one accent, and the accent has exactly one referent — the pool this
+ * page is about. It appears twice: a pointer under the hero band, and a marker on that
+ * pool's row. Nowhere else. If it ever spreads to links or buttons it stops meaning
+ * anything and the page becomes generic immediately.
  *
- * TYPE. One family does the structural and numeric work — Archivo, variable in both
- * weight and width, with the width axis used as an instrument: condensed for the
- * wordmark and dense numerals, normal for prose. Widths are set with `font-stretch`
- * rather than `font-variation-settings`, because the latter is not additive — a rule
- * setting only one axis silently resets the other — and because a fallback face can
- * respond to `font-stretch` but not to a raw axis tuple. A serif appears in exactly one role,
- * the method notes and caveats, because those are the part a reader must actually read
- * and the change of voice says so. Monospace is reserved for hex pool addresses, where
- * it is semantic, and appears nowhere else.
+ * Colour does NOT carry sign. The ▲▼ arrows do, alone. An earlier revision had oxblood
+ * for below-median and teal for above, which was a second channel repeating what the
+ * arrows already said, and spending the page's only accent on forty table cells is not
+ * rare use. Sign is now legible identically to every reader.
+ *
+ * TYPE. One family, one width, four sizes, two weights. An earlier revision used Archivo's
+ * width axis at five settings and called it an instrument; it was five typefaces in a
+ * trench coat. A small scale used consistently reads as more considered than a large one
+ * used expressively. Figures are tabular and lining everywhere, so columns align on the
+ * decimal without help.
+ *
+ * SPACE. The main tool. The scale below is deliberately coarse — five usable steps, with
+ * the large ones genuinely large — because a page fixed by spacing cannot be fixed by
+ * styling.
  */
 
 :root {
-  /* neutrals ------------------------------------------------------------- */
-  --ground: #e6eae8;          /* page: cool paper, faintly green */
-  --surface: #f2f5f3;         /* raised panel, table stripe */
-  --rule: #c4cfcb;            /* hairlines, scale ticks */
-  --ink: #14232c;             /* deepest value; the dominant block at full strength */
-  --ink-muted: #5c6e76;       /* secondary figures, labels */
+  --paper: #eae9e4;      /* ground: warm light grey */
+  --ink: #1a1a17;        /* text, and the dominant pool's block */
+  --ink-2: #75756c;      /* labels, secondary figures */
+  --line: #cfcec7;       /* hairlines, ticks, the sub-pixel remainder */
+  --fill: #b9b8b0;       /* every non-dominant band segment */
+  --accent: #b8371f;     /* the pool this page is about. Two uses. */
 
-  /* signed --------------------------------------------------------------- */
-  --low: #8e3b4e;             /* below its 7-day median */
-  --high: #1c6b60;            /* above its 7-day median */
-  --low-wash: #8e3b4e1a;
-  --high-wash: #1c6b601a;
+  --focus: #1f5fd0;
 
-  /* magnitude ramp: one hue, six strengths. Never a new colour. ----------- */
-  --ink-95: color-mix(in oklab, var(--ink) 95%, var(--ground));
-  --ink-72: color-mix(in oklab, var(--ink) 72%, var(--ground));
-  --ink-52: color-mix(in oklab, var(--ink) 52%, var(--ground));
-  --ink-34: color-mix(in oklab, var(--ink) 34%, var(--ground));
-  --ink-20: color-mix(in oklab, var(--ink) 20%, var(--ground));
-  --ink-10: color-mix(in oklab, var(--ink) 10%, var(--ground));
+  --sans: 'Archivo', ui-sans-serif, 'Helvetica Neue', Helvetica, Arial, sans-serif;
 
-  --focus: #1d4ed8;
+  /* four sizes, two weights */
+  --t-micro: 0.6875rem;  /* 11px — scale ticks, strip labels */
+  --t-small: 0.8125rem;  /* 13px — table, controls */
+  --t-body: 1rem;        /* 16px — prose */
+  --t-lead: 2.25rem;     /* 36px — the one headline */
 
-  /* type ----------------------------------------------------------------- */
-  --sans: 'Archivo', ui-sans-serif, 'Helvetica Neue', Arial, sans-serif;
-  --serif: 'Source Serif 4', ui-serif, Georgia, 'Times New Roman', serif;
-  --mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, monospace;
+  --w-regular: 400;
+  --w-medium: 600;
 
-  /* A modular scale, third-based, truncated hard at both ends: this page is
-   * dense, so it needs many small steps and only one large one. */
-  --t-2xs: 0.688rem;   /* 11px  strip labels, scale ticks */
-  --t-xs: 0.75rem;     /* 12px  table secondary */
-  --t-s: 0.813rem;     /* 13px  table body */
-  --t-base: 0.938rem;  /* 15px  prose */
-  --t-m: 1.125rem;     /* 18px  section heads */
-  --t-l: 1.5rem;       /* 24px  band figures */
-  --t-xl: 2.25rem;     /* 36px  the one headline */
+  --lh-tight: 1.18;
+  --lh-body: 1.6;
 
-  --lh-tight: 1.1;
-  --lh-data: 1.35;
-  --lh-prose: 1.6;
+  /* space */
+  --s-1: 0.25rem;   /*  4 */
+  --s-2: 0.5rem;    /*  8 */
+  --s-3: 1rem;      /* 16 */
+  --s-4: 1.5rem;    /* 24 */
+  --s-5: 2.5rem;    /* 40 */
+  --s-6: 4rem;      /* 64 */
+  --s-7: 6rem;      /* 96 */
+  --s-8: 8rem;      /* 128 */
 
-  /* space: a 4px grid, because the tables are read in rows ----------------- */
-  --s-1: 0.25rem;
-  --s-2: 0.5rem;
-  --s-3: 0.75rem;
-  --s-4: 1rem;
-  --s-6: 1.5rem;
-  --s-8: 2rem;
-  --s-12: 3rem;
-
-  --measure: 66ch;
-  --page: 1440px;
+  --measure: 60ch;
+  --page: 1080px;
 
   color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --ground: #101a20;
-    --surface: #17242b;
-    --rule: #2c3f48;
-    --ink: #dfe8e6;
-    --ink-muted: #8fa3a9;
-    --low: #d98099;
-    --high: #5cbcab;
-    --low-wash: #d9809922;
-    --high-wash: #5cbcab22;
-    --focus: #8ab4ff;
+    --paper: #17171a;
+    --ink: #e8e7e1;
+    --ink-2: #8e8e84;
+    --line: #35353a;
+    --fill: #4e4e51;
+    --accent: #e0603f;
+    --focus: #7fa9ff;
     color-scheme: dark;
   }
 }
 
 :root[data-theme='dark'] {
-  --ground: #101a20;
-  --surface: #17242b;
-  --rule: #2c3f48;
-  --ink: #dfe8e6;
-  --ink-muted: #8fa3a9;
-  --low: #d98099;
-  --high: #5cbcab;
-  --low-wash: #d9809922;
-  --high-wash: #5cbcab22;
-  --focus: #8ab4ff;
+  --paper: #17171a;
+  --ink: #e8e7e1;
+  --ink-2: #8e8e84;
+  --line: #35353a;
+  --fill: #4e4e51;
+  --accent: #e0603f;
+  --focus: #7fa9ff;
   color-scheme: dark;
 }

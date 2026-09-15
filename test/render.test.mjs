@@ -13,6 +13,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 
 import { headline } from '../web/lib/findings.js';
@@ -50,20 +51,49 @@ test('the band draws every pool, with the invisible ones kept as a remainder', (
   const total = widths.reduce((a, b) => a + b, 0);
   assert.ok(Math.abs(total - 100) < 1e-6, `band widths sum to ${total}%, not 100%`);
 
-  // The dominant pool is the darkest ink, and it is labelled.
+  // Width is the magnitude. The dominant pool is the only segment in full ink.
   assert.equal(segments[0].dataset.rank, '1');
-  assert.ok(segments[0].byClass('band-label').length === 1, 'the dominant pool has no label');
   assert.match(band.getAttribute('aria-label'), /SPY/);
 });
 
+test('the accent points at the pool the page is about, and is used twice', () => {
+  // One referent. If it spreads to links or buttons it stops meaning anything.
+  const mark = get('band-pointer').byClass('band-pointer-mark');
+  assert.equal(mark.length, 1, 'the hero has no pointer at its subject');
+  assert.match(mark[0].textContent, /SPY/);
+  assert.match(mark[0].textContent, /75\.83%/);
+  assert.match(mark[0].textContent, /▲/);
+
+  const rows = get('depth-body').byTag('tr');
+  assert.ok(rows[0].className.includes('subject'), 'the subject row is not marked');
+  assert.equal(rows[0].byClass('subject-mark').length, 1);
+  const otherMarks = rows.slice(1).flatMap((r) => r.byClass('subject-mark'));
+  assert.equal(otherMarks.length, 0, 'the accent marks more than one pool');
+});
+
 test('the headline claims a fraction the data actually supports', () => {
-  // It used to be hardcoded in the markup. On a page whose argument is that the numbers
-  // are checkable, the headline has to be checkable too.
   const text = get('finding').textContent;
-  assert.equal(text, 'One pool holds three quarters of it.');
+  assert.equal(
+    text,
+    'Of the 66 tokenized-stock pools on Robinhood Chain, one holds three quarters of everything you could actually trade.',
+  );
   const share = depthPools[0].share_of_chain_executable_pct;
   assert.ok(share >= 72.5 && share < 80,
     `the headline says three quarters but the leader holds ${share.toFixed(1)}%`);
+  assert.equal(depthPools.length, 66, 'the headline states a pool count the data must match');
+});
+
+test('the headline is not written into the markup', () => {
+  // This is the reversion the test exists to catch: someone types the sentence into
+  // index.html, deletes the derived assignment, and the page goes on claiming three
+  // quarters long after the tape says otherwise.
+  const markup = readFileSync(new URL('../web/index.html', import.meta.url), 'utf8');
+  for (const fragment of ['three quarters', 'two thirds', 'tokenized-stock pools']) {
+    assert.ok(!markup.includes(fragment),
+      `index.html hardcodes "${fragment}"; the headline must come from the data`);
+  }
+  assert.match(markup, /id="finding"><\/h2>/,
+    'the headline element should ship empty and be filled from the data');
 });
 
 test('the hero states the sub-pixel finding, not a generic summary', () => {
@@ -72,7 +102,7 @@ test('the hero states the sub-pixel finding, not a generic summary', () => {
     'the sub-pixel sentence is missing; the hero is now a generic stacked bar');
   assert.match(note, /\d+ of \d+/);
   assert.match(note, /the smallest holds \$0\.02/);
-  assert.match(note, /chain-wide/);
+  assert.match(note, /across all 66 pools/);
 });
 
 test('the table renders every pool with both depth bases', () => {
@@ -108,23 +138,28 @@ test('the log-scaled depth ruler draws its axis instead of hiding the transform'
   assert.equal(axis.length, 1, 'the log ruler has no drawn axis');
   assert.match(axis[0].textContent, /\$100/);
   assert.match(axis[0].textContent, /\$1M/);
-  assert.match(get('depth-note').textContent, /log-scaled/);
+  assert.match(get('depth-note').textContent, /log scale/i,
+    'the log transform is no longer disclosed in words');
 });
 
 test('the headline follows the data rather than the markup', () => {
   // Every band of the scale says something a reader can check against the leader's share.
   const cases = [
-    [76, 'One pool holds three quarters of it.'],
-    [61, 'One pool holds two thirds of it.'],
-    [47, 'One pool holds half of it.'],
-    [33, 'One pool holds a third of it.'],
-    [12, 'The deepest pool holds 12.0% of it.'],
+    [76, 'one holds three quarters of'],
+    [61, 'one holds two thirds of'],
+    [47, 'one holds half of'],
+    [33, 'one holds a third of'],
+    [12, 'the deepest holds 12.0% of'],
   ];
   for (const [share, expected] of cases) {
-    const pools = [{ pool_id: '0x1', ticker: 'X', depth_executable: 1,
-      share_of_chain_executable_pct: /** @type {number} */ (share),
-      pct_of_median_executable: 100 }];
-    assert.equal(headline(pools).text, expected);
+    const pools = Array.from({ length: 40 }, (_, i) => ({
+      pool_id: `0x${i}`, ticker: 'X', depth_executable: 1,
+      share_of_chain_executable_pct: /** @type {number} */ (i === 0 ? share : 0),
+      pct_of_median_executable: 100,
+    }));
+    const { text } = headline(pools);
+    assert.ok(text.includes(String(expected)), `share ${share} produced: ${text}`);
+    assert.ok(text.startsWith('Of the 40 tokenized-stock pools'), text);
   }
 });
 
@@ -143,12 +178,25 @@ test('the calculator renders a distribution, not a point estimate', async () => 
   const hist = body.byClass('hist');
   assert.equal(hist.length, 1, 'no distribution rendered');
   assert.ok(hist[0].byClass('hist-col').length > 5, 'the histogram has almost no bars');
-  assert.match(hist[0].getAttribute('aria-label'), /Distribution of net return/);
+  // The alternative text must describe a spread too, not read out one number.
+  const described = hist[0].getAttribute('aria-label');
+  assert.match(described, /Spread of results/);
+  assert.match(described, /worst one in twenty/i);
+  assert.match(described, /best one in twenty/i);
 
+  // The spread is the answer. A middle figure on its own is the point estimate this
+  // calculator exists to replace, so the readout must carry both tails and the count.
   const quantiles = body.byClass('quantiles')[0].textContent;
-  for (const label of ['5th percentile', 'median', '95th percentile', 'beat holding']) {
+  for (const label of ['worst 1 in 20', 'middle', 'best 1 in 20', 'beat holding']) {
     assert.ok(quantiles.includes(label), `the readout is missing ${label}`);
   }
+  // Break-even is stated on the axis rather than carried by colour. Where zero falls
+  // inside the range it is drawn as a line; where it does not, the axis says so rather
+  // than labelling a marker that is not there.
+  const axis = body.byClass('hist-axis')[0];
+  assert.equal(axis.elements().length, 3, 'the axis lost a label');
+  assert.match(axis.elements()[1].textContent, /break even|beat holding/,
+    'the reader is no longer told where holding sits on this axis');
   // The fee estimate's error bound is surfaced rather than implying exactness.
-  assert.match(calc.get('result-note').textContent, /relative error/);
+  assert.match(calc.get('result-note').textContent, /error/);
 });

@@ -49,7 +49,6 @@ function renderProvenance(target) {
     ['measured', stamp(anchors.executable_depth_anchor.ts)],
     ['volume to', stamp(anchors.swap_tape_end.ts)],
     ['pools', String(prov.universe.pools_valued)],
-    ['basis', 'executable, tick-map walk'],
   ];
   target.replaceChildren();
   for (const [key, value] of items) {
@@ -78,13 +77,7 @@ function renderBand() {
     const s = node('div', 'band-seg');
     s.style.width = `${seg.share}%`;
     s.dataset.rank = String(seg.rank);
-    if (seg.labelled) {
-      const label = node('div', 'band-label');
-      label.append(node('span', 'band-share', pct(seg.share, 2)));
-      label.append(node('span', '', `${seg.pool.ticker} ${shortAddress(seg.pool.pool_id)}`));
-      s.append(label);
-    }
-    s.title = `${seg.pool.ticker} ${shortAddress(seg.pool.pool_id)} — ${money(seg.pool.depth_executable)}, ${pct(seg.share, 2)} of chain-wide depth`;
+    s.title = `${seg.pool.ticker} ${shortAddress(seg.pool.pool_id)} — ${money(seg.pool.depth_executable)}, ${pct(seg.share, 2)} of the total`;
     band.append(s);
   });
   if (remainder) {
@@ -102,20 +95,32 @@ function renderBand() {
 
   const scale = el('band-scale');
   scale.replaceChildren();
-  for (let p = 0; p <= 100; p += 20) {
-    const tick = node('span', 'band-tick', `${p}%`);
+  for (const p of [0, 25, 50, 75, 100]) {
+    const tick = node('span', `band-tick${p === 100 ? ' band-tick--last' : ''}`, `${p}%`);
     tick.style.left = `${p}%`;
     scale.append(tick);
   }
 
-  el('finding').textContent = headline(pools).text;
+  // One of the accent's two uses: a pointer at the pool the page is about.
+  const subject = segments[0];
+  const pointer = el('band-pointer');
+  pointer.replaceChildren();
+  if (subject) {
+    const mark = node('div', 'band-pointer-mark');
+    mark.style.left = `${Math.min(subject.share / 2, 92)}%`;
+    mark.append(node('span', 'band-pointer-arrow', '▲'));
+    mark.append(node('span', '',
+      `${subject.pool.ticker} ${shortAddress(subject.pool.pool_id)}  ${pct(subject.share, 2)}`));
+    pointer.append(mark);
+  }
 
+  el('finding').textContent = headline(pools).text;
   const leader = pools[0];
   const note = el('band-note');
   note.replaceChildren();
-  const lead = node('b', undefined,
-    `${money(leader.depth_executable)} of ${money(depth.totals.executable_usd)} chain-wide. `);
-  note.append(lead, document.createTextNode(subPixelNote(pools, width, money)));
+  note.append(document.createTextNode(
+    `${money(leader.depth_executable)} of ${money(depth.totals.executable_usd)} across all ${pools.length} pools. ` +
+    subPixelNote(pools, width, money)));
 }
 
 /* ------------------------------------------------------------------ table */
@@ -133,7 +138,9 @@ function renderTable() {
 
     row.append(node('td', 'rank', String(i + 1)));
 
+    if (i === 0) row.className = 'subject';
     const who = node('td');
+    if (i === 0) who.append(node('span', 'subject-mark', '■'));
     who.append(node('span', 'ticker', p.ticker), document.createTextNode(' '));
     who.append(node('span', 'addr', shortAddress(p.pool_id)));
     row.append(who);
@@ -142,7 +149,7 @@ function renderTable() {
     const frac = Math.max(0, (Math.log10(Math.max(p.depth_executable, min)) - logMin) / (logMax - logMin));
     const bar = node('span', 'ruler-bar');
     bar.style.width = `${Math.max(frac * 100, 0.6)}%`;
-    const amount = node('span', 'num num-strong', money(p.depth_executable));
+    const amount = node('span', 'num-strong', money(p.depth_executable));
     amount.style.display = 'block';
     cell.append(amount, bar);
     row.append(cell);
@@ -156,6 +163,7 @@ function renderTable() {
       med.textContent = '—';
     } else {
       const below = p.pct_of_median_executable < 100;
+      // Sign is the arrow and only the arrow — no hue. The accent has one referent.
       med.className = `num ${below ? 'sign-low' : 'sign-high'}`;
       med.append(node('span', 'sign-mark', below ? '▼' : '▲'));
       med.append(document.createTextNode(pct(p.pct_of_median_executable, 0)));
@@ -166,12 +174,15 @@ function renderTable() {
     body.append(row);
   });
 
-  const { below, of } = belowMedian(pools, 10);
+  const { below } = belowMedian(pools, 10);
   el('depth-note').textContent =
-    `${below} of the top ${of} sit below their own 7-day median. Depth bars are log-scaled.`;
+    `${below} of the 10 deepest pools are holding less than their typical level over the ` +
+    'past week. Depth is drawn on a log scale.';
   el('depth-caption').textContent =
-    `“vs flat” is executable depth as a percentage of lp-terminal's flat-L figure for the same pool. ` +
-    `Under 100% the flat figure overstates depth; over 100% it understates it.`;
+    'Depth is measured by walking the chain\u2019s own liquidity map. The older, simpler ' +
+    'method assumed the money was spread evenly across the band; “vs flat” is this ' +
+    'measurement as a percentage of that one. Below 100% the older method overstated ' +
+    'depth, above 100% it understated it.';
 
   // The log axis is drawn rather than left implicit.
   const head = el('ruler-head');

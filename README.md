@@ -89,45 +89,49 @@ the lookup differs.
 
 Two pages, served straight from `web/` with no build step.
 
-**Colour obeys two rules and has no third job.** Hue carries sign — oxblood below a 7-day
-median, teal above it. Ink density carries magnitude: the hero band, the in-row depth
-rulers and the table rules are one ink at different strengths, so any two marks are
-comparable without a legend. Red and green are the default in market interfaces and fail
-for red-green colour blindness; these two hold the polarity, separate under protanopia and
-deuteranopia, and sit in the ink's tonal register. Signed figures also carry an arrow, so
-colour is never the only channel — pinned by a test.
+**One material: ink on paper.** Six values, one accent, and the accent has exactly one
+referent — the pool the page is about. It appears twice: a pointer under the hero band and
+a marker on that pool's row. Nowhere else. Colour does not carry sign; the ▲▼ arrows do,
+alone. An earlier version had oxblood for below-median and teal for above, which was a
+second channel repeating what the arrows already said, and spending the page's only accent
+on forty table cells is not rare use.
 
-**Type is one family doing structural work.** Archivo, variable in weight and width, with
-the width axis used as an instrument: 64% for the wordmark, 80–86% for dense numerals,
-100% for prose. Widths are set with `font-stretch`, not `font-variation-settings`, because
-the latter is not additive — a rule setting one axis silently resets the other. Source
-Serif 4 appears in exactly one role, the method notes and restatements, because those are
-the part a reader must weigh rather than scan. Monospace is reserved for hex pool
-addresses, where it is semantic.
+**One family, four sizes, two weights.** Archivo at 11 / 13 / 16 / 36px, weights 400 and
+600, tabular lining figures throughout. An earlier version used the width axis at five
+settings and called it an instrument; it was five typefaces in a trench coat.
 
-**The hero is a measurement, not an infographic.** A full-bleed band divided by true share
-with the scale drawn beneath it, and under that the sentence that makes it a finding: *47
-of 66 pools are narrower than one pixel at this width; the smallest holds $0.02.* That
-count is computed from the reader's own band width and recomputed on resize, so it is true
-of the screen in front of them. Without it the chart is a generic stacked bar, which is
-why it is a tested function rather than markup.
+**Space is the tool.** Sections are 96–128px apart, table rows 16px. Zebra striping, sticky
+headers, hover fills, the entrance animation and the coloured strip rule were all removed —
+space and alignment do the same work more quietly. One left edge runs from the wordmark to
+the footer; every numeric column is right-aligned on tabular figures.
 
-**Provenance is chrome.** Both anchors, the pool count and the gas-subsidy caveat sit in a
-strip under the masthead on every page — not in a footer. The subsidy note reads the clock:
-after 29 September 2026 it says the subsidy *ended* rather than describing a past date in
-the future tense.
+**The band is an instrument scale, not a chart.** Width is the magnitude, so nothing else
+encodes it: one block in full ink for the dominant pool, one grey for everything else, a
+drawn scale beneath, and a small accent pointer. Under it, the sentence that makes it a
+finding: *47 of 66 pools are narrower than one pixel at this width; the smallest holds
+$0.02.* That count comes from the reader's own band width and is recomputed on resize.
 
-**The calculator answers with a distribution.** Histogram first, percentiles under it, the
-median window's fee and IL split under that. A requested range is snapped to the nearest
-width the pool's tick spacing can express and the interface says so; nothing is
-interpolated between widths. The fee estimate's certified error bound is shown rather than
-implying exactness.
+**Plain language, once.** Depth is defined in normal words — "how much you could buy or
+sell in one trade before moving the price by 1%" — and then used plainly. No term is
+explained twice, and "executable ±1% depth", "tick-map walk" and "basis" are gone from
+everything a first-time reader meets.
+
+### What the tests hold in place
 
 There is no browser in this environment, so `test/render.test.mjs` runs both pages against
-a small DOM stub and asserts what they built from the real data. It is not a visual check
-— nothing here lays out or paints — but it holds the decisions above in place. Reverting
-any one of them (subsidy out of the strip, headline back into the markup, arrows dropped,
-log axis hidden, distribution replaced by a median) fails the suite.
+a small DOM stub and asserts what they built from the real data. It proves content, not
+appearance — nothing here lays out or paints. Each of these was checked by making the
+reversion and watching the suite fail:
+
+| Reversion | Caught by |
+|---|---|
+| headline typed into `index.html` | `the headline is not written into the markup` |
+| sub-pixel line made generic | `the hero states the sub-pixel finding` |
+| subsidy caveat out of the strip | `the provenance strip carries both anchors` |
+| sign arrows removed | `signed figures carry an arrow` |
+| log axis undrawn, or transform undisclosed | `the log-scaled depth ruler draws its axis` |
+| accent spread beyond one pool | `the accent points at the pool the page is about` |
+| distribution replaced by a median | `the calculator renders a distribution` |
 
 ## Executable depth
 

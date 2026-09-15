@@ -28,16 +28,17 @@ export function compact(n) {
   return money(n);
 }
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
 /** @param {number} ts seconds */
 export function stamp(ts) {
+  // Built by hand rather than through toLocaleDateString: en-GB renders September as
+  // "Sept", which is four characters in a column of three and reads as a typo.
   const d = new Date(ts * 1000);
-  const date = d.toLocaleDateString('en-GB', {
-    day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC',
-  });
-  const time = d.toLocaleTimeString('en-GB', {
-    hour: '2-digit', minute: '2-digit', timeZone: 'UTC',
-  });
-  return `${date} ${time} UTC`;
+  const pad = (/** @type {number} */ n) => String(n).padStart(2, '0');
+  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}, `
+    + `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())} UTC`;
 }
 
 /** @param {string} poolId */
