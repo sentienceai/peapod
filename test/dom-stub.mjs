@@ -251,6 +251,32 @@ export async function install(htmlUrl) {
   });
 
   /**
+   * A clipboard that records what was written and can be made to fail.
+   *
+   * `navigator.clipboard` is undefined on an insecure origin and its writeText rejects
+   * when permission is refused. Both are ordinary states for a real visitor, so the stub
+   * can produce them on demand — otherwise the only path ever tested is the happy one and
+   * a silent failure ships.
+   */
+  const clipboard = {
+    /** @type {string[]} */
+    writes: [],
+    /** @type {'ok' | 'reject' | 'absent'} */
+    mode: 'ok',
+    /** @param {string} text */
+    async writeText(text) {
+      if (clipboard.mode === 'reject') throw new Error('NotAllowedError');
+      clipboard.writes.push(text);
+    },
+  };
+  // Node 22 defines globalThis.navigator itself, as a getter-only property, so it has to
+  // be redefined rather than assigned.
+  Object.defineProperty(globalThis, 'navigator', {
+    configurable: true,
+    value: { get clipboard() { return clipboard.mode === 'absent' ? undefined : clipboard; } },
+  });
+
+  /**
    * The element with this id, or a failure naming it. Tests assert on content, so a
    * missing id should say which one rather than surface as "possibly undefined".
    * @param {string} id
@@ -262,5 +288,5 @@ export async function install(htmlUrl) {
     return node;
   };
 
-  return { byId, get, document };
+  return { byId, get, document, clipboard };
 }

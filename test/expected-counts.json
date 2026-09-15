@@ -3,7 +3,7 @@
   "test/counts.test.mjs": 3,
   "test/findings.test.mjs": 8,
   "test/kernel.test.mjs": 6,
-  "test/leaderboard.test.mjs": 28,
+  "test/leaderboard.test.mjs": 34,
   "test/liquidity-math.test.mjs": 7,
   "test/render.test.mjs": 13,
   "test/tick-math-sweep.test.mjs": 6,

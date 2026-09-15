@@ -14,6 +14,7 @@
 
 import { areaChart } from './chart.js';
 import { tokenCell } from './token.js';
+import { copyButton } from './copy.js';
 
 const NS_TEXT = (/** @type {string} */ t) => document.createTextNode(t);
 /** @param {string} id */
@@ -86,7 +87,9 @@ function renderRail(d) {
   const id = node('div', 'rail-id');
   const av = node('span', 'avatar', '◇');
   const names = node('div');
-  names.append(node('b', undefined, shortAddr(d.address)));
+  const line = node('div', 'rail-line');
+  line.append(node('b', undefined, shortAddr(d.address)), copyButton(d.address));
+  names.append(line);
   names.append(node('small', undefined, d.address));
   id.append(av, names);
   rail.append(id);
@@ -381,7 +384,9 @@ function renderNoRoundTrips(d) {
   rail.replaceChildren();
   const id = node('div', 'rail-id');
   const names = node('div');
-  names.append(node('b', undefined, shortAddr(d.address)));
+  const line = node('div', 'rail-line');
+  line.append(node('b', undefined, shortAddr(d.address)), copyButton(d.address));
+  names.append(line);
   names.append(node('small', undefined, d.address));
   id.append(node('span', 'avatar', '◇'), names);
   rail.append(id);

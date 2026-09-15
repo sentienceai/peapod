@@ -14,7 +14,7 @@ import { readFile } from 'node:fs/promises';
 
 import { install } from './dom-stub.mjs';
 
-const { get } = await install(new URL('../web/index.html', import.meta.url));
+const { get, clipboard } = await install(new URL('../web/index.html', import.meta.url));
 await import('../web/index.js');
 
 const index = JSON.parse(
@@ -431,4 +431,121 @@ test('every ticker the shipped data actually uses resolves to a logo file', asyn
   assert.ok(used.size > 20, 'the sample found too few tickers to say anything');
   const missing = [...used].filter((t) => !logos[t]);
   assert.deepEqual(missing, [], `tickers in use with no logo: ${missing.join(', ')}`);
+});
+
+/**
+ * A click as the row beneath it would see one: cancellable, and it records interference.
+ * @returns {[any, {stopped: boolean, prevented: boolean}]}
+ */
+function clickEvent() {
+  const seen = { stopped: false, prevented: false };
+  return [{
+    key: 'Enter',
+    stopPropagation() { seen.stopped = true; },
+    preventDefault() { seen.prevented = true; },
+  }, seen];
+}
+
+/** @param {any} root */
+const copiesIn = (root) => root.descendants()
+  .filter((/** @type {any} */ n) => n.tag === 'button'
+    && String(n.className).split(' ').includes('copy'));
+
+test('every address on the leaderboard can be taken, at full length', () => {
+  const rows = get('rows').byTag('tr');
+  assert.ok(rows.length > 0);
+  for (const tr of rows) {
+    const buttons = copiesIn(tr);
+    assert.equal(buttons.length, 1, 'a row has no copy button, or more than one');
+    const label = buttons[0].attributes['aria-label'];
+    // The visible text is shortened. What gets copied must not be.
+    assert.match(label, /^Copy address 0x[0-9a-f]{40}$/,
+      `copy button does not name a full address: ${label}`);
+    assert.ok(!label.includes('…'), 'the copy button offers the shortened address');
+  }
+  // Exactly the cards: 'pcard-top' and 'pcard-addr' start with the same letters.
+  for (const card of get('podium').descendants()
+    .filter((/** @type {any} */ n) => String(n.className).split(' ').includes('pcard'))) {
+    assert.equal(copiesIn(card).length, 1, 'a podium card has no copy button');
+  }
+});
+
+test('copying puts the whole address on the clipboard and says it did', async () => {
+  clipboard.mode = 'ok';
+  clipboard.writes.length = 0;
+  const row = get('rows').byTag('tr')[0];
+  const button = copiesIn(row)[0];
+  const full = button.attributes['aria-label'].replace('Copy address ', '');
+
+  const [e, seen] = clickEvent();
+  await button.onclick?.(e);
+
+  assert.deepEqual(clipboard.writes, [full]);
+  assert.ok(button.textContent.includes('Copied'), 'no confirmation after a copy');
+  assert.equal(button.className, 'copy is-ok');
+  // Announced, not only drawn: a tick that is just a colour is not a confirmation.
+  const live = button.descendants().find((/** @type {any} */ n) => n.className === 'copy-live');
+  assert.equal(live.attributes.role, 'status');
+  assert.ok(seen.stopped, 'the click reached the row, which would also open the modal');
+});
+
+test('a refused clipboard says so rather than pretending it worked', async () => {
+  clipboard.mode = 'reject';
+  clipboard.writes.length = 0;
+  const button = copiesIn(get('rows').byTag('tr')[1])[0];
+
+  const [e] = clickEvent();
+  await button.onclick?.(e);
+
+  assert.deepEqual(clipboard.writes, [], 'a rejected write still recorded something');
+  assert.ok(button.textContent.includes('Copy failed'),
+    'a refused copy left the person believing they have the address');
+  assert.equal(button.className, 'copy is-fail');
+  clipboard.mode = 'ok';
+});
+
+test('an absent clipboard is a failure state, not a crash', async () => {
+  clipboard.mode = 'absent';
+  const button = copiesIn(get('rows').byTag('tr')[2])[0];
+  const [e] = clickEvent();
+  await button.onclick?.(e);
+  assert.ok(button.textContent.includes('Copy failed'),
+    'no clipboard API on an insecure origin, and the button claimed success');
+  clipboard.mode = 'ok';
+});
+
+test('the confirmation is brief, and Enter on it does not open the modal', async () => {
+  clipboard.mode = 'ok';
+  const button = copiesIn(get('rows').byTag('tr')[3])[0];
+  const [e] = clickEvent();
+  await button.onclick?.(e);
+  assert.equal(button.className, 'copy is-ok');
+
+  await new Promise((r) => { setTimeout(r, 1400); });
+  assert.equal(button.className, 'copy', 'the confirmation never reverted');
+  assert.ok(!button.textContent.includes('Copied'));
+
+  const [k, keySeen] = clickEvent();
+  button.onkeydown?.(k);
+  assert.ok(keySeen.stopped, 'Enter on copy also reaches the row and opens the modal');
+});
+
+test('the detail rail carries the copy glyph next to the address', async () => {
+  const { openDetail } = await import('../web/lib/detail.js');
+  const top = JSON.parse(
+    await readFile(new URL('../web/data/leaderboard/rwa-usdg-all.json', import.meta.url), 'utf8'),
+  ).rows[0];
+  await openDetail(top.address);
+
+  const buttons = copiesIn(get('rail'));
+  assert.equal(buttons.length, 1, 'the rail has no copy button, or more than one');
+  assert.equal(buttons[0].attributes['aria-label'], `Copy address ${top.address}`);
+  // The rail also prints the address in full, so a refused clipboard still leaves
+  // something selectable rather than only a shortened form.
+  assert.ok(get('rail').textContent.includes(top.address));
+
+  clipboard.writes.length = 0;
+  const [e] = clickEvent();
+  await buttons[0].onclick?.(e);
+  assert.deepEqual(clipboard.writes, [top.address]);
 });

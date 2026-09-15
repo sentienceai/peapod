@@ -318,3 +318,30 @@ table.mini td:first-child { text-align: left; }
 .chip.token { padding-left: 3px; }
 .chip .token-icon { width: 14px; height: 14px; }
 .chip .token-tile { font-size: 7px; }
+
+/* Copy. Quiet until wanted, but never unreachable: hover hides it only where hover
+   exists, and focus always brings it back for a keyboard. */
+.copy { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; padding: 0 3px;
+  border: 0; background: none; color: var(--text-muted); font: inherit; font-size: var(--t-micro);
+  line-height: 1; cursor: pointer; border-radius: 3px; vertical-align: baseline; }
+.copy:hover { color: var(--text); background: var(--raised); }
+.copy:focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; color: var(--text); }
+.copy.is-ok { color: var(--up); }
+.copy.is-fail { color: var(--down); }
+.copy-live { font-size: var(--t-micro); }
+.copy-glyph { font-size: 11px; }
+
+/* In the table the glyph appears on the row you are pointing at. The button keeps its
+   space whatever its opacity, so a row does not reflow under the pointer. */
+#rows .copy, .pcard .copy { opacity: 0; transition: opacity 90ms linear; }
+#rows tr:hover .copy, #rows tr:focus-within .copy, #rows .copy:focus-visible,
+.pcard:hover .copy, .pcard:focus-within .copy, .pcard .copy:focus-visible { opacity: 1; }
+@media (hover: none) {
+  #rows .copy, .pcard .copy { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .copy { transition: none; }
+}
+
+.rail-line { display: flex; align-items: center; gap: 2px; }
+.rail-line .copy { opacity: 1; }

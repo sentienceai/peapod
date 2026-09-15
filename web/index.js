@@ -12,6 +12,7 @@
 import { sparkline } from './lib/spark.js';
 import { closeDetail, openDetail } from './lib/detail.js';
 import { setTokenLogos, tokenCell } from './lib/token.js';
+import { copyButton } from './lib/copy.js';
 
 /** @param {string} id */
 const el = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
@@ -194,7 +195,8 @@ function podiumCard(r, place) {
   };
   const top = node('div', 'pcard-top');
   const who = node('div', 'pcard-addr');
-  who.append(node('span', 'avatar', '◇'), document.createTextNode(shortAddr(r.address)));
+  who.append(node('span', 'avatar', '◇'), document.createTextNode(shortAddr(r.address)),
+    copyButton(r.address));
   top.append(who, node('span', 'rankbadge', `#${place}`));
   card.append(top);
   card.append(sparkline(r.spark, { width: 380, height: 64 }));
@@ -234,7 +236,8 @@ function render() {
     tr.append(node('td', 'rank', String(i + 4)));
     const who = node('td');
     const wrap = node('div', 'who');
-    wrap.append(node('span', 'avatar', '◇'), node('span', 'addr', shortAddr(r.address)));
+    wrap.append(node('span', 'avatar', '◇'), node('span', 'addr', shortAddr(r.address)),
+      copyButton(r.address));
     who.append(wrap);
     tr.append(who);
 
