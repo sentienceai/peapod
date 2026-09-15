@@ -1,0 +1,5 @@
+# Foundry build artifacts from generate.sh
+out/
+cache/
+# Emitted fixtures are moved into test/fixtures/ by generate.sh; strays are not tracked.
+*.json
