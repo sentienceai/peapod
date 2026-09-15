@@ -56,7 +56,10 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    const file = resolve(root, '.' + (path === '/' ? '/index.html' : path));
+    // A path with no extension is a page: /traders serves traders.html. Without this the
+    // nav would have to carry .html into every link and every browser history entry.
+    const asPage = path === '/' ? '/index.html' : (extname(path) ? path : `${path}.html`);
+    const file = resolve(root, '.' + asPage);
     // Never serve outside web/, whatever the request says.
     if (file !== root.replace(/\/$/, '') && !file.startsWith(root.replace(/\/$/, '') + sep)) {
       res.writeHead(403);

@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>peapod — traders, and whether the record means anything</title>
+<meta name="description" content="Every trader on Robinhood Chain with a closed round-trip, with their win rate tested against chance.">
+<link rel="icon" href="/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="/styles/tokens.css">
+<link rel="stylesheet" href="/styles/app.css">
+<script type="module" src="/traders.js"></script>
+</head>
+<body>
+<a class="skip" href="#grid">Skip to the traders</a>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="/"><i></i>peapod</a>
+    <nav class="topnav" aria-label="Main">
+      <a href="/">Leaderboard</a>
+      <a href="/traders" aria-current="page">Traders</a>
+    </nav>
+    <span class="spacer"></span>
+    <label class="search">
+      <span aria-hidden="true">&#8981;</span>
+      <input id="search" type="search" placeholder="Search address&#8230;" aria-label="Search address">
+    </label>
+    <div class="wallet" id="wallet"></div>
+  </div>
+</header>
+
+<div class="shell">
+  <section class="hero">
+    <div class="hero-copy">
+      <h1>Every trader on the chain, <em>and whether it was luck.</em></h1>
+      <p>Realized profit on round-trips closed on-chain, with each win rate tested
+        against what a coin-flipper would produce over the same number of closes.
+        There is no execution here. This is the record, not a signal.</p>
+    </div>
+    <div class="hero-deck" id="hero-deck" aria-hidden="true"></div>
+  </section>
+
+  <div class="controls">
+    <div class="tabset" id="presets" role="tablist" aria-label="Preset"></div>
+    <span class="spacer"></span>
+    <label class="pill pill--sort">Sort
+      <select id="sort">
+        <option value="realized">Realized</option>
+        <option value="evidence">Strength of evidence</option>
+        <option value="win_rate">Win rate</option>
+        <option value="round_trips">Round-trips</option>
+        <option value="matched_volume">Matched volume</option>
+        <option value="last_ts">Most recent</option>
+      </select>
+    </label>
+    <div class="toggle" id="unit" role="group" aria-label="Show as dollars or percent">
+      <button type="button" data-unit="abs" aria-pressed="true">$</button>
+      <button type="button" data-unit="pct" aria-pressed="false">%</button>
+    </div>
+    <div class="toggle" id="view" role="group" aria-label="Grid or table">
+      <button type="button" data-view="grid" aria-pressed="true" aria-label="Grid">&#9638;</button>
+      <button type="button" data-view="list" aria-pressed="false" aria-label="Table">&#9776;</button>
+    </div>
+  </div>
+
+  <div class="pills">
+    <label class="pill">Realized
+      <select id="f-realized">
+        <option value="-1e12">any</option><option value="0">above zero</option>
+        <option value="100">$100+</option><option value="500">$500+</option>
+      </select>
+    </label>
+    <label class="pill">Round-trips
+      <select id="f-trips">
+        <option value="1">any</option><option value="5">5+</option>
+        <option value="10">10+</option><option value="25">25+</option>
+      </select>
+    </label>
+    <label class="pill">Win rate
+      <select id="f-win">
+        <option value="0">any</option><option value="50">50%+</option>
+        <option value="60">60%+</option><option value="75">75%+</option>
+      </select>
+    </label>
+    <label class="pill">Evidence
+      <select id="f-evidence">
+        <option value="any">any</option>
+        <option value="decisive">outside chance</option>
+        <option value="above">beyond chance</option>
+      </select>
+    </label>
+  </div>
+
+  <p class="caveat" id="caveat"></p>
+
+  <section class="cardgrid" id="grid" aria-label="Traders"></section>
+  <div class="table-wrap" id="listwrap" hidden>
+    <table class="board">
+      <thead><tr id="head"></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+  <p class="empty" id="empty" hidden>No address matches these filters.</p>
+  <div class="more"><button type="button" id="more">Show more</button></div>
+
+  <div class="footnote" id="footnote"></div>
+</div>
+
+<div class="modal-backdrop" id="modal" hidden role="dialog" aria-modal="true" aria-labelledby="modal-addr">
+  <div class="modal">
+    <div class="modal-head">
+      <span class="crumb">Leaderboard /</span>
+      <span class="who-addr" id="modal-addr"></span>
+      <button class="modal-close" id="modal-close" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <aside class="rail" id="rail"></aside>
+      <div class="pane">
+        <div class="metric-grid" id="metrics"></div>
+        <div class="chartcard">
+          <div class="chartcard-head">
+            <h5>Cumulative realized</h5>
+            <strong id="chart-total"></strong>
+            <span class="spacer"></span>
+            <div class="tabset tabset--segmented" id="chart-range" role="tablist" aria-label="Chart range"></div>
+          </div>
+          <div class="chart-stage" id="chart-stage">
+            <div class="tip" id="tip" hidden></div>
+          </div>
+        </div>
+        <div class="subtabs" id="subtabs" role="tablist"></div>
+        <div class="scroller" id="subtable"></div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -345,3 +345,115 @@ table.mini td:first-child { text-align: left; }
 
 .rail-line { display: flex; align-items: center; gap: 2px; }
 .rail-line .copy { opacity: 1; }
+
+/* ─── Traders page ─────────────────────────────────────────────────────────────
+   The reference's copytrading layout: hero over preset tabs over a filter row over
+   a card grid. What differs is the bar across the bottom of each card, which holds
+   evidence rather than a score and a purchase. */
+
+.hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 46%);
+  gap: var(--s-6); align-items: center; padding: var(--s-7) 0 var(--s-6); }
+.hero h1 { font-size: clamp(26px, 3.2vw, 40px); font-weight: var(--w-semi);
+  line-height: 1.12; letter-spacing: -0.02em; color: var(--text); margin: 0 0 var(--s-3); }
+.hero h1 em { font-style: normal; color: var(--accent); }
+.hero p { margin: 0; max-width: 54ch; color: var(--text-muted);
+  font-size: var(--t-body); line-height: 1.55; }
+
+/* The deck is decoration, and it is the only decoration on the page: three real cards
+   from the ranking, tilted and overlapped the way the reference stacks them. */
+.hero-deck { position: relative; height: 200px; }
+.deckcard { position: absolute; width: 58%; padding: var(--s-3); border-radius: 10px;
+  background: var(--surface); border: 1px solid var(--line);
+  display: flex; flex-direction: column; gap: var(--s-1); }
+.deckcard:nth-child(1) { left: 0; top: 34px; transform: rotate(-4deg); opacity: 0.55; }
+.deckcard:nth-child(2) { left: 22%; top: 0; transform: rotate(0deg); z-index: 2; }
+.deckcard:nth-child(3) { left: 44%; top: 30px; transform: rotate(4deg); opacity: 0.55; }
+.deck-addr { font-size: var(--t-small); color: var(--text-muted); }
+.deck-fig { font-size: var(--t-lead); }
+.deckcard .spark { width: 100%; height: 48px; }
+@media (max-width: 900px) { .hero { grid-template-columns: 1fr; } .hero-deck { display: none; } }
+
+.pill--sort select { min-width: 140px; }
+
+.cardgrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--s-3); margin-top: var(--s-4); }
+@media (max-width: 1180px) { .cardgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .cardgrid { grid-template-columns: 1fr; } }
+
+.tcard { display: flex; flex-direction: column; background: var(--surface);
+  border: 1px solid var(--line); border-radius: 10px; overflow: hidden; cursor: pointer; }
+.tcard:hover { border-color: #2b2825; }
+.tcard:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+.tcard-head { display: flex; align-items: flex-start; gap: var(--s-2);
+  padding: var(--s-3); }
+.tcard-who { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: var(--s-1); }
+.tcard-addr { display: flex; align-items: center; }
+.tcard-addr b { font-weight: var(--w-medium); font-size: var(--t-body); color: var(--text); }
+.tcard-toks { display: flex; gap: var(--s-1); flex-wrap: wrap; }
+.tcard-ago { font-size: var(--t-micro); color: var(--text-muted); white-space: nowrap; }
+
+.tcard-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 52%);
+  gap: var(--s-2); padding: 0 var(--s-3) var(--s-3); align-items: end; }
+.tcard-figs { display: flex; flex-direction: column; }
+.tcard-figs strong { font-size: var(--t-lead); font-weight: var(--w-semi); line-height: 1.2; }
+.tcard-second { color: var(--text-body); margin-top: var(--s-2); }
+.tcard-label { font-size: var(--t-micro); color: var(--text-muted); }
+.tcard-spark { min-width: 0; }
+.tcard-spark .spark { width: 100%; height: 88px; display: block; }
+
+/* The bottom bar. Tinted by the verdict, the way the reference tints by score, but the
+   tint is reporting a test result rather than a rating. */
+.tcard-bar { display: flex; align-items: center; gap: var(--s-3);
+  padding: var(--s-2) var(--s-3); border-top: 1px solid var(--line);
+  background: var(--raised); margin-top: auto; }
+.tcard-bar.v-above { background: var(--up-fill); }
+.tcard-bar.v-below { background: var(--down-fill); }
+.ev { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.ev-head { display: flex; align-items: baseline; gap: var(--s-1); }
+.ev-head b { font-size: var(--t-num); font-weight: var(--w-semi); color: var(--text); }
+.ev-of, .ev-n { font-size: var(--t-micro); color: var(--text-muted); }
+.ev-track { position: relative; height: 6px; border-radius: 3px;
+  background: rgba(255, 255, 255, 0.06); overflow: hidden; }
+/* Where a coin-flipper with this many closes lands. */
+.ev-band { position: absolute; top: 0; bottom: 0; background: rgba(255, 255, 255, 0.12); }
+.ev-mark { position: absolute; top: -2px; width: 2px; height: 10px; margin-left: -1px;
+  background: var(--text); border-radius: 1px; }
+.v-above .ev-mark { background: var(--up); }
+.v-below .ev-mark { background: var(--down); }
+.ev-foot { display: flex; align-items: baseline; gap: var(--s-2); }
+.ev-label { font-size: var(--t-micro); color: var(--text-body); }
+.v-above .ev-label { color: var(--up); }
+.v-below .ev-label { color: var(--down); }
+.v-text-above { color: var(--up); }
+.v-text-below { color: var(--down); }
+.v-text-within, .v-text-none { color: var(--text-muted); }
+
+.ev-cta { flex: none; padding: 6px 12px; border-radius: 6px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--surface); color: var(--text-body);
+  font: inherit; font-size: var(--t-small); }
+.ev-cta:hover { color: var(--text); border-color: #38342f; }
+.ev-cta:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+.more { display: flex; justify-content: center; padding: var(--s-5) 0; }
+.more button { padding: 8px 18px; border-radius: 6px; border: 1px solid var(--line);
+  background: var(--surface); color: var(--text-body); font: inherit; cursor: pointer; }
+.more button:hover { color: var(--text); }
+.more button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* Wallet */
+.wallet { display: flex; align-items: center; gap: var(--s-2); margin-left: var(--s-3); }
+.wallet-btn { padding: 6px 12px; border-radius: 6px; border: 1px solid var(--line);
+  background: var(--raised); color: var(--text-body); font: inherit;
+  font-size: var(--t-small); cursor: pointer; white-space: nowrap; }
+.wallet-btn:hover { color: var(--text); border-color: #38342f; }
+.wallet-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.wallet-btn[disabled] { opacity: 0.6; cursor: default; }
+.wallet-addr { font-size: var(--t-small); color: var(--text-body); }
+.wallet-note { font-size: var(--t-micro); color: var(--text-muted); }
+.wallet-note.is-fail { color: var(--down); }
+.wallet-menu { display: flex; gap: var(--s-1); }
+.wallet-pick { padding: 6px 10px; border-radius: 6px; border: 1px solid var(--line);
+  background: var(--raised); color: var(--text-body); font: inherit;
+  font-size: var(--t-small); cursor: pointer; }
+.wallet-pick:hover { color: var(--text); }

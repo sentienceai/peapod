@@ -229,7 +229,12 @@ def build(state, lo, hi, limit=ROW_LIMIT):
             "matched_volume": state["matched"][addr],
             "total_volume": state["total"][addr],
             "win_rate": state["wins"][addr] / trips * 100,
+            # The raw count too, not only the rate. The card's evidence bar compares this
+            # record against what a coin-flipper of the same size would produce, and that
+            # comparison needs n and k, not a percentage it would have to invert.
+            "wins": int(state["wins"][addr]),
             "round_trips": trips,
+            "last_ts": int(state["last"][addr]) if addr in state["last"] else None,
             "tokens": sorted(state["tokens"][addr])[:4],
             "token_count": len(state["tokens"][addr]),
             "out_of_scope_volume": state["unmatched"][addr],
@@ -238,10 +243,10 @@ def build(state, lo, hi, limit=ROW_LIMIT):
     shipped = rows[:limit]
     for i, r in enumerate(shipped, 1):
         r["rank"] = i
-        # Sparklines are only drawn on the podium, so only the podium carries the series.
-        # Shipping 24 points for every row tripled the file for pixels nothing renders.
-        if i <= 3:
-            r["spark"] = spark(state["series"][r["address"]], lo, hi)
+        # The podium gets a wide sparkline and the cards on the copy-trade page get one
+        # each, so every shipped row carries the series now. It is the file's largest
+        # single cost, so it stays coarse: 24 points is all either drawing resolves.
+        r["spark"] = spark(state["series"][r["address"]], lo, hi)
     return shipped, len(rows)
 
 
