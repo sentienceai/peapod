@@ -33,7 +33,8 @@ runtime dependencies, and any third-party browser library is vendored as a pinne
 ## Commands
 
 ```sh
-npm test      # node --test — the parity gate
+npm run dev   # serve web/ on :3000, no build, live reload
+npm test      # node --test — parity, kernel, findings, render
 npm run lint  # tsc --noEmit, JSDoc type check, emits nothing
 npm run check # both
 ```
@@ -83,6 +84,50 @@ The fee model is `fee_attribution.py` — per-swap tick splitting, grossed up fo
 the fee before the price moves, price-taker. `export/test_windows.py` asserts peapod's
 faster splitter is segment-for-segment identical to lp-terminal's on randomised maps; only
 the lookup differs.
+
+## The site
+
+Two pages, served straight from `web/` with no build step.
+
+**Colour obeys two rules and has no third job.** Hue carries sign — oxblood below a 7-day
+median, teal above it. Ink density carries magnitude: the hero band, the in-row depth
+rulers and the table rules are one ink at different strengths, so any two marks are
+comparable without a legend. Red and green are the default in market interfaces and fail
+for red-green colour blindness; these two hold the polarity, separate under protanopia and
+deuteranopia, and sit in the ink's tonal register. Signed figures also carry an arrow, so
+colour is never the only channel — pinned by a test.
+
+**Type is one family doing structural work.** Archivo, variable in weight and width, with
+the width axis used as an instrument: 64% for the wordmark, 80–86% for dense numerals,
+100% for prose. Widths are set with `font-stretch`, not `font-variation-settings`, because
+the latter is not additive — a rule setting one axis silently resets the other. Source
+Serif 4 appears in exactly one role, the method notes and restatements, because those are
+the part a reader must weigh rather than scan. Monospace is reserved for hex pool
+addresses, where it is semantic.
+
+**The hero is a measurement, not an infographic.** A full-bleed band divided by true share
+with the scale drawn beneath it, and under that the sentence that makes it a finding: *47
+of 66 pools are narrower than one pixel at this width; the smallest holds $0.02.* That
+count is computed from the reader's own band width and recomputed on resize, so it is true
+of the screen in front of them. Without it the chart is a generic stacked bar, which is
+why it is a tested function rather than markup.
+
+**Provenance is chrome.** Both anchors, the pool count and the gas-subsidy caveat sit in a
+strip under the masthead on every page — not in a footer. The subsidy note reads the clock:
+after 29 September 2026 it says the subsidy *ended* rather than describing a past date in
+the future tense.
+
+**The calculator answers with a distribution.** Histogram first, percentiles under it, the
+median window's fee and IL split under that. A requested range is snapped to the nearest
+width the pool's tick spacing can express and the interface says so; nothing is
+interpolated between widths. The fee estimate's certified error bound is shown rather than
+implying exactness.
+
+There is no browser in this environment, so `test/render.test.mjs` runs both pages against
+a small DOM stub and asserts what they built from the real data. It is not a visual check
+— nothing here lays out or paints — but it holds the decisions above in place. Reverting
+any one of them (subsidy out of the strip, headline back into the markup, arrows dropped,
+log axis hidden, distribution replaced by a median) fails the suite.
 
 ## Executable depth
 

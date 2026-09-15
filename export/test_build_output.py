@@ -104,6 +104,20 @@ class ShippedFiles(unittest.TestCase):
             joined = " ".join(payload["provenance"]["caveats"])
             self.assertIn("2026-09-29", joined, f"{name} lost the gas-subsidy caveat")
 
+    def test_the_subsidy_block_can_drive_the_provenance_strip(self):
+        # The caveat list is prose. The strip needs structure: a date to compare against,
+        # and both tenses, so a reader arriving after 29 September sees "ended", not a
+        # sentence written in the future tense about a date that has passed.
+        for name, payload in self.files.items():
+            subsidy = payload["provenance"].get("subsidy")
+            self.assertIsNotNone(subsidy, f"{name} has no subsidy block")
+            for field in ("ends", "label", "note", "before_text", "after_text"):
+                self.assertTrue(subsidy.get(field), f"{name} subsidy missing {field}")
+            self.assertEqual(subsidy["ends"], "2026-09-29")
+            self.assertIn("ends", subsidy["before_text"])
+            self.assertIn("ended", subsidy["after_text"])
+            self.assertTrue(subsidy["tape_predates_end"])
+
     def test_the_fee_model_is_named(self):
         model = self.files["meta.json"]["provenance"]["fee_model"]
         self.assertEqual(model["name"], "fee_attribution.py")

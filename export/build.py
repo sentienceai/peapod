@@ -190,6 +190,19 @@ def provenance(root: Path, anchors, engine_cases: int, pools_valued: int, exclud
                             "a reader can see what changed and by how much",
             },
         },
+        "subsidy": {
+            "ends": SUBSIDY_END,
+            "label": "gas subsidy",
+            "note": "Robinhood Chain ran under a gas subsidy until this date. The tape "
+                    "behind every figure here predates it, so none of this volume or "
+                    "activity was recorded under the real cost regime.",
+            "tape_predates_end": True,
+            "before_text": f"ends {SUBSIDY_END}, after the tape behind these figures",
+            "after_text": f"ended {SUBSIDY_END}, after the tape behind these figures",
+            "why_it_is_chrome": "a reader arriving months later must see this without "
+                                "opening the method page, so it sits in the provenance "
+                                "strip on every page, not only in the caveat list",
+        },
         "restatements": restatements(depth_rows),
         "caveats": [
             f"Robinhood Chain ran under a gas subsidy that ends {SUBSIDY_END}. Every volume "

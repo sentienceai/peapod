@@ -5,6 +5,8 @@
   "type": "module",
   "description": "Public data site for tokenized equity pools on Robinhood Chain.",
   "scripts": {
+    "dev": "node server.mjs",
+    "start": "NODE_ENV=production node server.mjs",
     "test": "node --test 'test/*.test.mjs'",
     "lint": "tsc --noEmit",
     "check": "npm run lint && npm test"
