@@ -23,8 +23,8 @@ const depthPools = JSON.parse(
   await readFile(new URL('../web/data/depth.json', import.meta.url), 'utf8'),
 ).pools;
 
-const { get } = await install(new URL('../web/index.html', import.meta.url));
-await import('../web/app.js');
+const { get } = await install(new URL('../archive/web/depth.html', import.meta.url));
+await import('../archive/web/depth.js');
 
 test('the provenance strip carries both anchors and the subsidy caveat', () => {
   const strip = get('provenance');
@@ -87,7 +87,7 @@ test('the headline is not written into the markup', () => {
   // This is the reversion the test exists to catch: someone types the sentence into
   // index.html, deletes the derived assignment, and the page goes on claiming three
   // quarters long after the tape says otherwise.
-  const markup = readFileSync(new URL('../web/index.html', import.meta.url), 'utf8');
+  const markup = readFileSync(new URL('../archive/web/depth.html', import.meta.url), 'utf8');
   for (const fragment of ['three quarters', 'two thirds', 'tokenized-stock pools']) {
     assert.ok(!markup.includes(fragment),
       `index.html hardcodes "${fragment}"; the headline must come from the data`);
@@ -196,8 +196,8 @@ test('the method section carries both restatements', () => {
 });
 
 test('the calculator renders a distribution, not a point estimate', async () => {
-  const calc = await install(new URL('../web/calculator.html', import.meta.url));
-  await import('../web/calc.js');
+  const calc = await install(new URL('../archive/web/calculator.html', import.meta.url));
+  await import('../archive/web/calc.js');
   const body = calc.get('result-body');
 
   const hist = body.byClass('hist');

@@ -12,9 +12,9 @@
  * the kernel in lib/kernel.js.
  */
 
-import { histogram, netVsHodlPct, quantile } from './lib/kernel.js';
-import { compact, money, pct, shortAddress, stamp } from './lib/format.js';
-import { subsidyNote } from './lib/findings.js';
+import { histogram, netVsHodlPct, quantile } from '../../web/lib/kernel.js';
+import { compact, money, pct, shortAddress, stamp } from '../../web/lib/format.js';
+import { subsidyNote } from '../../web/lib/findings.js';
 
 /** @param {string} id */
 const el = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
@@ -32,10 +32,10 @@ function node(tag, cls, text) {
 }
 
 const [index, meta, depth, poolMeta] = await Promise.all([
-  fetch('/data/windows.json').then((r) => r.json()),
-  fetch('/data/meta.json').then((r) => r.json()),
-  fetch('/data/depth.json').then((r) => r.json()),
-  fetch('/data/pools.json').then((r) => r.json()),
+  fetch('../../web/data/windows.json').then((r) => r.json()),
+  fetch('../../web/data/meta.json').then((r) => r.json()),
+  fetch('../../web/data/depth.json').then((r) => r.json()),
+  fetch('../../web/data/pools.json').then((r) => r.json()),
 ]);
 
 const prov = meta.provenance;

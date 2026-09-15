@@ -3,89 +3,106 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>peapod — how much you could trade on Robinhood Chain</title>
-<meta name="description" content="How much you could buy or sell in one trade before moving the price by 1%, for every tokenized-stock pool on Robinhood Chain.">
+<title>peapod — traders by realized PnL</title>
+<meta name="description" content="Traders on Robinhood Chain ranked by realized profit on completed round-trips: bought and sold on-chain.">
 <link rel="icon" href="/favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap">
 <link rel="stylesheet" href="/styles/tokens.css">
 <link rel="stylesheet" href="/styles/app.css">
-<script type="module" src="/app.js"></script>
+<script type="module" src="/index.js"></script>
 </head>
 <body>
-<a class="skip" href="#pools">Skip to the pool table</a>
+<a class="skip" href="#board">Skip to the ranking</a>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="/"><i></i>peapod</a>
+    <nav class="topnav" aria-label="Main">
+      <a href="/" aria-current="page">Leaderboard</a>
+    </nav>
+    <span class="spacer"></span>
+    <label class="search">
+      <span aria-hidden="true">⌕</span>
+      <input id="search" type="search" placeholder="Search address…" aria-label="Search address">
+    </label>
+  </div>
+</header>
 
 <div class="shell">
-  <header class="masthead">
-    <h1 class="wordmark">peapod</h1>
-    <p class="masthead-sub">How much you could trade before the price moves 1%.</p>
-    <nav class="masthead-nav" aria-label="Sections">
-      <a href="/" aria-current="page">Depth</a>
-      <a href="/calculator.html">Calculator</a>
-    </nav>
-  </header>
+  <div class="page-head">
+    <h1>Traders by realized PnL</h1>
+    <p class="caveat" id="caveat"></p>
+  </div>
 
-  <div class="provenance" id="provenance" aria-label="How and when this was measured"></div>
+  <div class="controls">
+    <div class="tabset" id="categories" role="tablist" aria-label="Token category"></div>
+    <span class="divider"></span>
+    <div class="tabset" id="quotes" role="tablist" aria-label="Quote asset"></div>
+    <span class="spacer"></span>
+    <div class="tabset tabset--segmented" id="windows" role="tablist" aria-label="Timeframe"></div>
+    <div class="toggle" id="unit" role="group" aria-label="Show as dollars or percent">
+      <button type="button" data-unit="abs" aria-pressed="true">$</button>
+      <button type="button" data-unit="pct" aria-pressed="false">%</button>
+    </div>
+  </div>
 
-  <main>
-    <section class="hero" aria-labelledby="finding">
-      <h2 class="hero-head" id="finding"></h2>
-      <figure class="band-figure">
-        <div class="band" id="band" role="img" aria-describedby="band-note"></div>
-        <div class="band-scale" id="band-scale" aria-hidden="true"></div>
-        <div class="band-pointer" id="band-pointer" aria-hidden="true"></div>
-        <figcaption class="hero-note" id="band-note"></figcaption>
-      </figure>
-    </section>
+  <div class="pills">
+    <label class="pill">Min round-trips
+      <select id="min-trips">
+        <option value="1">1</option><option value="5">5</option>
+        <option value="10">10</option><option value="25">25</option>
+      </select>
+    </label>
+    <label class="pill">Min win rate
+      <select id="min-win">
+        <option value="0">any</option><option value="50">50%</option>
+        <option value="60">60%</option><option value="75">75%</option>
+      </select>
+    </label>
+  </div>
 
-    <section class="section" aria-labelledby="measures-head">
-      <div class="section-head"><h2 id="measures-head">What this measures</h2></div>
-      <div class="prose">
-        <p>Depth is how much you could buy or sell in one trade before moving the price by
-          1%. It is not the money sitting in a pool: most of that sits at prices nobody
-          trades at, and cannot be traded against today.</p>
-        <p>Every figure here comes from replaying the chain's own record of where that
-          money sits, tick by tick, and checking the result against what the chain
-          reported at each trade.</p>
+  <section class="podium" id="podium" aria-label="Top three"></section>
+
+  <div class="table-wrap" id="board">
+    <table class="board">
+      <thead><tr id="head"></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <p class="empty" id="empty" hidden>No address matches these filters.</p>
+  </div>
+
+  <div class="footnote" id="footnote"></div>
+</div>
+
+<div class="modal-backdrop" id="modal" hidden role="dialog" aria-modal="true" aria-labelledby="modal-addr">
+  <div class="modal">
+    <div class="modal-head">
+      <span class="crumb">Leaderboard /</span>
+      <span class="who-addr" id="modal-addr"></span>
+      <button class="modal-close" id="modal-close" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <aside class="rail" id="rail"></aside>
+      <div class="pane">
+        <div class="metric-grid" id="metrics"></div>
+        <div class="chartcard">
+          <div class="chartcard-head">
+            <h5>Cumulative realized</h5>
+            <strong id="chart-total"></strong>
+            <span class="spacer"></span>
+            <div class="tabset tabset--segmented" id="chart-range" role="tablist" aria-label="Chart range"></div>
+          </div>
+          <div class="chart-stage" id="chart-stage">
+            <div class="tip" id="tip" hidden></div>
+          </div>
+        </div>
+        <div class="subtabs" id="subtabs" role="tablist"></div>
+        <div class="scroller" id="subtable"></div>
       </div>
-    </section>
-
-    <section class="section" id="pools" aria-labelledby="pools-head">
-      <div class="section-head">
-        <h2 id="pools-head">Every pool</h2>
-        <p class="section-note" id="depth-note"></p>
-      </div>
-      <div class="table-wrap">
-        <table class="depth">
-          <caption id="depth-caption"></caption>
-          <thead>
-            <tr>
-              <th scope="col" class="rank">#</th>
-              <th scope="col">Pool</th>
-              <th scope="col" class="num">Depth</th>
-              <th scope="col" class="num">Share</th>
-              <th scope="col" class="num">vs flat</th>
-              <th scope="col" class="num">7-day median</th>
-              <th scope="col" class="num">vs 7-day median</th>
-              <th scope="col" class="num">Traded per day</th>
-            </tr>
-          </thead>
-          <tbody id="depth-body"></tbody>
-        </table>
-      </div>
-    </section>
-
-    <section class="section" aria-labelledby="method-head">
-      <div class="section-head"><h2 id="method-head">What changed, and why</h2></div>
-      <div id="restatements"></div>
-      <div class="prose" id="method-body" style="margin-top: var(--s-5)"></div>
-    </section>
-  </main>
-
-  <footer class="footer">
-    <p id="footer-note"></p>
-  </footer>
+    </div>
+  </div>
 </div>
 </body>
 </html>

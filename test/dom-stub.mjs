@@ -28,25 +28,53 @@ class Node {
     this.hidden = false;
     this.title = '';
     this.value = '';
-    this._text = '';
+    this.disabled = false;
+    this.tabIndex = 0;
+    /** @type {((e: any) => void)|null} */
+    this.onclick = null;
+    /** @type {((e: any) => void)|null} */
+    this.onkeydown = null;
+    this.scope = '';
     this.clientWidth = 1400;
+    /** @type {Node|null} */
+    this.parent = null;
   }
 
-  /** @param {string} value */
+  /**
+   * Setting textContent replaces the children with a single text node, exactly as the DOM
+   * does. Storing the text beside the children instead loses it the moment anything is
+   * appended — which silently emptied every sortable column header until it was caught.
+   * @param {string} value
+   */
   set textContent(value) {
-    this._text = String(value);
-    this.children = [];
+    this.children = [String(value)];
   }
 
   /** @returns {string} */
   get textContent() {
-    if (this.children.length === 0) return this._text;
     return this.children.map((c) => (typeof c === 'string' ? c : c.textContent)).join('');
+  }
+
+  /** @param {(Node|string)[]} nodes */
+  prepend(...nodes) {
+    for (const n of nodes.reverse()) {
+      if (typeof n !== 'string') n.parent = this;
+      this.children.unshift(n);
+    }
+  }
+
+  /** Detach from the parent, as Element.remove does. */
+  remove() {
+    if (!this.parent) return;
+    const i = this.parent.children.indexOf(this);
+    if (i >= 0) this.parent.children.splice(i, 1);
+    this.parent = null;
   }
 
   /** @param {(Node|string)[]} nodes */
   append(...nodes) {
     for (const n of nodes) {
+      if (typeof n !== 'string') n.parent = this;
       this.children.push(n);
       if (this.tag === 'select' && typeof n !== 'string' && n.tag === 'option' && !this.value) {
         this.value = n.value;
@@ -57,15 +85,39 @@ class Node {
   /** @param {(Node|string)[]} nodes */
   replaceChildren(...nodes) {
     this.children = [];
-    this._text = '';
     this.append(...nodes);
   }
 
   /** @param {string} name @param {unknown} value */
-  setAttribute(name, value) { this.attributes[name] = String(value); }
+  setAttribute(name, value) {
+    this.attributes[name] = String(value);
+    // Real elements mirror class between the attribute and the property. SVG nodes are
+    // built with setAttribute('class', …), so without this they are invisible to byClass.
+    if (name === 'class') this.className = String(value);
+  }
   /** @param {string} name @returns {string} */
   getAttribute(name) { return this.attributes[name] ?? ''; }
   addEventListener() {}
+
+  /** @param {string} sel */
+  closest(sel) {
+    // Only the attribute form the pages use, e.g. [data-unit].
+    const m = sel.match(/^\[([\w-]+)\]$/);
+    if (m) {
+      const key = m[1].replace(/^data-/, '').replace(/-(\w)/g, (_, c) => c.toUpperCase());
+      return this.dataset[key] !== undefined || this.attributes[m[1]] !== undefined ? this : null;
+    }
+    return null;
+  }
+
+  /** @param {string} sel */
+  querySelectorAll(sel) {
+    const m = sel.match(/^\[([\w-]+)\]$/);
+    if (!m) return [];
+    const key = m[1].replace(/^data-/, '').replace(/-(\w)/g, (_, c) => c.toUpperCase());
+    return this.descendants().filter((n) => n.dataset[key] !== undefined
+      || n.attributes[m[1]] !== undefined);
+  }
 
   /** Every node beneath this one, for assertions. */
   descendants() {
@@ -116,18 +168,30 @@ export async function install(htmlUrl) {
     byId.set(match[3], node);
   }
 
+  globalThis.document = /** @type {any} */ ({});
   const document = {
     getElementById: (/** @type {string} */ id) => byId.get(id) ?? null,
     createElement: (/** @type {string} */ tag) => new Node(tag),
     createTextNode: (/** @type {unknown} */ text) => String(text),
+    createElementNS: (/** @type {string} */ _ns, /** @type {string} */ tag) => new Node(tag),
   };
 
   globalThis.document = /** @type {any} */ (document);
   globalThis.addEventListener = () => {};
   globalThis.fetch = /** @type {any} */ (async (/** @type {string} */ path) => {
     const file = new URL(`../web${path}`, import.meta.url);
-    const body = await readFile(file, 'utf8');
-    return { ok: true, json: async () => JSON.parse(body), text: async () => body };
+    try {
+      const body = await readFile(file, 'utf8');
+      return { ok: true, status: 200, json: async () => JSON.parse(body), text: async () => body };
+    } catch {
+      // Real fetch RESOLVES with ok:false on a 404; it does not reject. Throwing here
+      // meant any not-found path looked like a crash instead of a handled state.
+      return {
+        ok: false, status: 404,
+        json: async () => { throw new Error('404'); },
+        text: async () => '',
+      };
+    }
   });
 
   /**

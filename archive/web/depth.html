@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>peapod — how much you could trade on Robinhood Chain</title>
+<meta name="description" content="How much you could buy or sell in one trade before moving the price by 1%, for every tokenized-stock pool on Robinhood Chain.">
+<link rel="icon" href="/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600&display=swap">
+<link rel="stylesheet" href="./styles/tokens.css">
+<link rel="stylesheet" href="./styles/app.css">
+<script type="module" src="./depth.js"></script>
+</head>
+<body>
+<a class="skip" href="#pools">Skip to the pool table</a>
+
+<div class="shell">
+  <header class="masthead">
+    <h1 class="wordmark">peapod</h1>
+    <p class="masthead-sub">How much you could trade before the price moves 1%.</p>
+    <nav class="masthead-nav" aria-label="Sections">
+      <a href="./depth.html" aria-current="page">Depth</a>
+      <a href="./calculator.html">Calculator</a>
+    </nav>
+  </header>
+
+  <div class="provenance" id="provenance" aria-label="How and when this was measured"></div>
+
+  <main>
+    <section class="hero" aria-labelledby="finding">
+      <h2 class="hero-head" id="finding"></h2>
+      <figure class="band-figure">
+        <div class="band" id="band" role="img" aria-describedby="band-note"></div>
+        <div class="band-scale" id="band-scale" aria-hidden="true"></div>
+        <div class="band-pointer" id="band-pointer" aria-hidden="true"></div>
+        <figcaption class="hero-note" id="band-note"></figcaption>
+      </figure>
+    </section>
+
+    <section class="section" aria-labelledby="measures-head">
+      <div class="section-head"><h2 id="measures-head">What this measures</h2></div>
+      <div class="prose">
+        <p>Depth is how much you could buy or sell in one trade before moving the price by
+          1%. It is not the money sitting in a pool: most of that sits at prices nobody
+          trades at, and cannot be traded against today.</p>
+        <p>Every figure here comes from replaying the chain's own record of where that
+          money sits, tick by tick, and checking the result against what the chain
+          reported at each trade.</p>
+      </div>
+    </section>
+
+    <section class="section" id="pools" aria-labelledby="pools-head">
+      <div class="section-head">
+        <h2 id="pools-head">Every pool</h2>
+        <p class="section-note" id="depth-note"></p>
+      </div>
+      <div class="table-wrap">
+        <table class="depth">
+          <caption id="depth-caption"></caption>
+          <thead>
+            <tr>
+              <th scope="col" class="rank">#</th>
+              <th scope="col">Pool</th>
+              <th scope="col" class="num">Depth</th>
+              <th scope="col" class="num">Share</th>
+              <th scope="col" class="num">vs flat</th>
+              <th scope="col" class="num">7-day median</th>
+              <th scope="col" class="num">vs 7-day median</th>
+              <th scope="col" class="num">Traded per day</th>
+            </tr>
+          </thead>
+          <tbody id="depth-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="method-head">
+      <div class="section-head"><h2 id="method-head">What changed, and why</h2></div>
+      <div id="restatements"></div>
+      <div class="prose" id="method-body" style="margin-top: var(--s-5)"></div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p id="footer-note"></p>
+  </footer>
+</div>
+</body>
+</html>

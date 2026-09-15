@@ -178,6 +178,135 @@ def stage_ingest(root: Path, days: float):
     print("  verification:", "passed" if bad == 0 else f"FAILED on {bad} of 6 windows")
 
 
+def stage_resolve(root: Path, max_hours: float | None):
+    """Resolve tx.from for the blocks holding Pons swaps, newest first.
+
+    Newest first so a partial run is a COMPLETE recent window rather than a scatter, which
+    is the only shape round-trip matching can be run on honestly.
+    """
+    from dedup import Deduplicator, tx_key  # noqa: PLC0415
+
+    blocks = sorted(json.loads((OUT / "pons_blocks.json").read_text()), reverse=True)
+    swaps = pl.concat([pl.read_parquet(p) for p in PONS_SWAPS.glob("part-*.parquet")])
+    wanted = set(swaps["tx_hash"].to_list())
+    PONS_FROM.mkdir(parents=True, exist_ok=True)
+    done = set()
+    for f in PONS_FROM.glob("part-*.parquet"):
+        done.update(pl.read_parquet(f)["block"].to_list())
+    todo = [b for b in blocks if b not in done]
+    print(f"{len(wanted):,} pons transactions across {len(blocks):,} blocks; "
+          f"{len(todo):,} blocks to resolve", flush=True)
+
+    url = env()["GOLDSKY_EDGE_URL"]
+    session = requests.Session()
+    batch, pace = int(os.environ.get("PEAPOD_RPC_BATCH", "200")), float(os.environ.get("PEAPOD_RPC_PACE", "2.0"))
+    seen = Deduplicator(key_of=tx_key, track_conflicts=False)
+    buffer, part, began, last_flush = [], len(list(PONS_FROM.glob("part-*.parquet"))), time.time(), time.time()
+
+    for i in range(0, len(todo), batch):
+        if max_hours and (time.time() - began) / 3600 >= max_hours:
+            print("reached --max-hours, stopping cleanly", flush=True)
+            break
+        chunk = todo[i:i + batch]
+        payload = [{"jsonrpc": "2.0", "id": k, "method": "eth_getBlockByNumber",
+                    "params": [hex(b), True]} for k, b in enumerate(chunk)]
+        try:
+            r = session.post(url, json=payload, timeout=120)
+            body = r.json() if r.status_code == 200 else None
+        except requests.RequestException:
+            body = None
+        if not isinstance(body, list):
+            time.sleep(5)
+            continue
+        for entry in body:
+            k, result = entry.get("id"), entry.get("result")
+            if not isinstance(k, int) or k >= len(chunk) or not result:
+                continue
+            for tx in result.get("transactions") or []:
+                if tx.get("hash") in wanted:
+                    row = {"tx_hash": tx["hash"], "tx_from": tx["from"].lower(),
+                           "block": chunk[k], "block_hash": result.get("hash")}
+                    if seen.accept(row):
+                        buffer.append(row)
+        if len(buffer) >= 5000 or time.time() - last_flush >= 300:
+            if buffer:
+                pl.DataFrame(buffer).write_parquet(PONS_FROM / f"part-{part:05d}.parquet")
+                part += 1
+                buffer = []
+            last_flush = time.time()
+        if (i // batch) % 40 == 0:
+            rate = (i + len(chunk)) / max(time.time() - began, 1)
+            print(f"  {i + len(chunk):,}/{len(todo):,} blocks  back to {min(chunk):,}  "
+                  f"{rate * 3600 / 1000:.0f}k/h", flush=True)
+        time.sleep(pace)
+    if buffer:
+        pl.DataFrame(buffer).write_parquet(PONS_FROM / f"part-{part:05d}.parquet")
+    print(f"identity: {seen.summary()}", flush=True)
+
+
+def stage_report(root: Path):
+    """Round-trip qualification and realized PnL, denominated in each pool's quote asset."""
+    universe = pool_universe(root)
+    swaps = pl.concat([pl.read_parquet(p) for p in PONS_SWAPS.glob("part-*.parquet")])
+    parts = sorted(PONS_FROM.glob("part-*.parquet"))
+    if not parts:
+        raise SystemExit("no resolved pons transactions; run --stage resolve first")
+    senders = pl.concat([pl.read_parquet(p) for p in parts]).unique(subset=["tx_hash"])
+    df = swaps.join(senders, on="tx_hash", how="inner")
+    bt = pl.read_parquet(root / "out" / "block_times.parquet").sort("block")
+    bn, bts = bt["block"].to_numpy().astype(np.int64), bt["ts"].to_numpy().astype(np.int64)
+    ts = np.interp(df["block"].to_numpy().astype(np.int64), bn, bts)
+    span = (ts.max() - ts.min()) / 3600
+
+    a0 = np.array([float(int(x)) for x in df["amount0"].to_list()])
+    a1 = np.array([float(int(x)) for x in df["amount1"].to_list()])
+    side = np.array([universe[p]["quote_side"] for p in df["pool_id"].to_list()])
+    qdec = np.array([universe[p]["qdec"] for p in df["pool_id"].to_list()])
+    quote = [universe[p]["quote"] for p in df["pool_id"].to_list()]
+    # Trader delta is the negative of the pool's. Base stays in raw units: its decimals
+    # cancel between quantity and price, and the registry does not have them anyway.
+    base_delta = -np.where(side == 0, a1, a0)
+    quote_delta = -np.where(side == 0, a0, a1) / (10.0 ** qdec)
+
+    net = (pl.DataFrame({"tx": df["tx_hash"], "addr": df["tx_from"], "pool": df["pool_id"],
+                         "quote": quote, "base": base_delta, "q": quote_delta, "ts": ts})
+           .group_by(["tx", "addr", "pool", "quote"])
+           .agg(pl.col("base").sum(), pl.col("q").sum(), pl.col("ts").min())
+           .filter(pl.col("base").abs() > 0).sort("ts"))
+
+    print("=" * 74)
+    print(f"PONS ROUND-TRIPS  ({span:.1f} hours resolved, {len(net):,} position changes)")
+    print("=" * 74)
+    for qsym in ("ETH", "USDG"):
+        w = net.filter(pl.col("quote") == qsym)
+        if len(w) == 0:
+            continue
+        books, realized, matched, tot = defaultdict(deque), defaultdict(float), defaultdict(float), defaultdict(float)
+        for tx, addr, pool, _q, base, q, _t in w.iter_rows():
+            tot[addr] += abs(q)
+            key = (addr, pool)
+            if base > 0:
+                books[key].append([base, abs(q) / base])
+            else:
+                want, price = -base, abs(q) / -base
+                while want > DUST and books[key]:
+                    lot = books[key][0]
+                    take = min(lot[0], want)
+                    realized[addr] += take * (price - lot[1])
+                    matched[addr] += take * price
+                    lot[0] -= take
+                    want -= take
+                    if lot[0] <= DUST:
+                        books[key].popleft()
+        qual = [a for a in tot if matched[a] > 0]
+        ranked = sorted(qual, key=lambda a: -realized[a])
+        print(f"\n  quoted in {qsym}: {len(tot):,} addresses, {len(qual):,} qualify "
+              f"({len(qual)/max(len(tot),1)*100:.1f}%)")
+        print(f"  {'#':>3} {'address':<16}{'realized ' + qsym:>20}{'matched vol':>18}")
+        for i, a in enumerate(ranked[:10], 1):
+            print(f"  {i:>3} {a[:14]:<16}{realized[a]:>20,.6f}{matched[a]:>18,.4f}")
+
+
 def main() -> int:
     import sys
     sys.path.insert(0, str(HERE.parent / "export"))
@@ -185,10 +314,15 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--stage", default="ingest", choices=["ingest", "resolve", "report"])
     ap.add_argument("--days", type=float, default=7.0)
+    ap.add_argument("--max-hours", type=float, default=None)
     args = ap.parse_args()
     root = lp_terminal()
     if args.stage == "ingest":
         stage_ingest(root, args.days)
+    elif args.stage == "resolve":
+        stage_resolve(root, args.max_hours)
+    else:
+        stage_report(root)
     return 0
 
 

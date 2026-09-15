@@ -1,88 +1,72 @@
 /* peapod design tokens.
  *
- * One material: ink on paper. Geometry carries the argument.
+ * Every value below was sampled from the Hyperdash screenshots in design-refs/ rather than
+ * estimated by eye: the surfaces are the most common pixel in their region, the text and
+ * accent colours the extreme pixel in theirs, and the spacing comes from measured row
+ * pitch at a known device pixel ratio.
  *
- * COLOUR. Six values, one accent, and the accent has exactly one referent — the pool this
- * page is about. It appears twice: a pointer under the hero band, and a marker on that
- * pool's row. Nowhere else. If it ever spreads to links or buttons it stops meaning
- * anything and the page becomes generic immediately.
+ * The palette is warmer and more muted than "dark terminal" implies. The ground is a warm
+ * near-black, not blue-black; the positive is sage rather than neon; the negative is rose
+ * rather than alarm red. Matching that restraint is what keeps a dense page readable.
  *
- * Colour does NOT carry sign. The ▲▼ arrows do, alone. An earlier revision had oxblood
- * for below-median and teal for above, which was a second channel repeating what the
- * arrows already said, and spending the page's only accent on forty table cells is not
- * rare use. Sign is now legible identically to every reader.
- *
- * TYPE. One family, one width, four sizes, two weights. An earlier revision used Archivo's
- * width axis at five settings and called it an instrument; it was five typefaces in a
- * trench coat. A small scale used consistently reads as more considered than a large one
- * used expressively. Figures are tabular and lining everywhere, so columns align on the
- * decimal without help.
- *
- * SPACE. The main tool. The scale below is deliberately coarse — five usable steps, with
- * the large ones genuinely large — because a page fixed by spacing cannot be fixed by
- * styling.
+ * SIGN IS CARRIED TWICE, DELIBERATELY. Colour plus a signed number is two channels for
+ * most readers but not for someone colourblind scanning quickly, and a minus sign is a few
+ * pixels. Signed figures therefore carry a direction glyph as well, and a test asserts
+ * both are present.
  */
 
 :root {
-  --paper: #eae9e4;      /* ground: warm light grey */
-  --ink: #1a1a17;        /* text, and the dominant pool's block */
-  --ink-2: #75756c;      /* labels, secondary figures */
-  --line: #cfcec7;       /* hairlines, ticks, the sub-pixel remainder */
-  --fill: #b9b8b0;       /* every non-dominant band segment */
-  --accent: #b8371f;     /* the pool this page is about. Two uses. */
+  /* surfaces, sampled */
+  --bg: #181613;           /* page ground */
+  --surface: #171915;      /* cards */
+  --raised: #1c1b19;       /* active tab, filter pills, hover */
+  --line: #211f1c;         /* borders and row dividers */
+  --line-soft: #1d1a18;
 
-  --focus: #1f5fd0;
+  /* text, sampled */
+  --text: #ffffff;         /* headings only */
+  --text-body: #d5d1ce;    /* numbers and body */
+  --text-muted: #918d87;   /* labels, column headers, subtitles */
 
-  --sans: 'Archivo', ui-sans-serif, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  /* signed and status, sampled */
+  --up: #76be9d;
+  --down: #c55564;
+  --warn: #d6bc62;
+  --accent: #ea562e;       /* rank 1, active tab underline. One referent each. */
 
-  /* four sizes, two weights */
-  --t-micro: 0.6875rem;  /* 11px — scale ticks, strip labels */
-  --t-small: 0.8125rem;  /* 13px — table, controls */
-  --t-body: 1rem;        /* 16px — prose */
-  --t-lead: 2.25rem;     /* 36px — the one headline */
+  /* chart fills, sampled from the area charts */
+  --up-fill: #1f342b;
+  --down-fill: #351318;
+
+  --focus: #76be9d;
+
+  --sans: 'Inter', ui-sans-serif, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  /* type: five sizes, three weights, measured from the screenshots at 2x */
+  --t-micro: 11px;   /* column headers, uppercase, tracked */
+  --t-small: 13px;   /* dense labels */
+  --t-body: 14px;    /* tabs, filters, subtitle */
+  --t-num: 15px;     /* table numbers */
+  --t-lead: 20px;    /* podium figures */
+  --t-head: 28px;    /* page heading */
 
   --w-regular: 400;
-  --w-medium: 600;
+  --w-medium: 500;
+  --w-semi: 600;
 
-  --lh-tight: 1.18;
-  --lh-body: 1.6;
+  /* spacing: measured section rhythm 37 / 57 / 39 / 31 */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-7: 40px;
+  --s-8: 56px;
 
-  /* space */
-  --s-1: 0.25rem;   /*  4 */
-  --s-2: 0.5rem;    /*  8 */
-  --s-3: 1rem;      /* 16 */
-  --s-4: 1.5rem;    /* 24 */
-  --s-5: 2.5rem;    /* 40 */
-  --s-6: 4rem;      /* 64 */
-  --s-7: 6rem;      /* 96 */
-  --s-8: 8rem;      /* 128 */
+  --row-h: 44px;           /* measured table row pitch */
+  --card-h: 223px;         /* measured podium card height */
+  --page: 1333px;          /* the viewport the screenshots were taken at */
 
-  --measure: 60ch;
-  --page: 1080px;
-
-  color-scheme: light;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
-    --paper: #17171a;
-    --ink: #e8e7e1;
-    --ink-2: #8e8e84;
-    --line: #35353a;
-    --fill: #4e4e51;
-    --accent: #e0603f;
-    --focus: #7fa9ff;
-    color-scheme: dark;
-  }
-}
-
-:root[data-theme='dark'] {
-  --paper: #17171a;
-  --ink: #e8e7e1;
-  --ink-2: #8e8e84;
-  --line: #35353a;
-  --fill: #4e4e51;
-  --accent: #e0603f;
-  --focus: #7fa9ff;
   color-scheme: dark;
 }

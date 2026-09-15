@@ -1,0 +1,88 @@
+/* peapod design tokens.
+ *
+ * One material: ink on paper. Geometry carries the argument.
+ *
+ * COLOUR. Six values, one accent, and the accent has exactly one referent — the pool this
+ * page is about. It appears twice: a pointer under the hero band, and a marker on that
+ * pool's row. Nowhere else. If it ever spreads to links or buttons it stops meaning
+ * anything and the page becomes generic immediately.
+ *
+ * Colour does NOT carry sign. The ▲▼ arrows do, alone. An earlier revision had oxblood
+ * for below-median and teal for above, which was a second channel repeating what the
+ * arrows already said, and spending the page's only accent on forty table cells is not
+ * rare use. Sign is now legible identically to every reader.
+ *
+ * TYPE. One family, one width, four sizes, two weights. An earlier revision used Archivo's
+ * width axis at five settings and called it an instrument; it was five typefaces in a
+ * trench coat. A small scale used consistently reads as more considered than a large one
+ * used expressively. Figures are tabular and lining everywhere, so columns align on the
+ * decimal without help.
+ *
+ * SPACE. The main tool. The scale below is deliberately coarse — five usable steps, with
+ * the large ones genuinely large — because a page fixed by spacing cannot be fixed by
+ * styling.
+ */
+
+:root {
+  --paper: #eae9e4;      /* ground: warm light grey */
+  --ink: #1a1a17;        /* text, and the dominant pool's block */
+  --ink-2: #75756c;      /* labels, secondary figures */
+  --line: #cfcec7;       /* hairlines, ticks, the sub-pixel remainder */
+  --fill: #b9b8b0;       /* every non-dominant band segment */
+  --accent: #b8371f;     /* the pool this page is about. Two uses. */
+
+  --focus: #1f5fd0;
+
+  --sans: 'Archivo', ui-sans-serif, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+
+  /* four sizes, two weights */
+  --t-micro: 0.6875rem;  /* 11px — scale ticks, strip labels */
+  --t-small: 0.8125rem;  /* 13px — table, controls */
+  --t-body: 1rem;        /* 16px — prose */
+  --t-lead: 2.25rem;     /* 36px — the one headline */
+
+  --w-regular: 400;
+  --w-medium: 600;
+
+  --lh-tight: 1.18;
+  --lh-body: 1.6;
+
+  /* space */
+  --s-1: 0.25rem;   /*  4 */
+  --s-2: 0.5rem;    /*  8 */
+  --s-3: 1rem;      /* 16 */
+  --s-4: 1.5rem;    /* 24 */
+  --s-5: 2.5rem;    /* 40 */
+  --s-6: 4rem;      /* 64 */
+  --s-7: 6rem;      /* 96 */
+  --s-8: 8rem;      /* 128 */
+
+  --measure: 60ch;
+  --page: 1080px;
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --paper: #17171a;
+    --ink: #e8e7e1;
+    --ink-2: #8e8e84;
+    --line: #35353a;
+    --fill: #4e4e51;
+    --accent: #e0603f;
+    --focus: #7fa9ff;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme='dark'] {
+  --paper: #17171a;
+  --ink: #e8e7e1;
+  --ink-2: #8e8e84;
+  --line: #35353a;
+  --fill: #4e4e51;
+  --accent: #e0603f;
+  --focus: #7fa9ff;
+  color-scheme: dark;
+}

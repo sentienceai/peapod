@@ -6,19 +6,19 @@
  * why the sub-pixel line in particular is a function rather than markup.
  */
 
-import { bandSegments, belowMedian, headline, subPixelNote, subsidyNote } from './lib/findings.js';
+import { bandSegments, belowMedian, headline, subPixelNote, subsidyNote } from '../../web/lib/findings.js';
 /**
  * A row of depth.json. findings.js declares only the subset it reads; this is the rest of
  * what the table renders.
- * @typedef {import('./lib/findings.js').Pool & {
+ * @typedef {import('../../web/lib/findings.js').Pool & {
  *   depth_flat: number,
  *   median_7d_executable: number,
  *   executable_over_flat_pct: number|null,
  *   volume_per_day_usd: number|null,
  * }} DepthRow
  */
-/** @typedef {import('./lib/findings.js').Pool} Pool */
-import { compact, delta, money, pct, shortAddress, stamp } from './lib/format.js';
+/** @typedef {import('../../web/lib/findings.js').Pool} Pool */
+import { compact, delta, money, pct, shortAddress, stamp } from '../../web/lib/format.js';
 
 /** @param {string} id */
 const el = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
@@ -32,8 +32,8 @@ function node(tag, cls, text) {
 }
 
 const [depth, meta] = await Promise.all([
-  fetch('/data/depth.json').then((r) => r.json()),
-  fetch('/data/meta.json').then((r) => r.json()),
+  fetch('../../web/data/depth.json').then((r) => r.json()),
+  fetch('../../web/data/meta.json').then((r) => r.json()),
 ]);
 
 const pools = depth.pools;

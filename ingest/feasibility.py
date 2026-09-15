@@ -34,7 +34,7 @@ DUST_UNITS = 1e-6          # token units below which a negative balance is float
 DUST_USD = 1.0             # dollars below which a short position is not worth flagging
 
 
-def load(root: Path) -> pl.DataFrame:
+def load(root: Path, source: str = "public") -> pl.DataFrame:
     swaps = pl.concat([pl.read_parquet(p) for p in sorted((HERE / "out" / "swaps_tx").glob("part-*.parquet"))])
     # The RPC returns blockTimestamp as 0x0 on every log, so times come from the block
     # index rather than the log, as they did before the re-ingest.
@@ -43,7 +43,8 @@ def load(root: Path) -> pl.DataFrame:
     times = bt["ts"].to_numpy().astype(np.int64)
     swaps = swaps.with_columns(ts=pl.Series(
         np.interp(swaps["block"].to_numpy().astype(np.int64), blocks, times).astype(np.int64)))
-    parts = sorted((HERE / "out" / "tx_from").glob("part-*.parquet"))
+    suffix = "" if source == "public" else f"_{source}"
+    parts = sorted((HERE / "out" / f"tx_from{suffix}").glob("part-*.parquet"))
     if not parts:
         raise SystemExit("no resolved transactions; run ingest/resolve_senders.py first")
     senders = pl.concat([pl.read_parquet(p) for p in parts]).unique(subset=["tx_hash"])
@@ -226,11 +227,12 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--days", type=float, nargs="*", default=[1, 3, 7],
                     help="windows to check for the convergence report")
+    ap.add_argument("--source", default="public")
     ap.add_argument("--report", type=float, default=None,
                     help="run the full three-question report on this window")
     args = ap.parse_args()
 
-    df = derive(load(lp_terminal()))
+    df = derive(load(lp_terminal(), args.source))
     coverage_table(df, args.days)
 
     if args.report is not None:
