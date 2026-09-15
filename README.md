@@ -10,8 +10,10 @@ read-only upstreams; peapod copies and ports from them, never edits them.
 
 ## Status
 
-Step 1 of the build order is complete: the v4 math engine is ported to BigInt and its
-parity tests are green. Nothing else is built yet.
+The v4 math engine is ported to BigInt with parity tests green, and executable ±1% depth
+is computed by walking the real tick liquidity map. The site itself is not built yet.
+
+**The headline number moved: 80.8% → 75.8%.** See [Executable depth](#executable-depth).
 
 ## Constraints
 
@@ -33,6 +35,53 @@ npm test      # node --test — the parity gate
 npm run lint  # tsc --noEmit, JSDoc type check, emits nothing
 npm run check # both
 ```
+
+Data export is offline Python, run against a read-only lp-terminal checkout:
+
+```sh
+PEAPOD_LP_TERMINAL=~/lp-terminal python export/executable_depth.py
+PEAPOD_LP_TERMINAL=~/lp-terminal PYTHONPATH=$PEAPOD_LP_TERMINAL/engine:export \
+  python export/test_executable_depth.py
+```
+
+It needs `polars` and `numpy`; lp-terminal's `.venv` already has them. peapod does not yet
+own a Python environment of its own — that is a loose end, not a decision.
+
+## Executable depth
+
+`export/executable_depth.py` replaces the flat-L depth figure with a walk of the real tick
+liquidity map: the ±1% band is split at every initialized tick the price would cross, each
+segment valued with the liquidity genuinely active there. Positions whose ranges end inside
+the band stop contributing where they end. That is what "executable" means, and it is why
+the site can say depth rather than TVL.
+
+The reconstruction is verified, not assumed. Active liquidity at the current tick is the
+sum of `liquidityNet` over all ticks at or below it, and every Swap event carries the
+pool's real active liquidity, so the map is checked against the chain at the anchor swap
+for every pool. **All 66 pools reconstruct exactly.** Any that did not would be excluded
+and counted, never silently valued.
+
+| Basis | Top-1 share | Chain-wide depth |
+|---|---|---|
+| flat-L at tape end (published) | 80.8% | $9.78M |
+| flat-L at anchor | 75.2% | $10.17M |
+| **executable at anchor** | **75.8%** | **$8.77M** |
+
+Both bases are computed at the same anchor so the comparison isolates the method, and the
+published figure is reproduced exactly at the original tape end as a control.
+
+**The anchor.** lp-terminal's ModifyLiquidity ingest finished at block 62,264,735; its swap
+ingest ran five hours later, to 62,441,080. Liquidity moved in between, so at the swap
+tape's end the tick map is stale — 19 of the top 25 pools fail to reconstruct there. Depth
+is therefore taken at each pool's last swap at or before the ModifyLiquidity head. That
+costs five hours of freshness and buys a number that can be checked against the chain. Both
+timestamps ship with the data.
+
+**The flat-L figure was never an upper bound.** lp-terminal describes it as one, and for
+most pools it is: SPY #1 is at 86.9% of it, GOOGL at 71.4%. But liquidity can also switch
+*on* inside the band, and then real depth is larger — SPCX 103.6%, TSLA 112.4%. Across
+pools with a real book the ratio runs p5=69%, p50=100%, p95=116%. It is a point estimate
+that errs in both directions, not a ceiling.
 
 ## The math engine
 
