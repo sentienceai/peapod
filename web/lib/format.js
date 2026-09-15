@@ -13,6 +13,23 @@ export function money(n) {
   return `$${Math.abs(n) < 1000 ? usd2.format(n) : usd0.format(Math.round(n))}`;
 }
 
+/**
+ * A signed change, in percentage points. Uses a true minus sign, which aligns with
+ * tabular figures where a hyphen does not.
+ *
+ * This exists because the table used to print a LEVEL where a reader expects a CHANGE:
+ * "99% of its 7-day median" rendered as a down-arrow and 99%, which reads as a 99% collapse
+ * and means a 1% dip. A level and a delta cannot share a column.
+ * @param {number} n a level in percent, where 100 means unchanged
+ * @param {number} [dp]
+ */
+export function delta(n, dp = 0) {
+  if (!Number.isFinite(n)) return '—';
+  const d = n - 100;
+  const sign = d < 0 ? '\u2212' : '+';
+  return `${sign}${Math.abs(d).toFixed(dp)}%`;
+}
+
 /** @param {number} n @param {number} [dp] */
 export function pct(n, dp = 1) {
   if (!Number.isFinite(n)) return '—';

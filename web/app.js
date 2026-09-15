@@ -18,7 +18,7 @@ import { bandSegments, belowMedian, headline, subPixelNote, subsidyNote } from '
  * }} DepthRow
  */
 /** @typedef {import('./lib/findings.js').Pool} Pool */
-import { compact, money, pct, shortAddress, stamp } from './lib/format.js';
+import { compact, delta, money, pct, shortAddress, stamp } from './lib/format.js';
 
 /** @param {string} id */
 const el = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
@@ -127,11 +127,6 @@ function renderBand() {
 
 function renderTable() {
   const body = el('depth-body');
-  const max = Math.max(...pools.map((/** @type {DepthRow} */ p) => p.depth_executable));
-  const min = 100;                              // floor the log ruler at $100
-  const logMax = Math.log10(max);
-  const logMin = Math.log10(min);
-
   body.replaceChildren();
   pools.forEach((/** @type {DepthRow} */ p, /** @type {number} */ i) => {
     const row = node('tr');
@@ -145,15 +140,8 @@ function renderTable() {
     who.append(node('span', 'addr', shortAddress(p.pool_id)));
     row.append(who);
 
-    const cell = node('td', 'ruler');
-    const frac = Math.max(0, (Math.log10(Math.max(p.depth_executable, min)) - logMin) / (logMax - logMin));
-    const bar = node('span', 'ruler-bar');
-    bar.style.width = `${Math.max(frac * 100, 0.6)}%`;
-    const amount = node('span', 'num-strong', money(p.depth_executable));
-    amount.style.display = 'block';
-    cell.append(amount, bar);
-    row.append(cell);
-
+    row.append(node('td', 'num-strong', money(p.depth_executable)));
+    row.append(node('td', 'num', pct(p.share_of_chain_executable_pct, 2)));
     row.append(node('td', 'num sub', p.executable_over_flat_pct === null
       ? '—' : pct(p.executable_over_flat_pct, 0)));
     row.append(node('td', 'num', money(p.median_7d_executable)));
@@ -164,9 +152,10 @@ function renderTable() {
     } else {
       const below = p.pct_of_median_executable < 100;
       // Sign is the arrow and only the arrow — no hue. The accent has one referent.
+      // A signed delta, not a level. The sign lives in the number, so it survives
+      // without colour and cannot be misread as a collapse when it is a 1% dip.
       med.className = `num ${below ? 'sign-low' : 'sign-high'}`;
-      med.append(node('span', 'sign-mark', below ? '▼' : '▲'));
-      med.append(document.createTextNode(pct(p.pct_of_median_executable, 0)));
+      med.textContent = delta(p.pct_of_median_executable);
     }
     row.append(med);
 
@@ -177,24 +166,12 @@ function renderTable() {
   const { below } = belowMedian(pools, 10);
   el('depth-note').textContent =
     `${below} of the 10 deepest pools are holding less than their typical level over the ` +
-    'past week. Depth is drawn on a log scale.';
+    'past week. Share is of all depth measured here.';
   el('depth-caption').textContent =
     'Depth is measured by walking the chain\u2019s own liquidity map. The older, simpler ' +
     'method assumed the money was spread evenly across the band; “vs flat” is this ' +
     'measurement as a percentage of that one. Below 100% the older method overstated ' +
     'depth, above 100% it understated it.';
-
-  // The log axis is drawn rather than left implicit.
-  const head = el('ruler-head');
-  const axis = node('span', 'ruler-axis');
-  axis.style.display = 'block';
-  ['$100', '$10k', '$1M'].forEach((/** @type {string} */ label, /** @type {number} */ idx) => {
-    const tick = node('span', '', label);
-    tick.style.left = `${(idx / 2) * 100}%`;
-    if (idx === 2) tick.style.transform = 'translateX(-100%)';
-    axis.append(tick);
-  });
-  head.append(axis);
 }
 
 /* ----------------------------------------------------------------- method */

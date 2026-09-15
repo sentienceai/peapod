@@ -230,14 +230,6 @@ table.depth th:last-child, table.depth td:last-child { padding-right: 0; }
 .subject .ticker { font-weight: var(--w-medium); }
 .subject-mark { color: var(--accent); padding-right: 0.5em; }
 
-/* A 2px hairline, not a filled block, and the log axis is drawn above it rather
- * than left as a hidden transform on a page whose whole claim is checkability. */
-.ruler { width: 9rem; }
-.ruler-bar { display: block; height: 2px; margin-top: var(--s-2); background: var(--ink-2); }
-.ruler-axis { position: relative; display: block; height: 1rem; color: var(--ink-2); font-size: var(--t-micro); }
-.ruler-axis span { position: absolute; top: 0; }
-.ruler-axis span:last-child { transform: translateX(-100%); }
-
 /* ------------------------------------------------------------------ method */
 
 .restatement { margin: 0 0 var(--s-5); max-width: var(--measure); }

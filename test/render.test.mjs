@@ -115,7 +115,10 @@ test('the table renders every pool with both depth bases', () => {
   assert.match(rows[0].textContent, /87%/);
 });
 
-test('signed figures carry an arrow, so colour is never the only channel', () => {
+test('signed figures carry an explicit sign, so colour is never the only channel', () => {
+  // This column used to print a LEVEL with a direction arrow: "▼99%" meant one percent
+  // below the 7-day median and read as a 99% collapse. It is now a signed delta, so the
+  // sign is in the number itself and needs neither colour nor a glyph to be legible.
   const rows = get('depth-body').byTag('tr');
   let low = 0;
   let high = 0;
@@ -124,22 +127,44 @@ test('signed figures carry an arrow, so colour is never the only channel', () =>
       const isLow = cell.className.includes('sign-low');
       const isHigh = cell.className.includes('sign-high');
       if (!isLow && !isHigh) continue;
-      const mark = cell.byClass('sign-mark');
-      assert.equal(mark.length, 1, 'a signed figure has no arrow');
-      assert.equal(mark[0].textContent, isLow ? '▼' : '▲');
+      const text = cell.textContent;
+      assert.match(text, /^[\u2212+]\d/,
+        `a signed figure reads as a level, not a change: ${text}`);
+      assert.equal(text.startsWith('\u2212'), isLow,
+        `sign character disagrees with the class: ${text}`);
       if (isLow) low += 1; else high += 1;
     }
   }
   assert.ok(low > 0 && high > 0, `expected both signs, got ${low} low and ${high} high`);
 });
 
-test('the log-scaled depth ruler draws its axis instead of hiding the transform', () => {
-  const axis = get('ruler-head').byClass('ruler-axis');
-  assert.equal(axis.length, 1, 'the log ruler has no drawn axis');
-  assert.match(axis[0].textContent, /\$100/);
-  assert.match(axis[0].textContent, /\$1M/);
-  assert.match(get('depth-note').textContent, /log scale/i,
-    'the log transform is no longer disclosed in words');
+test('a one percent dip does not render as a collapse', () => {
+  // The specific misreading this replaced: AMD at 99% of its median.
+  const rows = get('depth-body').byTag('tr');
+  const amd = rows.find((r) => r.textContent.includes('AMD'));
+  assert.ok(amd, 'AMD is not in the table');
+  const signed = amd.byTag('td').filter((c) => /sign-(low|high)/.test(c.className));
+  assert.equal(signed.length, 1);
+  const value = Number(signed[0].textContent.replace('\u2212', '-').replace('%', ''));
+  assert.ok(Math.abs(value) < 50,
+    `AMD renders as ${signed[0].textContent}, which reads far larger than its true change`);
+});
+
+test('the table applies no undisclosed transform to magnitudes', () => {
+  // A log-scaled bar used to sit in this table. It compressed a 94x gap between the first
+  // and tenth pool into bars of 100% and 59% width, which is a transform that flatters the
+  // data whether or not its axis is drawn. It was removed rather than relabelled: the hero
+  // band already carries magnitude, and the table's job is exact values.
+  const body = get('depth-body');
+  const scaled = body.descendants().filter((n) => n.style.width !== undefined && n.style.width);
+  assert.equal(scaled.length, 0,
+    `${scaled.length} scaled elements in the table; a bar here needs a drawn axis or removal`);
+
+  // Magnitude is instead legible as a share, which states the gap rather than drawing it.
+  const first = get('depth-body').byTag('tr')[0].byTag('td');
+  const shares = first.filter((c) => /%$/.test(c.textContent));
+  assert.ok(shares.length >= 1, 'no share column to carry magnitude');
+  assert.match(get('depth-note').textContent, /Share is of all depth/);
 });
 
 test('the headline follows the data rather than the markup', () => {

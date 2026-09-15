@@ -1,0 +1,14 @@
+{
+  "test/boundary.test.mjs": 4,
+  "test/counts.test.mjs": 3,
+  "test/findings.test.mjs": 8,
+  "test/kernel.test.mjs": 6,
+  "test/liquidity-math.test.mjs": 7,
+  "test/render.test.mjs": 13,
+  "test/tick-math-sweep.test.mjs": 6,
+  "test/wait-for-pid.test.mjs": 7,
+  "export/test_bandwalk.py": 8,
+  "export/test_build_output.py": 17,
+  "export/test_windows.py": 8,
+  "ingest/test_dedup.py": 11
+}
