@@ -47,6 +47,41 @@ PEAPOD_LP_TERMINAL=~/lp-terminal PYTHONPATH=$PEAPOD_LP_TERMINAL/engine:export \
 It needs `polars` and `numpy`; lp-terminal's `.venv` already has them. peapod does not yet
 own a Python environment of its own — that is a loose end, not a decision.
 
+## The data files
+
+`export/build.py` writes four top-level files plus a per-pool directory:
+
+| File | Size | What |
+|---|---|---|
+| `web/data/meta.json` | 4 KB | provenance, anchors, both depth bases, caveats |
+| `web/data/pools.json` | 24 KB | the universe, and which widths each pool can express |
+| `web/data/depth.json` | 171 KB | ±1% depth per pool, both bases, 7-day series |
+| `web/data/windows.json` | 741 KB | 5,650 calculator windows, columnar, no kernels |
+| `web/data/windows/<pool>.json` | 15 KB median | that pool's fee kernels |
+
+Every file carries the same provenance block — deliberate duplication, because these get
+downloaded and quoted individually and a depth figure without its anchor will be misread.
+
+**Why windows is split.** Held as one object per window it came to 12.3 MB, and 39% of that
+was fee kernels that only ever matter one pool at a time. Rounding and columnar encoding cut
+the rest; the kernels moved to per-pool files the calculator fetches when a pool is selected.
+This is a deviation from the one-file plan, forced by measurement.
+
+**The calculator precompute.** The IL term is size-independent — position value and the hold
+benchmark are both linear in L, and L is linear in notional — so it is computed once per
+window. Only fees depend on size, and only through `L/(L + active)`, so each window ships a
+bucketed kernel: `fees(N) = Σ G·L/(L+A)` with `L = liquidity_per_dollar · N`. That is the
+same functional form as the exact sum, not a curve fitted to it. Bucket width is chosen per
+window by measuring the error against the exact sum and narrowing until it is under 0.1%;
+each window ships its own certified bound. Two earlier designs were measured against real
+segments and discarded: fixed 2× buckets (1.1% worst error) and a sampled size grid with
+log-log interpolation (0.37% at 41 points per window, both worse and larger).
+
+The fee model is `fee_attribution.py` — per-swap tick splitting, grossed up for v4 taking
+the fee before the price moves, price-taker. `export/test_windows.py` asserts peapod's
+faster splitter is segment-for-segment identical to lp-terminal's on randomised maps; only
+the lookup differs.
+
 ## Executable depth
 
 `export/executable_depth.py` replaces the flat-L depth figure with a walk of the real tick
@@ -76,6 +111,17 @@ tape's end the tick map is stale — 19 of the top 25 pools fail to reconstruct 
 is therefore taken at each pool's last swap at or before the ModifyLiquidity head. That
 costs five hours of freshness and buys a number that can be checked against the chain. Both
 timestamps ship with the data.
+
+**The replay is checked at every swap, not just at the anchor.** Building the fee segments
+walks the tick map through all 2.4 million swaps in the universe, and every Swap event
+carries the pool's real post-swap active liquidity. The reconstruction matched the chain at
+**every single swap** — zero mismatches.
+
+**"Nine of ten below their 7-day median" becomes eight of ten.** lp-terminal's median took
+the median liquidity and median sqrt price over the window and valued that once. peapod
+samples executable depth every four hours and takes the median of the depths. The two are
+different statistics, and on the second one SPY #1 sits at 109% of its own median rather
+than below it.
 
 **The flat-L figure was never an upper bound.** lp-terminal describes it as one, and for
 most pools it is: SPY #1 is at 86.9% of it, GOOGL at 71.4%. But liquidity can also switch

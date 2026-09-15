@@ -1,0 +1,21 @@
+[project]
+name = "peapod-export"
+version = "0.1.0"
+description = "Offline data export for peapod: reads lp-terminal's tapes, writes the site's JSON"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "polars>=1.0",
+    "numpy>=2.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["export"]
+python_files = ["test_*.py"]

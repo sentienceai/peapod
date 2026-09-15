@@ -8,7 +8,7 @@ time it ran: a tick whose boundary coincides with the current price was skipped 
 than crossed, so its liquidityNet was never applied and every later segment ran on the
 wrong liquidity.
 
-Usage:  PEAPOD_LP_TERMINAL=~/lp-terminal python export/test_executable_depth.py
+Usage:  PEAPOD_LP_TERMINAL=~/lp-terminal uv run pytest export/
 """
 
 from __future__ import annotations
@@ -17,8 +17,13 @@ import math
 import sys
 import unittest
 
-import executable_depth as E
-from liquidity_math import get_amount0_delta, get_amount1_delta, get_sqrt_price_at_tick
+import bandwalk as E
+from upstream import engine
+
+lm, _LP_ROOT, _CASES = engine()
+get_sqrt_price_at_tick = lm.get_sqrt_price_at_tick
+get_amount0_delta = lm.get_amount0_delta
+get_amount1_delta = lm.get_amount1_delta
 
 SP = get_sqrt_price_at_tick(0)
 TICK = 0
@@ -33,7 +38,7 @@ OUT_OF_BAND = 50_000
 
 def walk(net):
     depth, segments, sane = E.walk_band_depth(
-        SP, TICK, L, sorted(net), net, D0, D1, RWA0, PX)
+        lm, SP, TICK, L, sorted(net), net, D0, D1, RWA0, PX)
     return depth, segments, sane
 
 
@@ -83,7 +88,7 @@ def brute(net):
 
 class BandWalk(unittest.TestCase):
     def setUp(self):
-        self.flat = E.flat_band_depth(SP, L, D0, D1, RWA0, PX)
+        self.flat = E.flat_band_depth(lm, SP, L, D0, D1, RWA0, PX)
 
     def test_empty_map_equals_flat_exactly(self):
         # With no initialized ticks there is nothing to cross, so the walk must reduce to
