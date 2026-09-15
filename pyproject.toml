@@ -18,5 +18,5 @@ dev = [
 package = false
 
 [tool.pytest.ini_options]
-testpaths = ["export"]
+testpaths = ["export", "ingest"]
 python_files = ["test_*.py"]

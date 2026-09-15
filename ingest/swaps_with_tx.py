@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -30,7 +31,15 @@ from pathlib import Path
 import polars as pl
 import requests
 
-RPC = "https://rpc.mainnet.chain.robinhood.com"
+from dedup import Deduplicator, log_key
+
+# The endpoint and its pacing are configuration, not constants, so moving to a paid
+# provider is an environment change rather than a code change. The defaults are the free
+# public node and the rate it was measured to tolerate: 25 sub-requests per call, 3s
+# apart, which ran 8/8 where anything faster was refused and then degraded to refusing
+# everything. A provider with 1:1 request billing has no such ceiling, so PEAPOD_RPC_BATCH
+# and PEAPOD_RPC_PACE should be raised with it.
+RPC = os.environ.get("PEAPOD_RPC_URL", "https://rpc.mainnet.chain.robinhood.com")
 POOL_MANAGER = "0x8366a39cc670b4001a1121b8f6a443a643e40951"
 SWAP_TOPIC = "0x40e9cecb9f5f1f1c5b9c97dec2917b7ee92e57ba5563708daca94dd84ad7112f"
 
@@ -138,6 +147,8 @@ def decode(log: dict) -> dict:
     return {
         "pool_id": log["topics"][1],
         "block": int(log["blockNumber"], 16),
+        "block_hash": log.get("blockHash"),
+        "removed": bool(log.get("removed", False)),
         "log_index": int(log["logIndex"], 16),
         "tx_hash": log["transactionHash"],
         "tx_index": int(log["transactionIndex"], 16),
@@ -196,6 +207,7 @@ def main() -> int:
 
     print(f"pools {len(pool_ids)}  blocks {start:,}..{end:,}  resuming at {cursor:,}")
     width = 20_000
+    seen = Deduplicator(key_of=log_key)
     buffer: list[dict] = []
     began = time.time()
 
@@ -213,7 +225,10 @@ def main() -> int:
             time.sleep(PACE * 3)
             continue
 
-        buffer.extend(decode(log) for log in logs)
+        for log in logs:
+            record = decode(log)
+            if seen.accept(record):
+                buffer.append(record)
         got = len(logs)
         cursor = hi + 1
 
@@ -248,6 +263,11 @@ def main() -> int:
     save_checkpoint(state)
     print(f"\ndone: {state['rows']:,} swaps in {state['part']} parts, "
           f"{state['calls']:,} calls, {(time.time() - began) / 60:.1f} min")
+    print(f"identity: {seen.summary()}")
+    if seen.conflicts:
+        (OUT.parent / "swap_conflicts.json").write_text(json.dumps(seen.conflicts[:1000], indent=1))
+        print(f"  {len(seen.conflicts)} position conflicts written to out/swap_conflicts.json -- "
+              "same block number and log index on different block hashes, NOT resolved here")
     return 0
 
 

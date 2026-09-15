@@ -33,13 +33,22 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import time
 from pathlib import Path
 
 import polars as pl
 import requests
 
-RPC = "https://rpc.mainnet.chain.robinhood.com"
+from dedup import Deduplicator, tx_key
+
+# The endpoint and its pacing are configuration, not constants, so moving to a paid
+# provider is an environment change rather than a code change. The defaults are the free
+# public node and the rate it was measured to tolerate: 25 sub-requests per call, 3s
+# apart, which ran 8/8 where anything faster was refused and then degraded to refusing
+# everything. A provider with 1:1 request billing has no such ceiling, so PEAPOD_RPC_BATCH
+# and PEAPOD_RPC_PACE should be raised with it.
+RPC = os.environ.get("PEAPOD_RPC_URL", "https://rpc.mainnet.chain.robinhood.com")
 HERE = Path(__file__).resolve().parent
 SWAPS = HERE / "out" / "swaps_tx"
 OUT = HERE / "out" / "tx_from"
@@ -48,9 +57,12 @@ PIDFILE = Path(__file__).resolve().parent / "out" / "resolve_senders.pid"
 
 # Measured, not assumed: 25 sub-requests 3s apart ran 8/8: anything faster was refused and
 # then degraded to refusing everything for a while.
-BATCH = 25
-PACE = 3.0
-PART_ROWS = 50_000
+BATCH = int(os.environ.get("PEAPOD_RPC_BATCH", "25"))
+PACE = float(os.environ.get("PEAPOD_RPC_PACE", "3.0"))
+PART_ROWS = int(os.environ.get("PEAPOD_PART_ROWS", "5000"))
+# A long run must also flush on time, not only on volume: a quiet stretch of blocks can
+# hold tens of thousands of rows in memory for an hour, and a crash there loses all of it.
+FLUSH_SECONDS = 300
 
 SESSION = requests.Session()
 
@@ -132,6 +144,7 @@ def resolve_blocks(blocks: list[int], wanted: set[str]) -> tuple[list[dict], lis
             if not result:
                 continue
             seen.add(blocks[idx])
+            block_hash = result.get("hash")
             for tx in result.get("transactions") or []:
                 h = tx.get("hash")
                 if h in wanted:
@@ -140,6 +153,7 @@ def resolve_blocks(blocks: list[int], wanted: set[str]) -> tuple[list[dict], lis
                         "tx_from": tx["from"].lower(),
                         "tx_to": (tx.get("to") or "").lower() or None,
                         "block": blocks[idx],
+                        "block_hash": block_hash,
                     })
         missing = [b for b in blocks if b not in seen]
         return rows, missing
@@ -182,7 +196,20 @@ def main() -> int:
     state = load_checkpoint()
     buffer: list[dict] = []
     unresolved: list[int] = []
+    seen = Deduplicator(key_of=tx_key, track_conflicts=False)
     began = time.time()
+    last_flush = time.time()
+
+    def flush():
+        nonlocal buffer, last_flush
+        if buffer:
+            pl.DataFrame(buffer).write_parquet(OUT / f"part-{state['part']:05d}.parquet")
+            state["part"] += 1
+            state["rows"] += len(buffer)
+            buffer = []
+        state["unresolved"] = len(unresolved)
+        CHECKPOINT.write_text(json.dumps(state, indent=1))
+        last_flush = time.time()
 
     for i in range(0, len(todo), BATCH):
         if args.max_hours and (time.time() - began) / 3600 >= args.max_hours:
@@ -190,15 +217,11 @@ def main() -> int:
             break
         chunk = todo[i:i + BATCH]
         rows, missing = resolve_blocks(chunk, wanted)
-        buffer.extend(rows)
+        buffer.extend(r for r in rows if seen.accept(r))
         unresolved.extend(missing)
 
-        if len(buffer) >= PART_ROWS:
-            pl.DataFrame(buffer).write_parquet(OUT / f"part-{state['part']:05d}.parquet")
-            state["part"] += 1
-            state["rows"] += len(buffer)
-            buffer = []
-            CHECKPOINT.write_text(json.dumps(state, indent=1))
+        if len(buffer) >= PART_ROWS or time.time() - last_flush >= FLUSH_SECONDS:
+            flush()
 
         if (i // BATCH) % 40 == 0:
             elapsed = max(time.time() - began, 1)
@@ -209,14 +232,10 @@ def main() -> int:
                   f"unresolved {len(unresolved):,}", flush=True)
         time.sleep(PACE)
 
-    if buffer:
-        pl.DataFrame(buffer).write_parquet(OUT / f"part-{state['part']:05d}.parquet")
-        state["part"] += 1
-        state["rows"] += len(buffer)
-    state["unresolved"] = len(unresolved)
-    CHECKPOINT.write_text(json.dumps(state, indent=1))
+    flush()
     if unresolved:
         (HERE / "out" / "unresolved_blocks.txt").write_text("\n".join(map(str, unresolved)))
+    print(f"identity: {seen.summary()}", flush=True)
     print(f"\nresolved {state['rows']:,} swap transactions, "
           f"{len(unresolved):,} blocks unresolved, {(time.time() - began) / 60:.1f} min",
           flush=True)

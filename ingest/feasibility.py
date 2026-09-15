@@ -10,7 +10,14 @@ single position change per token before anything is counted: deltas are summed w
 transaction nets to zero and disappears, which is what actually happened. Volume is
 counted once per transaction, not once per leg.
 
-Usage:  uv run python ingest/feasibility.py
+COVERAGE IS CHECKED, NOT ASSUMED. Resolution runs newest-first, so at any moment some
+recent window is complete and everything older is partial. A window that is only partly
+resolved cannot answer question 3 at all: an address whose earlier trades are missing looks
+like one that acquired tokens off-tape. So each window reports the share of its swaps with a
+resolved payer, and anything under the threshold is reported as incomplete rather than
+quietly averaged in.
+
+Usage:  uv run python ingest/feasibility.py [--days N ...]
 """
 
 from __future__ import annotations
@@ -185,14 +192,56 @@ def report(df: pl.DataFrame, netted: pl.DataFrame) -> None:
               f"{r['tickers']:>8}{short_tokens[r['tx_from']]:>10}")
 
 
+COVERAGE_FLOOR = 0.999
+
+
+def window(df: pl.DataFrame, days: float) -> tuple[pl.DataFrame, float]:
+    """The last `days` of tape, and the share of its swaps with a resolved payer."""
+    cutoff = int(df["ts"].max()) - int(days * 86400)
+    w = df.filter(pl.col("ts") >= cutoff)
+    if len(w) == 0:
+        return w, 0.0
+    return w, w.filter(pl.col("tx_from").is_not_null()).height / len(w)
+
+
+def coverage_table(df: pl.DataFrame, day_list) -> None:
+    print("=" * 78)
+    print("RESOLUTION COVERAGE  (newest-first; a partial window cannot answer question 3)")
+    print("=" * 78)
+    for days in day_list:
+        w, cov = window(df, days)
+        flag = "complete" if cov >= COVERAGE_FLOOR else "INCOMPLETE — do not report"
+        print(f"  last {days:>4}d: {len(w):>9,} swap legs, payer resolved for "
+              f"{cov * 100:6.2f}%   {flag}")
+    _, total_cov = window(df, 1e9)
+    print(f"  whole tape: {len(df):>9,} swap legs, payer resolved for {total_cov * 100:6.2f}%")
+
+
 def main() -> int:
+    import argparse
     import sys
     sys.path.insert(0, str(HERE.parent / "export"))
     from upstream import lp_terminal  # noqa: PLC0415
 
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--days", type=float, nargs="*", default=[1, 3, 7],
+                    help="windows to check for the convergence report")
+    ap.add_argument("--report", type=float, default=None,
+                    help="run the full three-question report on this window")
+    args = ap.parse_args()
+
     df = derive(load(lp_terminal()))
-    netted = net_transactions(df)
-    report(df, netted)
+    coverage_table(df, args.days)
+
+    if args.report is not None:
+        w, cov = window(df, args.report)
+        print(f"\nreporting on the last {args.report} days "
+              f"({cov * 100:.2f}% of its legs have a resolved payer)")
+        if cov < COVERAGE_FLOOR:
+            print("  refusing: this window is not fully resolved, so any count of addresses")
+            print("  holding tokens they did not buy here would be an artefact of the gap.")
+            return 1
+        report(w, net_transactions(w))
     return 0
 
 
