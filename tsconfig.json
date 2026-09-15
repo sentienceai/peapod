@@ -1,0 +1,30 @@
+{
+  "//": [
+    "Lint only. peapod has no build step: this never emits, and nothing it produces is",
+    "served. It exists so the BigInt engine — where types matter most and where a silent",
+    "Number/BigInt mix would be a correctness bug — is checked without putting a",
+    "transform between the file the parity tests prove and the file the browser loads.",
+    "Types are written as JSDoc in the .js sources for the same reason."
+  ],
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+
+    "strict": true,
+    "noImplicitOverride": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "exactOptionalPropertyTypes": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true
+  },
+  "include": ["web/**/*.js", "test/**/*.mjs"]
+}

@@ -1,0 +1,12 @@
+[profile.default]
+src = "src"
+out = "out"
+test = "test"
+solc = "0.8.26"
+evm_version = "cancun"
+remappings = [
+  "v4-core/=/Users/sentientai/lp-terminal/contracts/lib/v4-core/src/",
+  "forge-std/=/Users/sentientai/lp-terminal/contracts/lib/forge-std/src/",
+  "lp-terminal/=/Users/sentientai/lp-terminal/contracts/src/",
+]
+fs_permissions = [{ access = "write", path = "./" }]

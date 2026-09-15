@@ -1,0 +1,19 @@
+{
+  "name": "peapod",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Public data site for tokenized equity pools on Robinhood Chain.",
+  "scripts": {
+    "test": "node --test 'test/*.test.mjs'",
+    "lint": "tsc --noEmit",
+    "check": "npm run lint && npm test"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2"
+  }
+}
