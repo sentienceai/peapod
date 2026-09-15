@@ -324,3 +324,111 @@ test('two charts on one page do not share clip ids', async () => {
     .filter((/** @type {any} */ n) => n.tag === 'clipPath')[0].attributes.id;
   assert.notEqual(idOf(a), idOf(b), 'clip ids collide, so one chart would clip the other');
 });
+
+test('tokens render a logo where we have one and initials where we do not', async () => {
+  const { setTokenLogos, tokenCell } = await import('../web/lib/token.js');
+  setTokenLogos({ SPY: '0x1111111111111111111111111111111111111111.png' });
+
+  const known = /** @type {any} */ (tokenCell('SPY'));
+  const img = known.descendants().find((/** @type {any} */ n) => n.tag === 'img');
+  assert.ok(img, 'a token with a mapped logo rendered no image');
+  assert.equal(img.attributes.src, '/token-logos/0x1111111111111111111111111111111111111111.png');
+  assert.equal(img.attributes.alt, '', 'the ticker is already text; the logo is decorative');
+  assert.ok(known.descendants().some((/** @type {any} */ n) => n.className === 'token-tile'
+    && n.textContent === 'SP'), 'no initials tile underneath the image');
+  assert.ok(known.textContent.includes('SPY'), 'the ticker itself is not readable');
+
+  const unknown = /** @type {any} */ (tokenCell('ZZZZ'));
+  assert.equal(unknown.descendants().filter((/** @type {any} */ n) => n.tag === 'img').length, 0);
+  assert.ok(unknown.descendants().some((/** @type {any} */ n) => n.textContent === 'ZZ'));
+});
+
+test('a logo filename that is not one of ours never reaches a URL', async () => {
+  const { setTokenLogos, tokenCell } = await import('../web/lib/token.js');
+  for (const bad of ['../../etc/passwd', 'x.png', '0xabc.png', 'sPy.PNG',
+    '0x1111111111111111111111111111111111111111.svg',
+    '0x1111111111111111111111111111111111111111.png?x=1']) {
+    setTokenLogos({ SPY: bad });
+    assert.equal(/** @type {any} */ (tokenCell('SPY')).descendants()
+      .filter((/** @type {any} */ n) => n.tag === 'img').length, 0,
+    `a rejected filename reached the DOM: ${bad}`);
+  }
+});
+
+test('a broken image falls back to the tile without being bound to individually', async () => {
+  const { setTokenLogos, tokenCell } = await import('../web/lib/token.js');
+  setTokenLogos({ SPY: '0x1111111111111111111111111111111111111111.png' });
+
+  // Attached after load, the way the modal attaches its rows: the delegated listener has
+  // to catch this without anyone having bound to this particular image.
+  const cell = /** @type {any} */ (tokenCell('SPY'));
+  get('subtable').append(cell);
+
+  const img = cell.descendants().find((/** @type {any} */ n) => n.tag === 'img');
+  assert.equal(img.listeners.length, 0, 'the image carries its own error handler');
+
+  img.dispatchEvent({ type: 'error' });
+
+  assert.equal(cell.descendants().filter((/** @type {any} */ n) => n.tag === 'img').length, 0,
+    'the failed image is still in the DOM, so it renders as a broken-image glyph');
+  const tile = cell.descendants().find((/** @type {any} */ n) => n.className === 'token-tile');
+  assert.ok(tile && tile.textContent === 'SP', 'no initials left once the image failed');
+  assert.ok(cell.textContent.includes('SPY'), 'the ticker went with the image');
+  cell.remove();
+});
+
+test('token logos reach the leaderboard column and every tab that names a token', async () => {
+  const logos = JSON.parse(
+    await readFile(new URL('../web/data/tokens.json', import.meta.url), 'utf8'),
+  );
+  const { setTokenLogos } = await import('../web/lib/token.js');
+  setTokenLogos(logos);
+  // Earlier tests leave their own map behind, and the rows were built at boot. Force a
+  // re-render so this asserts what the page builds, not what it built before.
+  get('head').byTag('button')[0].onclick?.(/** @type {any} */ ({}));
+
+  const chipImgs = get('rows').descendants()
+    .filter((/** @type {any} */ n) => n.tag === 'img' && n.attributes['data-token-logo'] !== undefined);
+  assert.ok(chipImgs.length > 0, 'the Tokens column renders no logos');
+  assert.ok(chipImgs.every((/** @type {any} */ n) => /^\/token-logos\/0x[0-9a-f]{40}\.(png|jpg|jpeg|webp)$/
+    .test(n.attributes.src)), 'a logo src is not a token-logos path');
+
+  const { openDetail } = await import('../web/lib/detail.js');
+  const top = JSON.parse(
+    await readFile(new URL('../web/data/leaderboard/rwa-usdg-all.json', import.meta.url), 'utf8'),
+  ).rows[0];
+  await openDetail(top.address);
+  const buttons = get('subtabs').byTag('button');
+  const labels = buttons.map((/** @type {any} */ b) => b.textContent);
+  for (const label of ['Round-trips', 'Trades', 'Tokens']) {
+    buttons[labels.indexOf(label)].onclick?.(/** @type {any} */ ({}));
+    const rendered = get('subtable').descendants();
+    assert.ok(rendered.some((/** @type {any} */ n) => n.className === 'token-tile'),
+      `${label} names tokens without the icon treatment`);
+    assert.ok(rendered.some((/** @type {any} */ n) => n.tag === 'img'
+      && n.attributes['data-token-logo'] !== undefined), `${label} renders no logos at all`);
+  }
+});
+
+test('every ticker the shipped data actually uses resolves to a logo file', async () => {
+  // Coverage is 35 of the top 50 by volume across the whole registry, but the page only
+  // ever names the tokens that were traded. If one of those is missing a file the tile is
+  // correct behaviour, not a bug — this pins the number so a drop is visible.
+  const { readdir } = await import('node:fs/promises');
+  const logos = JSON.parse(
+    await readFile(new URL('../web/data/tokens.json', import.meta.url), 'utf8'),
+  );
+  const root = new URL('../web/data/address/', import.meta.url);
+  const used = new Set();
+  for (const shard of (await readdir(root)).slice(0, 12)) {
+    for (const name of (await readdir(new URL(`${shard}/`, root))).slice(0, 40)) {
+      const d = JSON.parse(await readFile(new URL(`${shard}/${name}`, root), 'utf8'));
+      for (const t of d.tokens ?? []) used.add(t.token);
+      for (const t of d.round_trips ?? []) used.add(t.token);
+      for (const t of d.trades ?? []) used.add(t.token);
+    }
+  }
+  assert.ok(used.size > 20, 'the sample found too few tickers to say anything');
+  const missing = [...used].filter((t) => !logos[t]);
+  assert.deepEqual(missing, [], `tickers in use with no logo: ${missing.join(', ')}`);
+});

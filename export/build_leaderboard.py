@@ -400,6 +400,31 @@ def write_address(addr: str, state, lo: int, hi: int, out: Path, provenance: dic
         json.dumps(payload, separators=(",", ":"), allow_nan=False, default=plain))
 
 
+def write_token_logos(tokens: pl.DataFrame, web: Path) -> dict:
+    """Map ticker -> logo filename, for the tickers where that map is unambiguous.
+
+    The logo files are named by contract address; the shipped data names tokens by
+    ticker.  Three tickers in the registry resolve to more than one address ("P" covers
+    four), and there is no way to tell from a row which one it means, so those are left
+    without a logo and fall back to the initials tile.  A wrong logo is worse than none:
+    it puts another company's mark on somebody's trade.
+    """
+    logo_dir = web / "token-logos"
+    files = {p.stem.lower(): p.name for p in logo_dir.iterdir()
+             if p.is_file() and p.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp"}}
+    rwa = tokens.filter(pl.col("kind") == "rwa_spot")
+    by_ticker: dict[str, list[str]] = defaultdict(list)
+    for row in rwa.iter_rows(named=True):
+        by_ticker[row["symbol"]].append(row["address"].lower())
+    mapping = {t: files[a[0]] for t, a in by_ticker.items()
+               if len(a) == 1 and a[0] in files}
+    ambiguous = sorted(t for t, a in by_ticker.items() if len(a) > 1)
+    (web / "data" / "tokens.json").write_text(json.dumps(mapping, sort_keys=True))
+    print(f"token logos: {len(mapping):,} of {len(by_ticker):,} tickers resolve to a file; "
+          f"{len(files):,} files on disk; ambiguous tickers skipped: {ambiguous}")
+    return mapping
+
+
 def main() -> int:
     import sys
     sys.path.insert(0, str(HERE))
@@ -409,6 +434,9 @@ def main() -> int:
     args = ap.parse_args()
 
     root = lp_terminal()
+    web = HERE.parent / "web"
+    write_token_logos(
+        pl.read_parquet(root / "out" / "raw" / "tokens" / "part-00000.parquet"), web)
     df = load(root, args.source)
     trades = netted(df)
     lo, hi = int(trades["ts"].min()), int(trades["ts"].max())

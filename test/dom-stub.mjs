@@ -28,6 +28,8 @@ class Node {
     this.hidden = false;
     this.title = '';
     this.value = '';
+    /** @type {{type: string, fn: (e: any) => void, capture: boolean}[]} */
+    this.listeners = [];
     this.disabled = false;
     this.tabIndex = 0;
     /** @type {((e: any) => void)|null} */
@@ -97,7 +99,51 @@ class Node {
   }
   /** @param {string} name @returns {string} */
   getAttribute(name) { return this.attributes[name] ?? ''; }
-  addEventListener() {}
+  /** @param {string} name */
+  hasAttribute(name) { return this.attributes[name] !== undefined; }
+  /** @param {string} name */
+  removeAttribute(name) { delete this.attributes[name]; }
+
+  get tagName() { return String(this.tag).toUpperCase(); }
+
+  /**
+   * @param {string} type @param {(e: any) => void} fn
+   * @param {boolean | {capture?: boolean}} [opts]
+   */
+  addEventListener(type, fn, opts) {
+    const capture = typeof opts === 'boolean' ? opts : Boolean(opts && opts.capture);
+    this.listeners.push({ type, fn, capture });
+  }
+
+  /**
+   * Dispatch with a real capture phase.
+   *
+   * `error` on an image does NOT bubble, so a listener on an ancestor only ever sees it
+   * during capture. A stub that called listeners on the target alone would let a page
+   * that delegates image fallbacks pass while doing nothing in a browser, so the phases
+   * are modelled rather than collapsed.
+   *
+   * @param {{type: string, bubbles?: boolean}} event
+   */
+  dispatchEvent(event) {
+    /** @type {any[]} */
+    const path = [];
+    for (let n = /** @type {any} */ (this); n; n = n.parent) path.push(n);
+    if (globalThis.document && path[path.length - 1] !== globalThis.document) {
+      path.push(globalThis.document);
+    }
+    const e = { ...event, target: this };
+    for (const n of path.slice(1).reverse()) {
+      for (const l of n.listeners ?? []) if (l.capture && l.type === event.type) l.fn(e);
+    }
+    for (const l of this.listeners ?? []) if (l.type === event.type) l.fn(e);
+    if (event.bubbles) {
+      for (const n of path.slice(1)) {
+        for (const l of n.listeners ?? []) if (!l.capture && l.type === event.type) l.fn(e);
+      }
+    }
+    return true;
+  }
 
   /** @param {string} sel */
   closest(sel) {
@@ -174,6 +220,16 @@ export async function install(htmlUrl) {
     createElement: (/** @type {string} */ tag) => new Node(tag),
     createTextNode: (/** @type {unknown} */ text) => String(text),
     createElementNS: (/** @type {string} */ _ns, /** @type {string} */ tag) => new Node(tag),
+    /** @type {any[]} */
+    listeners: [],
+    /**
+     * @param {string} type @param {(e: any) => void} fn
+     * @param {boolean | {capture?: boolean}} [opts]
+     */
+    addEventListener(type, fn, opts) {
+      const capture = typeof opts === 'boolean' ? opts : Boolean(opts && opts.capture);
+      document.listeners.push({ type, fn, capture });
+    },
   };
 
   globalThis.document = /** @type {any} */ (document);

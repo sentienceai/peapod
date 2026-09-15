@@ -13,6 +13,7 @@
  */
 
 import { areaChart } from './chart.js';
+import { tokenCell } from './token.js';
 
 const NS_TEXT = (/** @type {string} */ t) => document.createTextNode(t);
 /** @param {string} id */
@@ -218,7 +219,7 @@ function renderChart(d) {
 const TABS = [
   ['Round-trips', (/** @type {Detail} */ d) => ({
     cols: ['Token', 'Qty', 'Bought', 'Sold', 'Held', 'Closed', 'Realized'],
-    rows: d.round_trips.map((/** @type {any} */ t) => [t.token, t.qty.toFixed(4), money(t.buy),
+    rows: d.round_trips.map((/** @type {any} */ t) => [tokenCell(t.token), t.qty.toFixed(4), money(t.buy),
       money(t.sell), duration(t.held), when(t.closed), signed(t.realized)]),
     empty: 'No completed round-trips.',
   })],
@@ -228,14 +229,14 @@ const TABS = [
       const side = node('span', t.side === 'buy' ? 'up' : 'down');
       side.append(node('span', 'mark', t.side === 'buy' ? '▲' : '▼'));
       side.append(NS_TEXT(t.side === 'buy' ? 'Buy' : 'Sell'));
-      return [when(t.ts), t.token, side, t.qty.toFixed(4), money(t.price), money(t.value)];
+      return [when(t.ts), tokenCell(t.token), side, t.qty.toFixed(4), money(t.price), money(t.value)];
     }),
     empty: 'No position changes in this window.',
     note: 'Most recent 100. Each row is one transaction netted across its legs, not one swap.',
   })],
   ['Tokens', (/** @type {Detail} */ d) => ({
     cols: ['Token', 'Round-trips', 'Win rate', 'Matched vol', 'Realized'],
-    rows: d.tokens.map((/** @type {any} */ t) => [t.token, String(t.round_trips),
+    rows: d.tokens.map((/** @type {any} */ t) => [tokenCell(t.token), String(t.round_trips),
       `${t.win_rate.toFixed(0)}%`, money(t.matched), signed(t.realized)]),
     empty: 'No token has a completed round-trip.',
   })],

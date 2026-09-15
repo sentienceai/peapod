@@ -11,6 +11,7 @@
 
 import { sparkline } from './lib/spark.js';
 import { closeDetail, openDetail } from './lib/detail.js';
+import { setTokenLogos, tokenCell } from './lib/token.js';
 
 /** @param {string} id */
 const el = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
@@ -60,6 +61,10 @@ function signedPct(n) {
 const shortAddr = (a) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
 const index = await fetch('/data/leaderboard/index.json').then((r) => r.json());
+// Logos are decoration over data that already renders; a failed map leaves every
+// token on its initials tile rather than failing the page.
+setTokenLogos(await fetch('/data/tokens.json')
+  .then((r) => (r.ok ? r.json() : {})).catch(() => ({})));
 
 const state = {
   window: index.windows.at(-1)?.window ?? 'all',
@@ -244,7 +249,7 @@ function render() {
 
     const toks = node('td');
     const chips = node('span', 'chips');
-    for (const t of r.tokens) chips.append(node('span', 'chip', t));
+    for (const t of r.tokens) chips.append(tokenCell(t, 'chip'));
     if (r.token_count > r.tokens.length) chips.append(node('span', 'chip', `+${r.token_count - r.tokens.length}`));
     toks.append(chips);
     tr.append(toks);
