@@ -13,7 +13,9 @@ read-only upstreams; peapod copies and ports from them, never edits them.
 The v4 math engine is ported to BigInt with parity tests green, and executable ±1% depth
 is computed by walking the real tick liquidity map. The site itself is not built yet.
 
-**The headline number moved: 80.8% → 75.8%.** See [Executable depth](#executable-depth).
+**The headline number moved: 80.8% → 75.8%**, and two published claims are restated — the
+7-day-median count (eight of ten, not nine) and the flat-L "upper bound" (it is neither an
+upper nor a lower bound). See [Executable depth](#executable-depth).
 
 ## Constraints
 
@@ -117,17 +119,24 @@ walks the tick map through all 2.4 million swaps in the universe, and every Swap
 carries the pool's real post-swap active liquidity. The reconstruction matched the chain at
 **every single swap** — zero mismatches.
 
-**"Nine of ten below their 7-day median" becomes eight of ten.** lp-terminal's median took
-the median liquidity and median sqrt price over the window and valued that once. peapod
-samples executable depth every four hours and takes the median of the depths. The two are
-different statistics, and on the second one SPY #1 sits at 109% of its own median rather
-than below it.
+**"Nine of ten below their 7-day median" is restated: it is eight of ten, and SPY #1 is at
+109%.** lp-terminal took the median liquidity and the median sqrt price over the window and
+valued that pair once. peapod samples executable depth every four hours across the seven
+days and takes the median of those depths. Executable depth is a function of the whole book,
+so a median of the inputs is not the median of the output — they are different statistics,
+and peapod publishes the second. On it, eight of the top ten sit below their own median and
+the largest pool sits *above* it, at 109%.
+
+Both this and the flat-L correction ship in every data file under `provenance.restatements`,
+generated from the computed rows rather than typed in. `test_build_output.py` recomputes both
+counts from `depth.json` and fails if the shipped prose disagrees, so neither can quietly
+revert.
 
 **The flat-L figure was never an upper bound.** lp-terminal describes it as one, and for
-most pools it is: SPY #1 is at 86.9% of it, GOOGL at 71.4%. But liquidity can also switch
-*on* inside the band, and then real depth is larger — SPCX 103.6%, TSLA 112.4%. Across
-pools with a real book the ratio runs p5=69%, p50=100%, p95=116%. It is a point estimate
-that errs in both directions, not a ceiling.
+most pools it is: SPY #1 is at 87% of it, GOOGL at 71%. But liquidity can also switch *on*
+inside the band, and then real depth is larger — SPCX 104%, TSLA 112%. Across the 58 pools
+with a real book the ratio runs p5=69%, p50=100%, p95=116%. It is a point estimate that errs
+in both directions, not a ceiling.
 
 ## The math engine
 

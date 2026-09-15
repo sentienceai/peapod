@@ -58,6 +58,47 @@ class ShippedFiles(unittest.TestCase):
         caveats = " ".join(self.files["depth.json"]["provenance"]["caveats"]).lower()
         self.assertIn("errs in both directions", caveats)
 
+    def test_the_median_claim_is_restated_and_matches_the_data(self):
+        # lp-terminal published "nine of ten top pools below their 7-day median". peapod's
+        # median is a different statistic and gives a different answer, so the restatement
+        # ships with the data -- and is checked against the data, not merely spell-checked,
+        # so it cannot quietly revert to the old claim or drift away from the new one.
+        restatements = self.files["meta.json"]["provenance"]["restatements"]
+        entry = next(r for r in restatements if r["id"] == "top10_below_7d_median")
+
+        pools = self.files["depth.json"]["pools"]
+        top10 = pools[:10]
+        below = [p for p in top10
+                 if p["pct_of_median_executable"] is not None
+                 and p["pct_of_median_executable"] < 100]
+
+        self.assertEqual(entry["peapod_count"], len(below))
+        self.assertEqual(entry["peapod_of"], len(top10))
+        self.assertEqual(len(below), 8, "the restated count no longer matches the data")
+
+        # The leader is named, is above its median, and the figure quoted is the real one.
+        leader = pools[0]
+        self.assertEqual(entry["leader"]["pool_id"], leader["pool_id"])
+        self.assertAlmostEqual(entry["leader"]["pct_of_median_executable"],
+                               leader["pct_of_median_executable"], places=6)
+        self.assertGreater(leader["pct_of_median_executable"], 100,
+                           "the leader is no longer above its median; restate the claim")
+
+        # And the prose agrees with the numbers beside it.
+        text = entry["restated"]
+        self.assertIn(f"{len(below)} of {len(top10)}", text)
+        self.assertIn("not nine of ten", text)
+        self.assertIn(f"{leader['pct_of_median_executable']:.0f}%", text)
+        self.assertIn(leader["ticker"], text)
+
+    def test_the_median_restatement_travels_with_every_file(self):
+        for name, payload in self.files.items():
+            ids = {r["id"] for r in payload["provenance"]["restatements"]}
+            self.assertIn("top10_below_7d_median", ids, f"{name} lost the restatement")
+            self.assertIn("flat_l_upper_bound", ids, f"{name} lost the restatement")
+            joined = " ".join(payload["provenance"]["caveats"]).lower()
+            self.assertIn("eight of ten", joined, f"{name} lost the restated median claim")
+
     def test_the_subsidy_caveat_travels_with_every_file(self):
         for name, payload in self.files.items():
             joined = " ".join(payload["provenance"]["caveats"])

@@ -56,7 +56,71 @@ def git_commit(root: Path) -> str | None:
         return None
 
 
-def provenance(root: Path, anchors, engine_cases: int, pools_valued: int, excluded: dict) -> dict:
+def restatements(depth_rows: list[dict]) -> list[dict]:
+    """Published lp-terminal findings that peapod's method changes, with the new numbers.
+
+    These are generated from the rows just computed, never typed in, so a restatement
+    cannot quietly drift away from the data it describes. test_build_output.py recomputes
+    both counts from depth.json and fails if the shipped text disagrees with them.
+    """
+    top10 = depth_rows[:10]
+    below = [r for r in top10
+             if r["pct_of_median_executable"] is not None
+             and r["pct_of_median_executable"] < 100]
+    leader = depth_rows[0]
+    leader_pct = leader["pct_of_median_executable"]
+    ratios = [r["executable_over_flat_pct"] for r in depth_rows
+              if r["executable_over_flat_pct"] is not None and r["depth_flat"] > 1]
+    return [
+        {
+            "id": "top10_below_7d_median",
+            "original_claim": "nine of the top ten pools are below their 7-day median depth",
+            "source": "lp-terminal out/phase4-depth-capacity.md",
+            "peapod_count": len(below),
+            "peapod_of": len(top10),
+            "leader": {
+                "ticker": leader["ticker"],
+                "pool_id": leader["pool_id"],
+                "pct_of_median_executable": leader_pct,
+            },
+            "restated": (
+                f"On peapod's basis it is {len(below)} of {len(top10)}, not nine of ten. "
+                f"The largest pool ({leader['ticker']} {leader['pool_id'][:10]}) sits at "
+                f"{leader_pct:.0f}% of its own 7-day median rather than below it."
+            ),
+            "why": (
+                "lp-terminal took the median liquidity and the median sqrt price over the "
+                "window and valued that pair once. peapod samples executable depth every "
+                f"{depth_mod.SAMPLE_HOURS} hours across the {depth_mod.MEDIAN_DAYS} days "
+                "and takes the median of those depths. Executable depth is a function of "
+                "the whole book, so a median of the inputs is not the median of the "
+                "output. They are different statistics and the second is the one peapod "
+                "publishes."
+            ),
+        },
+        {
+            "id": "flat_l_upper_bound",
+            "original_claim": "the flat-L depth figure is an upper bound on true depth",
+            "source": "lp-terminal engine/depth_distribution.py, Limitations",
+            "restated": (
+                "It is not an upper bound. Liquidity can switch ON inside the band as "
+                "readily as off, and then real depth is larger than the flat-L figure. "
+                f"Across the {len(ratios)} pools with a real book the executable/flat ratio "
+                f"runs p5={np.percentile(ratios, 5):.0f}%, p50={np.percentile(ratios, 50):.0f}%, "
+                f"p95={np.percentile(ratios, 95):.0f}%."
+            ),
+            "why": "It is a point estimate that errs in both directions, not a ceiling.",
+            "ratio_percentiles": {
+                "p5": float(np.percentile(ratios, 5)),
+                "p50": float(np.percentile(ratios, 50)),
+                "p95": float(np.percentile(ratios, 95)),
+            },
+        },
+    ]
+
+
+def provenance(root: Path, anchors, engine_cases: int, pools_valued: int, excluded: dict,
+               depth_rows: list[dict]) -> dict:
     """The block every file carries. Read it as the footnote that cannot be lost."""
     return {
         "generated_at": iso(int(dt.datetime.now(dt.timezone.utc).timestamp())),
@@ -126,6 +190,7 @@ def provenance(root: Path, anchors, engine_cases: int, pools_valued: int, exclud
                             "a reader can see what changed and by how much",
             },
         },
+        "restatements": restatements(depth_rows),
         "caveats": [
             f"Robinhood Chain ran under a gas subsidy that ends {SUBSIDY_END}. Every volume "
             "and activity figure here predates the real cost regime, so every result is "
@@ -136,6 +201,9 @@ def provenance(root: Path, anchors, engine_cases: int, pools_valued: int, exclud
             "The flat-L basis is a point estimate that errs in both directions, not an upper "
             "bound. See depth_bases.flat.caveat.",
             "Chain-wide shares are shares of this universe, not of every pool on the chain.",
+            "lp-terminal's 'nine of ten top pools below their 7-day median' is restated "
+            "here: on peapod's sampled-depth median it is eight of ten, and the largest "
+            "pool is above its median. See `restatements`.",
         ],
     }
 
@@ -315,7 +383,7 @@ def main() -> int:
                   f"{len(window_rows):,} windows")
 
     depth_rows = depth_mod.add_shares(depth_rows)
-    prov = provenance(root, anchors, engine_cases, len(depth_rows), excluded)
+    prov = provenance(root, anchors, engine_cases, len(depth_rows), excluded, depth_rows)
 
     total_exec = sum(r["depth_executable"] for r in depth_rows)
     total_flat = sum(r["depth_flat"] for r in depth_rows)
