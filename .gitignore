@@ -4,3 +4,6 @@ node_modules/
 __pycache__/
 .venv/
 .DS_Store
+
+# Ingested chain data: large, regenerable, and not the deliverable
+ingest/out/
