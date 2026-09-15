@@ -51,9 +51,13 @@ from dedup import Deduplicator, tx_key
 RPC = os.environ.get("PEAPOD_RPC_URL", "https://rpc.mainnet.chain.robinhood.com")
 HERE = Path(__file__).resolve().parent
 SWAPS = HERE / "out" / "swaps_tx"
-OUT = HERE / "out" / "tx_from"
-CHECKPOINT = HERE / "out" / "tx_from.checkpoint.json"
-PIDFILE = Path(__file__).resolve().parent / "out" / "resolve_senders.pid"
+# Each source writes its own tree. Merging two providers into one directory would make
+# the cross-check impossible: agreement can only be asserted between sets kept apart.
+SOURCE = os.environ.get("PEAPOD_SOURCE", "public")
+_suffix = "" if SOURCE == "public" else f"_{SOURCE}"
+OUT = HERE / "out" / f"tx_from{_suffix}"
+CHECKPOINT = HERE / "out" / f"tx_from{_suffix}.checkpoint.json"
+PIDFILE = Path(__file__).resolve().parent / "out" / f"resolve_senders{_suffix}.pid"
 
 # Measured, not assumed: 25 sub-requests 3s apart ran 8/8: anything faster was refused and
 # then degraded to refusing everything for a while.
@@ -170,6 +174,9 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--max-hours", type=float, default=None,
                     help="stop cleanly after this long; the window resolved so far is usable")
+    ap.add_argument("--since-days", type=float, default=None,
+                    help="restrict to the last N days of tape (block density is not uniform, "
+                         "so this is resolved from timestamps, never scaled from a day count)")
     args = ap.parse_args()
     claim_pidfile(PIDFILE)
 
@@ -187,6 +194,16 @@ def main() -> int:
     # Newest first: at any moment the resolved set is a complete recent window, which is
     # the only shape that supports an honest answer about what an address has held.
     blocks = sorted(set(swaps["block"].to_list()), reverse=True)
+    if args.since_days is not None:
+        import numpy as np
+        bt = pl.read_parquet(Path(os.environ["PEAPOD_LP_TERMINAL"]).expanduser()
+                             / "out" / "block_times.parquet").sort("block")
+        bn = bt["block"].to_numpy().astype("int64"); bts = bt["ts"].to_numpy().astype("int64")
+        end_ts = float(np.interp(max(blocks), bn, bts))
+        cutoff = end_ts - args.since_days * 86400
+        blocks = [b for b in blocks if float(np.interp(b, bn, bts)) >= cutoff]
+        print(f"restricted to the last {args.since_days} days of tape: {len(blocks):,} blocks",
+              flush=True)
     todo = [b for b in blocks if b not in done_blocks]
     print(f"{len(wanted):,} swap transactions across {len(blocks):,} blocks; "
           f"{len(done_blocks):,} blocks already done, {len(todo):,} to go", flush=True)
