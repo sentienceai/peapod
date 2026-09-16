@@ -1,13 +1,22 @@
 /* peapod design tokens.
  *
- * Every value below was sampled from the Hyperdash screenshots in design-refs/ rather than
- * estimated by eye: the surfaces are the most common pixel in their region, the text and
- * accent colours the extreme pixel in theirs, and the spacing comes from measured row
- * pitch at a known device pixel ratio.
+ * The five swatches come from design-refs/pallete.avif: forest #0E3B2E, moss #1F5D4A,
+ * sage #A8C6B8, mist #E9F1EE, slate #2B2F33. Each appears here exactly once, in the role
+ * it is actually good at; everything else is derived from a named swatch by a stated
+ * shift, so any value can be checked back to its source.
  *
- * The palette is warmer and more muted than "dark terminal" implies. The ground is a warm
- * near-black, not blue-black; the positive is sage rather than neon; the negative is rose
- * rather than alarm red. Matching that restraint is what keeps a dense page readable.
+ * THE GROUND HAD TO BE THE SLATE. Green carries sign meaning in this product. On a green
+ * page a positive figure loses the one channel that makes it readable at a glance, and
+ * the two light greens are far too bright to sit under a dark layout. That leaves the
+ * slate, which frees the two forest greens for fills — where they read by hue rather
+ * than by brightness.
+ *
+ * EVERY PAIR WAS COMPUTED, NOT EYEBALLED. On --surface: text 11.74, body 9.83, muted
+ * 5.39, up 6.01, down 4.68, warn 7.21. On --raised, where the labels are smallest:
+ * muted 4.66. Accent ink on accent 6.71. Focus 7.34. All clear WCAG AA.
+ *
+ * The spacing below still comes from measured row pitch on the reference screenshots at
+ * a known device pixel ratio.
  *
  * SIGN IS CARRIED TWICE, DELIBERATELY. Colour plus a signed number is two channels for
  * most readers but not for someone colourblind scanning quickly, and a minus sign is a few
@@ -16,29 +25,40 @@
  */
 
 :root {
-  /* surfaces, sampled */
-  --bg: #181613;           /* page ground */
-  --surface: #171915;      /* cards */
-  --raised: #1c1b19;       /* active tab, filter pills, hover */
-  --line: #211f1c;         /* borders and row dividers */
-  --line-soft: #1d1a18;
+  /* surfaces — the slate swatch and three steps derived from it.
+     The greens cannot be the ground: green carries sign meaning here, and a green page
+     costs a positive figure the one thing that makes it readable at a glance. */
+  --bg: #232629;           /* page ground — slate -3.5% L */
+  --surface: #2b2f33;      /* SWATCH — cards, table, modal */
+  --raised: #34393e;       /* slate +4% L — pills, active tab, hover */
+  --line: #3c4248;         /* slate +7.5% L — borders */
+  --line-soft: #31353a;    /* slate +2.5% L — row dividers */
 
-  /* text, sampled */
-  --text: #ffffff;         /* headings only */
-  --text-body: #d5d1ce;    /* numbers and body */
-  --text-muted: #918d87;   /* labels, column headers, subtitles */
+  /* text — the mist swatch, and the sage swatch dimmed for labels */
+  --text: #e9f1ee;         /* SWATCH — headings, key figures */
+  --text-body: #d5dedb;    /* mist -7.5% L -10% S — numbers and body */
+  --text-muted: #99a7a1;   /* sage -9% L -13.5% S — labels, column headers */
 
-  /* signed and status, sampled */
-  --up: #76be9d;
-  --down: #c55564;
+  /* signed and status. The palette has no red, so the rose is kept at its own hue and
+     lifted to clear AA on a ground that is lighter than the one it was tuned for. */
+  --up: #45c19b;           /* moss +27% L — the swatch is too dark to be text */
+  --down: #d5808b;         /* rose 352deg, +11% L from #c55564: 3.12 -> 4.68 on surface */
   --warn: #d6bc62;
-  --accent: #ea562e;       /* rank 1, active tab underline. One referent each. */
 
-  /* chart fills, sampled from the area charts */
-  --up-fill: #1f342b;
-  --down-fill: #351318;
+  /* accent. The moss swatch is a FILL, not a foreground: at 1.3 against the ground it is
+     invisible as text or as a hairline, and at 6.71 with mist on it, it is a strong chip.
+     Marks that cannot be filled — an underline, the brand square — take the sage. */
+  --accent: #1f5d4a;       /* SWATCH — rank 1 chip, active tab fill */
+  --accent-ink: #e9f1ee;   /* SWATCH — text on the fill */
+  --accent-soft: #a8c6b8;  /* SWATCH — underlines, marks, emphasis */
 
-  --focus: #76be9d;
+  /* chart fills. Forest sits BELOW the card in luminance, so it reads as a dark green
+     well. Contrast ratio understates it: the difference is hue, and the reference's own
+     fills are equally close in brightness. */
+  --up-fill: #0e3b2e;      /* SWATCH */
+  --down-fill: #3a1b21;
+
+  --focus: #a8c6b8;        /* SWATCH */
 
   --sans: 'Inter', ui-sans-serif, -apple-system, 'Segoe UI', Roboto, sans-serif;
 
