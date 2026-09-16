@@ -109,6 +109,38 @@ class Node {
   get tagName() { return String(this.tag).toUpperCase(); }
 
   /**
+   * A real classList, kept in sync with className both ways.
+   *
+   * Pages use classList; a stub without one fails at the first `.add`, and a stub whose
+   * classList did not write back to className would let byClass miss the very class the
+   * page just set.
+   */
+  get classList() {
+    const owner = this;
+    const parts = () => String(owner.className).split(/\s+/).filter(Boolean);
+    const write = (/** @type {string[]} */ list) => {
+      owner.className = [...new Set(list)].join(' ');
+      if (owner.attributes.class !== undefined) owner.attributes.class = owner.className;
+    };
+    return {
+      /** @param {string[]} names */
+      add(...names) { write([...parts(), ...names]); },
+      /** @param {string[]} names */
+      remove(...names) { write(parts().filter((c) => !names.includes(c))); },
+      /** @param {string} name */
+      contains(name) { return parts().includes(name); },
+      /** @param {string} name @param {boolean} [on] */
+      toggle(name, on) {
+        const has = parts().includes(name);
+        const want = on === undefined ? !has : on;
+        if (want) this.add(name); else this.remove(name);
+        return want;
+      },
+      get length() { return parts().length; },
+    };
+  }
+
+  /**
    * @param {string} type @param {(e: any) => void} fn
    * @param {boolean | {capture?: boolean}} [opts]
    */
@@ -187,6 +219,14 @@ class Node {
     const d = /** @type {any} */ (globalThis.document);
     if (d) d.activeElement = this;
   }
+
+  blur() {
+    const d = /** @type {any} */ (globalThis.document);
+    if (d && d.activeElement === this) d.activeElement = null;
+  }
+
+  /** Text inputs select their contents when a shortcut focuses them. */
+  select() {}
 
   /** Every node beneath this one, for assertions. */
   descendants() {

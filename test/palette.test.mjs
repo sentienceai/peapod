@@ -80,6 +80,42 @@ test('the moss swatch is used as a fill, never as a foreground', () => {
   void app;
 });
 
+test('the podium medals are ordinal, distinguishable, and readable', () => {
+  // Three ranks in one colour make the order something you read rather than see.
+  const [g, s2, b] = [T['rank-1'], T['rank-2'], T['rank-3']];
+  assert.ok(g && s2 && b, 'the medals are not defined');
+  // Separated by HUE, not luminance: three medals at the same brightness is the point —
+  // they are peers. Luminance contrast is the wrong measure here, and rank is carried by
+  // the numeral in the badge as well, so colour is never the only channel.
+  const hue = (/** @type {string} */ h) => {
+    const [r, g2, b2] = rgb(h); const hi = Math.max(r, g2, b2); const lo = Math.min(r, g2, b2);
+    if (hi === lo) return 0;
+    const d = hi - lo;
+    const t = hi === r ? ((g2 - b2) / d + 6) % 6 : hi === g2 ? (b2 - r) / d + 2 : (r - g2) / d + 4;
+    return t * 60;
+  };
+  const apart = (/** @type {number} */ a, /** @type {number} */ x) => {
+    const d = Math.abs(a - x) % 360; return d > 180 ? 360 - d : d;
+  };
+  for (const [a, x] of [[g, s2], [s2, b], [g, b]]) {
+    assert.ok(apart(hue(a), hue(x)) > 20,
+      `medals ${a} and ${x} are ${apart(hue(a), hue(x)).toFixed(0)} degrees apart`);
+  }
+  // They sit on the card and on the raised surface, so both have to clear AA.
+  for (const m of [g, s2, b]) {
+    for (const ground of ['surface', 'raised']) {
+      const r = contrast(m, T[ground]);
+      assert.ok(r >= 4.5, `${m} on --${ground} is ${r.toFixed(2)}`);
+    }
+  }
+  // Muted, not metallic: a saturated gold on a dark ground tips this into a casino.
+  const sat = (/** @type {string} */ h) => {
+    const [r, g2, b2] = rgb(h); const hi = Math.max(r, g2, b2); const lo = Math.min(r, g2, b2);
+    return hi === 0 ? 0 : (hi - lo) / hi;
+  };
+  for (const m of [g, s2, b]) assert.ok(sat(m) < 0.62, `${m} is too saturated for this palette`);
+});
+
 test('the negative is still a rose, and still distinguishable from the positive', () => {
   const [r, g, b] = rgb(T.down);
   assert.ok(r > g && r > b, `--down is no longer red-dominant: ${T.down}`);

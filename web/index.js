@@ -13,6 +13,7 @@ import { sparkline } from './lib/spark.js';
 import { openDetail } from './lib/detail.js';
 import { setTokenLogos, tokenCell } from './lib/token.js';
 import { copyButton } from './lib/copy.js';
+import { mountSearchShortcut, rankBadge, renderStatusBar, stackedChips } from './lib/chrome.js';
 
 /** @param {string} id */
 const el = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
@@ -61,6 +62,7 @@ function signedPct(n) {
 /** @param {string} a */
 const shortAddr = (a) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
+const manifest = await fetch('/api/manifest').then((r) => r.json()).catch(() => ({}));
 const index = await fetch('/api/leaderboard/index')
   .then((r) => r.json()).catch(() => null) || { views: [], windows: [], scopes: [] };
 /**
@@ -216,7 +218,7 @@ function podiumCard(r, place) {
   const who = node('div', 'pcard-addr');
   who.append(node('span', 'avatar', '◇'), document.createTextNode(shortAddr(r.address)),
     copyButton(r.address));
-  top.append(who, node('span', 'rankbadge', `#${place}`));
+  top.append(who, rankBadge(place));
   card.append(top);
   card.append(sparkline(r.spark, { width: 380, height: 64 }));
   const fig = node('div', 'pcard-figure');
@@ -271,9 +273,9 @@ function render() {
 
     const toks = node('td');
     const chips = node('span', 'chips');
-    for (const t of r.tokens) chips.append(tokenCell(t, 'chip'));
-    if (r.token_count > r.tokens.length) chips.append(node('span', 'chip', `+${r.token_count - r.tokens.length}`));
-    toks.append(chips);
+    toks.append(stackedChips(r.tokens, r.token_count,
+      (x) => /** @type {any} */ (tokenCell(x, 'chip chip--stack'))));
+    void chips;
     tr.append(toks);
     body.append(tr);
   });
@@ -344,3 +346,6 @@ el('min-win').addEventListener('change', (e) => {
 
 
 await load();
+
+mountSearchShortcut();
+renderStatusBar(manifest);

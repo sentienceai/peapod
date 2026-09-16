@@ -23,6 +23,7 @@ import { setTokenLogos, tokenCell } from './lib/token.js';
 import { copyButton } from './lib/copy.js';
 import { chanceBand, coverage, CRITERION } from './lib/evidence.js';
 import { mountWallet } from './lib/wallet-ui.js';
+import { mountSearchShortcut, rankBadge, renderStatusBar, stackedChips } from './lib/chrome.js';
 
 /** @param {string} id */
 const el = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
@@ -216,12 +217,8 @@ function traderCard(r, anchor) {
   const line = node('div', 'tcard-addr');
   line.append(node('b', undefined, shortAddr(r.address)), copyButton(r.address));
   who.append(line);
-  const toks = node('div', 'tcard-toks');
-  for (const t of r.tokens) toks.append(tokenCell(t, 'chip'));
-  if (r.token_count > r.tokens.length) {
-    toks.append(node('span', 'chip', `+${r.token_count - r.tokens.length}`));
-  }
-  who.append(toks);
+  who.append(stackedChips(r.tokens, r.token_count,
+    (t) => /** @type {any} */ (tokenCell(t, 'chip chip--stack'))));
   head.append(who, node('span', 'tcard-ago', ago(r.last_ts, anchor)));
   card.append(head);
 
@@ -318,13 +315,16 @@ function render() {
   deck.replaceChildren();
   // Three or none. A stack of one is not a stack, it is a card that failed to render.
   deck.hidden = rows.length < 3;
-  for (const r of (rows.length < 3 ? [] : rows.slice(0, 3))) {
+  (rows.length < 3 ? [] : rows.slice(0, 3)).forEach((/** @type {any} */ r, /** @type {number} */ i) => {
     const mini = node('div', 'deckcard');
-    mini.append(node('span', 'deck-addr', shortAddr(r.address)));
+    const head = node('div', 'deck-head');
+    head.append(node('span', 'deck-addr', shortAddr(r.address)));
+    head.append(/** @type {any} */ (rankBadge(i + 1)));
+    mini.append(head);
     mini.append(signedMoney(r.realized, 'deck-fig'));
     mini.append(sparkline(r.spark ?? [], { width: 200, height: 48 }));
     deck.append(mini);
-  }
+  });
 }
 
 /**
@@ -483,6 +483,8 @@ setTokenLogos(await fetch('/api/leaderboard/tokens/tokens')
 await load();
 mountWallet(el('wallet'));
 }
+mountSearchShortcut();
+renderStatusBar(state.manifest);
 
 onSelect('sort', (v) => { state.sort = v; });
 onSelect('f-realized', (v) => { state.filters.realized = Number(v); });

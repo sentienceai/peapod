@@ -60,6 +60,19 @@
 
   --focus: #a8c6b8;        /* SWATCH */
 
+  /* Podium medals. Rank is an ordinal, and three ranks in one colour make the order
+     something you read rather than see. Gold is --warn, already in the palette; silver is
+     the sage desaturated; bronze is the rose walked toward copper and lifted until it
+     clears AA on the lightest surface it sits on. Deliberately muted: metallic gold on a
+     dark ground is the one place this palette could tip into a casino. */
+  --rank-1: #d6bc62;       /* = --warn */
+  --rank-2: #b8c1bc;       /* sage, desaturated */
+  --rank-3: #cd9784;       /* rose walked to copper: 31 degrees off the gold */
+
+  /* Radius. 12px on cards, matching the reference's rounded-xl; 8px on controls. */
+  --r-card: 12px;
+  --r-control: 8px;
+
   --sans: 'Inter', ui-sans-serif, -apple-system, 'Segoe UI', Roboto, sans-serif;
 
   /* type: five sizes, three weights, measured from the screenshots at 2x */

@@ -16,6 +16,7 @@ import { readFile } from 'node:fs/promises';
 
 import { install } from './dom-stub.mjs';
 import { index, sample, view } from './store.mjs';
+import * as chromeMod from '../web/lib/chrome.js';
 import { chanceBand } from '../web/lib/evidence.js';
 
 const { get } = await install(new URL('../web/traders.html', import.meta.url));
@@ -473,4 +474,100 @@ test('the dev server can run against a deployed store with no local data', async
   assert.match(src, /serving an empty state; the first cycle will fill it/);
   assert.ok(!/process\.exit\(1\)/.test(src), 'the server still exits when the store is missing');
   assert.match(src, /function emptyState/);
+});
+
+test('the search pill carries the shortcut its platform actually has', async () => {
+  const { mountSearchShortcut } = await import('../web/lib/chrome.js');
+  const cap = get('keycap');
+  const input = get('search');
+
+  mountSearchShortcut({ platform: 'Linux x86_64' });
+  assert.equal(cap.textContent, 'Ctrl K',
+    'a Linux visitor is being told to press a key they do not have');
+  assert.equal(input.attributes['aria-keyshortcuts'], 'Control+K');
+
+  mountSearchShortcut({ platform: 'MacIntel' });
+  assert.equal(cap.textContent, '⌘K');
+  assert.equal(input.attributes['aria-keyshortcuts'], 'Meta+K');
+
+  const doc = /** @type {any} */ (globalThis.document);
+  doc.activeElement = null;
+  doc.dispatchEvent({ type: 'keydown', key: 'k', metaKey: true });
+  assert.equal(doc.activeElement, input, 'the shortcut did not focus the field');
+  // Escape gives the field back, which is the other half of a shortcut being usable.
+  doc.dispatchEvent({ type: 'keydown', key: 'Escape' });
+  assert.notEqual(doc.activeElement, input);
+});
+
+test('the status bar says what build is being served, and nothing it cannot know', () => {
+  const { renderStatusBar } = /** @type {any} */ (chromeMod);
+  renderStatusBar({ build: '20260916T044645Z', addresses: 103920, qualifying: 30015 });
+  const bar = get('statusbar');
+  const text = bar.textContent;
+  assert.match(text, /20260916T044645Z/, 'the bar does not name the build');
+  assert.match(text, /103,920 addresses/);
+  assert.match(text, /30,015 with a round-trip/);
+  assert.equal(bar.byClass('status-dot')[0].className.includes('is-live'), true);
+
+  // The reference puts a wallet balance and a live socket dot here. We have neither, and
+  // an empty shell in the same shape advertises a feature that does not exist.
+  for (const absent of ['$0.00', 'Copiers', 'Account Value', 'Copy Score', 'Sharpe']) {
+    assert.ok(!text.includes(absent), `${absent} appeared in the status bar`);
+  }
+
+  // Before the first build it says so rather than showing a build id it has not got.
+  renderStatusBar({ build: null, addresses: 0, qualifying: 0 });
+  assert.match(get('statusbar').textContent, /No build yet/);
+  assert.equal(get('statusbar').byClass('status-dot')[0].className.includes('is-empty'), true);
+});
+
+test('podium badges carry the rank as a numeral, not only as a colour', async () => {
+  const { rankBadge } = /** @type {any} */ (chromeMod);
+  for (const place of [1, 2, 3]) {
+    const b = rankBadge(place);
+    assert.equal(b.textContent, String(place),
+      'the medal is colour-only, which is unreadable for a colourblind visitor');
+    assert.ok(b.className.includes(`medal--${place}`));
+    assert.equal(b.attributes['aria-label'], `Rank ${place}`);
+  }
+  // And the three are actually distinct classes, not one badge repeated.
+  const classes = [1, 2, 3].map((p) => rankBadge(p).className);
+  assert.equal(new Set(classes).size, 3);
+});
+
+test('token chips stack and the remainder is a count, not another chip', async () => {
+  const { stackedChips } = /** @type {any} */ (chromeMod);
+  /** @param {string} t */
+  const chip = (t) => {
+    const n = document.createElement('span');
+    n.className = 'chip';
+    n.textContent = t;
+    return n;
+  };
+  const many = stackedChips(['A', 'B', 'C', 'D', 'E', 'F'], 9, chip);
+  const items = many.byClass('chipstack-item');
+  assert.equal(items.length, 4, 'the stack is not bounded');
+  // The leftmost reads as the front of the set.
+  assert.deepEqual(items.map((/** @type {any} */ n) => Number(n.style.zIndex)), [4, 3, 2, 1]);
+  assert.equal(many.byClass('chipstack-more')[0].textContent, '+5');
+  assert.equal(many.attributes['aria-label'], '9 tokens');
+
+  const one = stackedChips(['A'], 1, chip);
+  assert.equal(one.byClass('chipstack-more').length, 0);
+  assert.equal(one.attributes['aria-label'], '1 token');
+});
+
+test('the components the data cannot support are still absent', async () => {
+  // The spec describes Copy Score, a Copytrade CTA and its setup modal, Active Positions
+  // with leverage and liquidation, Account Value, Sharpe, Max Drawdown and Copiers. None
+  // of those exist here, and rebuilding them as empty shells would be worse than the gap.
+  const page = get('grid').textContent + get('statusbar').textContent
+    + get('caveat').textContent + get('footnote').textContent;
+  for (const banned of ['Copy Score', 'Copytrade', 'Account Value', 'Sharpe',
+    'Max Drawdown', 'Copiers', 'Liquidation', 'Leverage', '/100']) {
+    assert.ok(!page.includes(banned), `"${banned}" appeared on the page`);
+  }
+  const css = await readFile(new URL('../web/styles/app.css', import.meta.url), 'utf8');
+  assert.ok(!/#09090B|#00E676|#FF5252|#00E5FF/i.test(css),
+    'a colour from the reference palette leaked into the stylesheet');
 });
