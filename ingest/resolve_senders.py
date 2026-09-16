@@ -208,8 +208,12 @@ def main() -> int:
     blocks = sorted(set(swaps["block"].to_list()), reverse=True)
     if args.since_days is not None:
         import numpy as np
-        bt = pl.read_parquet(Path(os.environ["PEAPOD_LP_TERMINAL"]).expanduser()
-                             / "out" / "block_times.parquet").sort("block")
+        # Our own clock, measured where the resolver has already been and vendored for
+        # the rest. Reaching into another checkout here was a latent KeyError in a
+        # container, waiting for the first --since-days run.
+        from partitions import BlockClock  # noqa: PLC0415
+        clock = BlockClock.load(None)
+        bt = pl.DataFrame({"block": clock.blocks, "ts": clock.times}).sort("block")
         bn = bt["block"].to_numpy().astype("int64"); bts = bt["ts"].to_numpy().astype("int64")
         end_ts = float(np.interp(max(blocks), bn, bts))
         cutoff = end_ts - args.since_days * 86400

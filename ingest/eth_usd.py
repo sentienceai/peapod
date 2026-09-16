@@ -37,6 +37,8 @@ import sys
 import time
 from pathlib import Path
 
+from settings import env
+
 import polars as pl
 import requests
 
@@ -50,13 +52,6 @@ USDG_DECIMALS = 6
 ETH_DECIMALS = 18
 
 
-def env() -> dict[str, str]:
-    values: dict[str, str] = {}
-    for line in (HERE.parent / ".env").read_text().splitlines():
-        if "=" in line and not line.strip().startswith("#"):
-            k, _, v = line.partition("=")
-            values[k.strip()] = v.strip().strip("'\"")
-    return values
 
 
 def rpc(url, method, params, session=requests):
@@ -292,11 +287,13 @@ def main() -> int:
     ap.add_argument("--stage", required=True, choices=["select", "series", "check"])
     args = ap.parse_args()
     root = Path(os.environ.get("PEAPOD_LP_TERMINAL") or HERE.parent).expanduser()
-    # lp-terminal's liquidity_math is the single source for the band arithmetic; peapod's
-    # BigInt port is checked against it rather than replacing it.
-    sys.path.insert(0, str(root / "engine"))
-    import importlib  # noqa: PLC0415
-    _LM = importlib.import_module("liquidity_math")
+    # The band arithmetic is vendored in engine/. It is only needed to CHOOSE the
+    # reference pool, so it is imported for that stage alone — importing it for every
+    # stage is what made a container fail on `--stage series`, which never touches it.
+    if args.stage == "select":
+        sys.path.insert(0, str(HERE.parent / "engine"))
+        import importlib  # noqa: PLC0415
+        _LM = importlib.import_module("liquidity_math")
     url = env()["GOLDSKY_EDGE_URL"]
     swaps = pl.concat([pl.read_parquet(p)
                        for p in sorted((HERE / "out" / "pons_swaps").rglob("*.parquet"))])

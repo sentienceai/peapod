@@ -19,6 +19,8 @@ import json
 import time
 from pathlib import Path
 
+from settings import env
+
 import polars as pl
 import requests
 
@@ -45,13 +47,6 @@ def decode_string(hexdata: str) -> str | None:
     return None
 
 
-def env() -> dict[str, str]:
-    values: dict[str, str] = {}
-    for line in (HERE.parent / ".env").read_text().splitlines():
-        if "=" in line and not line.strip().startswith("#"):
-            k, _, v = line.partition("=")
-            values[k.strip()] = v.strip().strip("'\"")
-    return values
 
 
 def fetch(url: str, addresses: list[str], selector: str = DECIMALS) -> dict:

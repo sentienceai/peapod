@@ -34,6 +34,8 @@ import time
 from collections import defaultdict, deque
 from pathlib import Path
 
+from settings import env
+
 import numpy as np
 import polars as pl
 import requests
@@ -55,14 +57,6 @@ QUOTES = {"ETH": 18, "USDG": 6}
 MIN_WIDTH, MAX_WIDTH = 500, 25_000
 
 
-def env() -> dict:
-    values = {}
-    path = HERE.parent / ".env"
-    for line in path.read_text().splitlines():
-        if "=" in line and not line.strip().startswith("#"):
-            k, _, v = line.partition("=")
-            values[k.strip()] = v.strip().strip("'\"")
-    return values
 
 
 def signed(value: int) -> int:

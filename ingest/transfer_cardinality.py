@@ -44,6 +44,8 @@ from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from itertools import islice
 from pathlib import Path
 
+from settings import env
+
 import polars as pl
 import requests
 
@@ -54,14 +56,6 @@ CHUNK = 5_000
 MOD = 256
 
 
-def env() -> dict[str, str]:
-    values: dict[str, str] = {}
-    path = HERE.parent / ".env"
-    for line in path.read_text().splitlines():
-        if "=" in line and not line.strip().startswith("#"):
-            k, _, v = line.partition("=")
-            values[k.strip()] = v.strip().strip("'\"")
-    return values
 
 
 def rpc(url: str, method: str, params: list, session: requests.Session):

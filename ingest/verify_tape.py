@@ -34,13 +34,6 @@ PM = "0x8366a39cc670b4001a1121b8f6a443a643e40951"
 SWAP = "0x40e9cecb9f5f1f1c5b9c97dec2917b7ee92e57ba5563708daca94dd84ad7112f"
 
 
-def env() -> dict:
-    values = {}
-    for line in (HERE.parent / ".env").read_text().splitlines():
-        if "=" in line and not line.strip().startswith("#"):
-            k, _, v = line.partition("=")
-            values[k.strip()] = v.strip().strip("'\"")
-    return values
 
 
 def query(session, url, lo, hi, pool_ids):

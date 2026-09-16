@@ -29,8 +29,14 @@ The URL contains the key, so there is no separate token. Set it as a Railway var
 whenever it detects a container or a platform marker, so you can delete the `HOST`
 variable if you added one to unblock a 502. An explicit `HOST` still wins if you set it.
 
-Nothing else. No database add-on, no object storage, and **no registry to seed** — the
-1.3 MB of pool and token data the build needs is vendored in `registry/`.
+Nothing else. No database add-on, no object storage, and **nothing to seed** — the pool
+and token registry (1.3 MB) and the v4 band arithmetic are both vendored in this
+repository. `PEAPOD_LP_TERMINAL` is honoured when set but is never required; a cycle that
+asks for it is a bug, and `test/cycle.test.mjs` fails if one starts to.
+
+Credentials come from the environment first and `.env` second. There is no `.env` in a
+container — it is gitignored, which is the point — so `GOLDSKY_EDGE_URL` must be a Railway
+variable.
 
 ## Getting the tape onto the volume
 
@@ -38,9 +44,11 @@ The tape is ~814 MB of ingested chain data. You have two options.
 
 ### Option A — do nothing (recommended for a first deploy)
 
-Leave the volume empty. The first cycles ingest from the chain. It is unattended and takes
-several hours to catch up; the site serves an empty state until the first build commits,
-then fills in. Costs roughly $9–20 of Goldsky requests once.
+Leave the volume empty. A cold start backfills about eight days of blocks and then keeps
+up; a container that began at the chain head would take seven days to have a seven-day
+leaderboard. It is unattended and takes several hours to catch up, the site serves an
+empty state until the first build commits, and it costs roughly $9–20 of Goldsky requests
+once.
 
 ### Option B — copy the local tape up
 

@@ -42,6 +42,8 @@ from dedup import Deduplicator, log_key
 RPC = os.environ.get("PEAPOD_RPC_URL", "https://rpc.mainnet.chain.robinhood.com")
 POOL_MANAGER = "0x8366a39cc670b4001a1121b8f6a443a643e40951"
 SWAP_TOPIC = "0x40e9cecb9f5f1f1c5b9c97dec2917b7ee92e57ba5563708daca94dd84ad7112f"
+# ~19,081 blocks/hour on this chain, so this is a little over eight days.
+COLD_START_BLOCKS = 3_900_000
 
 OUT = Path(__file__).resolve().parent / "out" / "swaps_tx"
 CHECKPOINT = Path(__file__).resolve().parent / "out" / "swaps_tx.checkpoint.json"
@@ -190,18 +192,35 @@ def main() -> int:
     args = ap.parse_args()
     claim_pidfile(PIDFILE)
 
-    lp = Path(__file__).resolve().parent.parent / "export"
-    sys.path.insert(0, str(lp))
-    from upstream import lp_terminal  # noqa: PLC0415
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "export"))
+    from registry import pools as registry_pools, tokens as registry_tokens  # noqa: PLC0415
 
-    root = lp_terminal()
-    existing = pl.concat([pl.read_parquet(p) for p in
-                          sorted((root / "out" / "raw" / "swaps_phase4").glob("part-*.parquet"))])
-    pool_ids = sorted(existing["pool_id"].unique().to_list())
-    start = args.start if args.start is not None else int(existing["block"].min())
-    end = args.end if args.end is not None else int(existing["block"].max())
+    # WHICH POOLS, AND OVER WHAT RANGE — without another checkout.
+    #
+    # This read lp-terminal's own swap tape for both: the distinct pool ids in it, and its
+    # first and last block. Neither exists in a container, and the cycle died here on every
+    # tick. The pools are the RWA universe, which the vendored registry defines; the range
+    # is "from where we left off to the head of the chain", which is what an incremental
+    # cycle actually wants and what the tape's fixed bounds were only ever standing in for.
+    tok = registry_tokens()
+    rwa = set(tok.filter(pl.col("kind") == "rwa_spot")["address"].to_list())
+    quote = set(tok.filter(pl.col("symbol").is_in(["USDG"]))["address"].to_list())
+    meta = registry_pools()
+    pool_ids = sorted(meta.filter(
+        (pl.col("currency0").is_in(list(rwa)) & pl.col("currency1").is_in(list(quote)))
+        | (pl.col("currency1").is_in(list(rwa)) & pl.col("currency0").is_in(list(quote)))
+    )["pool_id"].to_list())
+    if not pool_ids:
+        raise SystemExit("no RWA pools in the registry; run export/registry.py --refresh")
 
+    head = int(rpc("eth_blockNumber", []), 16)
     state = load_checkpoint()
+    # A cold start backfills a window rather than only moving forward: a container with an
+    # empty volume that began at the head would take seven days to have a seven-day
+    # leaderboard. COLD_START_BLOCKS is about eight days at this chain's rate.
+    start = args.start if args.start is not None else max(0, head - COLD_START_BLOCKS)
+    end = args.end if args.end is not None else head
+
     cursor = state["cursor"] if state["cursor"] is not None else start
     OUT.mkdir(parents=True, exist_ok=True)
 

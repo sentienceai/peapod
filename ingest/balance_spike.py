@@ -37,6 +37,8 @@ from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from itertools import islice
 from pathlib import Path
 
+from settings import env
+
 import polars as pl
 import requests
 
@@ -53,13 +55,6 @@ WIDTH = 20_000
 N = 1_000
 
 
-def env() -> dict[str, str]:
-    values: dict[str, str] = {}
-    for line in (HERE.parent / ".env").read_text().splitlines():
-        if "=" in line and not line.strip().startswith("#"):
-            k, _, v = line.partition("=")
-            values[k.strip()] = v.strip().strip("'\"")
-    return values
 
 
 def rpc(url, method, params, session=requests):
