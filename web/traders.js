@@ -100,7 +100,10 @@ const state = {
   /** @type {any} */ data: null,
   cat: 'all',
   /** @type {string | null} */ quote: null,
-  window: '7d',
+  // Set from the manifest at startup, not here. A tape younger than seven days publishes
+  // only the 24h window, and a page that asks for '7d' regardless finds no view and shows
+  // an empty grid over a store that has data in it. index.js already reads it this way.
+  window: '',
   sort: 'realized',
   unit: 'abs',
   view: 'grid',
@@ -481,6 +484,9 @@ async function load() {
 
 state.manifest = await fetch('/api/manifest').then((r) => r.json()).catch(() => ({}));
 state.index = await fetch('/api/leaderboard/index').then((r) => r.json()).catch(() => null);
+// The widest window this build actually has. windows[] carries only the ones that were
+// built, widest last.
+state.window = state.index?.windows?.at(-1)?.window ?? '7d';
 
 /**
  * Before the first build exists there is nothing to rank, and that is a state rather than

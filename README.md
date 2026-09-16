@@ -4,7 +4,7 @@ Realized profit and loss for every address that has traded on **Robinhood Chain*
 (Arbitrum Orbit L2, chain 4663), across both tokenized equities and the Pons memecoin
 pools, in one ranking. Searchable by address, whether or not the address ranks.
 
-Over the current seven-day window: **103,920 addresses traded, 30,010 of them closed a
+Over the current seven-day window: **103,920 addresses traded, 30,009 of them closed a
 round-trip.** 64.8% of those finished in profit, which sounds healthy until you see the
 sizes: the best made $188,639, the median made **$0.85**, and the top 1% took half of
 everything won.

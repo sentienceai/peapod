@@ -226,6 +226,25 @@ def spark(points, lo, hi, n=SPARK_POINTS):
 ROW_LIMIT = 1000
 
 
+def windows_for(span_h: float, windows: dict) -> tuple[dict, str | None]:
+    """Which declared windows this tape can support, and which one detail records come from.
+
+    A window wider than the tape is not built: a 7d ranking over 48 hours of trades is a
+    48-hour ranking wearing a label that says otherwise. The second return is the widest
+    window that IS built, and it is the one every address payload is written from.
+
+    THE TWO ANSWERS HAVE TO COME FROM THE SAME PLACE. They used to be independent: the
+    windows were filtered against the tape, and the detail writer was keyed on the literal
+    string "7d". On a tape younger than seven days that is every scope ranked and not one
+    payload stored, and the ranked rows point at addresses the store has never heard of.
+    Because every window is a suffix ending at the same instant, the widest one built holds
+    a superset of every narrower one's addresses, which is what makes the coverage true by
+    construction rather than by coincidence.
+    """
+    built = {n: h for n, h in windows.items() if h <= span_h + 0.5}
+    return built, (max(built, key=lambda n: built[n]) if built else None)
+
+
 def build(state, lo, hi, limit=ROW_LIMIT):
     rows = []
     for addr, trips in state["trips"].items():
@@ -516,10 +535,15 @@ def main() -> int:
     index = {"provenance": meta["provenance"], "generated_from": args.source,
              "scopes": [], "windows": [], "views": []}
     headline = {"qualifying": 0, "top": 0.0, "addresses": 0}
-
+    buildable, detail_window = windows_for(span_h, windows)
     for name, hours in windows.items():
-        if hours > span_h + 0.5:
-            continue
+        if name not in buildable:
+            # Said out loud. Skipping in silence is what made a build that stored no detail
+            # records at all read as "all seven scopes built".
+            print(f"   {name:>3} skipped: {hours}h window, {span_h:.1f}h of tape")
+    widest = None
+
+    for name, hours in buildable.items():
         w_all = trades.filter(pl.col("ts") >= hi - hours * 3600)
         wlo = int(w_all["ts"].min())
         for scope in SCOPES:
@@ -549,7 +573,7 @@ def main() -> int:
                 "provenance": meta["provenance"],
             }
             store.put_leaderboard(scope["id"], name, payload)
-            if scope["id"] == "all" and name == "7d":
+            if scope["id"] == "all" and (widest is None or hours >= widest[1]):
                 headline = {"qualifying": qualifying, "top": float(arr.max()),
                             "addresses": addresses}
             path = OUT / f"{scope['id']}-{name}.json"
@@ -562,20 +586,29 @@ def main() -> int:
                   f"{qualifying:>6,} qualify  top ${arr.max():>11,.0f}  "
                   f"p50 ${np.median(arr):>8,.2f}  -> {path.name}")
 
-        if name == "7d":
-            state = fold(w_all)
-            rows_all, qual_all = build(state, wlo, hi)
-            ranked = sorted((state["realized"][a] for a in state["trips"]
-                             if state["trips"][a] > 0))
-            everyone = sorted(state["total"])
-            ctx = {"qualifying": qual_all, "traded": len(everyone),
-                   "median": float(np.median(ranked)) if ranked else 0.0,
-                   "at_a_loss_pct": float(np.mean(np.array(ranked) < 0) * 100) if ranked else 0.0}
-            written = store.put_addresses(
-                (write_address(a, state, wlo, hi, None, meta["provenance"],
-                               ranked=ranked, context=ctx) for a in everyone), build_id)
-            print(f"        stored {written:,} addresses "
-                  f"({qual_all:,} qualifying, {written - qual_all:,} with no round-trip)")
+        if name == detail_window:
+            widest = (name, hours, w_all, wlo)
+
+    # DETAIL RECORDS COVER EVERY RANKED ADDRESS BECAUSE THEY COME FROM THE WIDEST WINDOW.
+    # Every window is a suffix of the tape ending at the same instant, so a narrower one
+    # holds a subset of these trades and therefore a subset of these addresses. Writing
+    # from the widest window that built is what makes "every ranked address has a detail
+    # record" true by construction rather than by coincidence.
+    if widest is not None:
+        name, _hours, w_all, wlo = widest
+        state = fold(w_all)
+        rows_all, qual_all = build(state, wlo, hi)
+        ranked = sorted((state["realized"][a] for a in state["trips"]
+                         if state["trips"][a] > 0))
+        everyone = sorted(state["total"])
+        ctx = {"qualifying": qual_all, "traded": len(everyone),
+               "median": float(np.median(ranked)) if ranked else 0.0,
+               "at_a_loss_pct": float(np.mean(np.array(ranked) < 0) * 100) if ranked else 0.0}
+        written = store.put_addresses(
+            (write_address(a, state, wlo, hi, None, meta["provenance"],
+                           ranked=ranked, context=ctx) for a in everyone), build_id)
+        print(f"        stored {written:,} addresses from the {name} window "
+              f"({qual_all:,} qualifying, {written - qual_all:,} with no round-trip)")
 
     index["scopes"] = [{"id": s["id"], "label": s["label"], "cat": s["cat"],
                         "quote": s["quote"]} for s in SCOPES]

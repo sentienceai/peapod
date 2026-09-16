@@ -579,3 +579,17 @@ test('the components the data cannot support are still absent', async () => {
   assert.ok(!/#09090B|#00E676|#FF5252|#00E5FF/i.test(css),
     'a colour from the reference palette leaked into the stylesheet');
 });
+
+test('both pages ask for a window the build actually has', async () => {
+  // A tape younger than seven days publishes only the 24h window. index.js already read
+  // the manifest for this; traders.js carried `window: '7d'` as a literal, so against that
+  // store it would look up a view that is not there and show an empty grid over a store
+  // with data in it. Same failure as the build's detail writer, one layer up.
+  for (const page of ['../web/traders.js', '../web/index.js']) {
+    const src = await readFile(new URL(page, import.meta.url), 'utf8');
+    assert.match(src, /windows\??\.?\.at\(-1\)/,
+      `${page} does not take its window from the build's own window list`);
+    assert.ok(!/^\s*window: '7d',/m.test(src),
+      `${page} still hardcodes a window that a short tape does not publish`);
+  }
+});
