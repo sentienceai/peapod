@@ -73,10 +73,28 @@ PIDFILE = Path(__file__).resolve().parent / "out" / "swaps_tx.pid"
 
 LOG_CAP = 10_000          # the endpoint's hard ceiling on one response
 TARGET_LOGS = 6_000       # aim below it, so density drift does not cost a retry
-# Measured against Edge, not chosen: 30,000 blocks is served and 30,001 is refused, from
-# three different base blocks. A run still narrows this further if its endpoint caps lower,
-# and remembers what it learned in the checkpoint.
+# Measured against Edge: 30,000 blocks is served and 30,001 refused, from five base blocks
+# carrying between 2,100 and 14,245 logs. That is the ceiling and the window never exceeds
+# it.
 MIN_WIDTH, MAX_WIDTH = 200, 30_000
+
+# THE LIMIT MOVES BY REGION. A backfill was refused at 27,000, 24,300 and 21,870 blocks,
+# inside that ceiling, with the same "block range too wide" every time — so it is one
+# limit that varies with where you are in the chain, not a span limit plus a second one.
+# A cap that only falls is therefore wrong twice over: one tight region lowers it for the
+# rest of the run, and once width has been clamped to the cap every refusal costs a whole
+# call to learn a single block (21,868, 21,867, 21,866 ...).
+#
+# Additive-increase, multiplicative-decrease, for the reason TCP uses it: unknown capacity
+# that varies, which has to be probed without collapsing.
+# Tuned against the cost of being wrong in each direction. A probe that overshoots costs
+# exactly one call and 25% of the cap; a streak that is too long leaves the run fetching a
+# sparse tape in windows sized by a dense patch it passed hours ago. Increase is kept below
+# 1/DECREASE so a probe that fails lands BELOW where it started and settles, instead of
+# refusing twice per cycle.
+CAP_DECREASE = 0.75       # on a refusal
+CAP_INCREASE = 1.25       # on a clean streak
+RECOVER_AFTER = 10        # consecutive successful calls before probing upward
 # Endpoints cap how many values a topic position may hold: the public RPC at 1,000. Start
 # below the lowest known cap and halve on refusal.
 TOPIC_CHUNK = 900
@@ -474,8 +492,11 @@ def main() -> int:
     began = time.time()
 
     chunk = TOPIC_CHUNK
+    clean = 0
     while cursor <= end:
+        width = max(MIN_WIDTH, min(width, width_cap))
         hi = min(cursor + width - 1, end)
+        width_before = width
         outcome, value = fetch(cursor, hi, pool_ids, chunk)
         state["calls"] += 1
 
@@ -486,22 +507,27 @@ def main() -> int:
                 stop(state, buffer, cursor, end, "endpoint refuses even one pool id")
                 return 1
             chunk = max(1, chunk // 2)
-            print(f"  topic filter too large at {cursor:,}; {chunk} pool ids per call",
-                  flush=True)
+            clean = 0
+            print(f"  topic filter too large at {cursor:,}; {chunk} pool ids per call: "
+                  f"{value}", flush=True)
             continue
 
         if outcome == TOO_WIDE:
-            # Learn the endpoint's cap so no width known to fail is ever requested again,
-            # then climb back toward it from below rather than probing past it.
-            width_cap = min(width_cap, width - 1)
+            was = width_cap
+            width_cap = max(MIN_WIDTH, min(width_cap, int(width * CAP_DECREASE)))
             state["max_width"] = width_cap
-            width = max(MIN_WIDTH, min(width // 2, width_cap))
-            print(f"  block range too wide at {cursor:,}; capping windows at "
-                  f"{width_cap:,} blocks", flush=True)
+            clean = 0
+            width = max(MIN_WIDTH, min(width, width_cap))
+            # The message, every time. Without it a size refusal and a span refusal and a
+            # rate limit are one indistinguishable event, which is what made the last round
+            # of this guesswork rather than diagnosis.
+            print(f"  cap DOWN {was:,} -> {width_cap:,} after a refusal at {width_before:,} "
+                  f"blocks ({cursor:,}): {value}", flush=True)
             continue
 
         if outcome == TOO_MANY_LOGS:
             if width > MIN_WIDTH:
+                clean = 0
                 width = max(MIN_WIDTH, width // 2)
                 time.sleep(PACE * 3)
                 continue
@@ -519,10 +545,21 @@ def main() -> int:
         if outcome == FAILED:
             # NEVER SKIP. A range we could not read is a hole, and a hole that advances the
             # cursor is indistinguishable from a range with no swaps in it.
+            clean = 0
             stop(state, buffer, cursor, hi, f"unreadable: {value}")
             return 1
 
         logs = value
+        clean += 1
+        # Probe upward after a clean streak, and SAY SO. A ratchet down and a healthy
+        # recovery are the same shape from outside unless the log distinguishes them.
+        if clean >= RECOVER_AFTER and width_cap < MAX_WIDTH:
+            was = width_cap
+            width_cap = min(MAX_WIDTH, int(width_cap * CAP_INCREASE))
+            state["max_width"] = width_cap
+            clean = 0
+            print(f"  cap UP   {was:,} -> {width_cap:,} after {RECOVER_AFTER} clean calls "
+                  f"(ceiling {MAX_WIDTH:,})", flush=True)
         clear_gaps(cursor, hi)
         for log in logs:
             record = decode(log)

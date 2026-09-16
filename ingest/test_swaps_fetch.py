@@ -194,3 +194,90 @@ def test_an_unrelated_range_leaves_a_gap_alone(monkeypatch, tmp_path):
     m.clear_gaps(5_000, 6_000)
     left = json.loads((tmp_path / "gaps.json").read_text())
     assert [(g["from"], g["to"]) for g in left] == [(1_000, 2_000)]
+
+
+# --- the window cap is a controller, not a ratchet -------------------------------------
+
+def simulate(refuse, calls=400, start_cap=m.MAX_WIDTH):
+    """Replay the cap logic. `refuse(width)` says whether the endpoint refuses that span."""
+    cap, width, clean = start_cap, min(20_000, start_cap), 0
+    seen = []
+    for _ in range(calls):
+        width = max(m.MIN_WIDTH, min(width, cap))
+        if refuse(width):
+            cap = max(m.MIN_WIDTH, min(cap, int(width * m.CAP_DECREASE)))
+            clean = 0
+            seen.append(("down", cap))
+            continue
+        clean += 1
+        if clean >= m.RECOVER_AFTER and cap < m.MAX_WIDTH:
+            cap = min(m.MAX_WIDTH, int(cap * m.CAP_INCREASE))
+            clean = 0
+            seen.append(("up", cap))
+        width = min(cap, int(width * 1.8))
+    return cap, seen
+
+
+def test_the_cap_recovers_once_the_refusals_stop():
+    # THE BUG. A dense patch used to lower the ceiling for the rest of the run, so the
+    # sparse half of the tape was fetched 200 blocks at a time because of something that
+    # happened forty hours earlier.
+    budget = {"n": 6}
+
+    def refuse(width):
+        if budget["n"] and width > 5_000:
+            budget["n"] -= 1
+            return True
+        return False
+
+    cap, seen = simulate(refuse)
+    assert any(d == "up" for d, _ in seen), "the cap never probed upward"
+    assert cap == m.MAX_WIDTH, f"the cap settled at {cap:,} instead of recovering"
+
+
+def test_a_persistently_tight_endpoint_settles_rather_than_collapsing():
+    # It must find the real limit and stay near it, not oscillate to the floor.
+    cap, _ = simulate(lambda w: w > 8_000)
+    assert m.MIN_WIDTH < cap <= 8_000, cap
+    assert cap > 3_000, f"the cap collapsed to {cap:,} against a limit of 8,000"
+
+
+def test_decrease_is_multiplicative_not_one_block():
+    # The old rule was cap = width - 1, and once width is clamped to the cap every refusal
+    # buys exactly one block: the deployed run was observed going 21,868, 21,867, 21,866.
+    # Reaching a real limit of 1,000 that way costs ~29,000 calls. Multiplicative decrease
+    # is logarithmic, and the difference is the whole point.
+    cap, seen = simulate(lambda w: w > 1_000, calls=40)
+    downs = [c for d, c in seen if d == "down"]
+    assert cap <= 1_000, f"never converged: {cap:,}"
+
+    steps_multiplicative = len(downs)
+    steps_by_one = m.MAX_WIDTH - 1_000
+    assert steps_multiplicative < 20, f"took {steps_multiplicative} refusals: {downs}"
+    assert steps_multiplicative < steps_by_one / 1_000, (
+        f"{steps_multiplicative} refusals against {steps_by_one:,} for width - 1")
+
+
+def test_the_cap_never_exceeds_the_measured_span_ceiling():
+    cap, _ = simulate(lambda w: False, calls=500)
+    assert cap == m.MAX_WIDTH == 30_000
+
+
+def test_both_cap_changes_are_logged_and_distinguishable(capsys, monkeypatch, tmp_path):
+    # A ratchet down and a healthy probe are the same shape from outside unless the log
+    # says which is which — and a refusal is undiagnosable unless the message is there.
+    source = open(m.__file__, encoding="utf8").read()
+    assert 'print(f"  cap DOWN' in source
+    assert 'print(f"  cap UP' in source
+    down = source[source.index('cap DOWN'):source.index('cap DOWN') + 320]
+    assert "{value}" in down, "the refusal is logged without the endpoint's message"
+    assert "refusal at" in down and "blocks" in down
+    up = source[source.index('cap UP'):source.index('cap UP') + 260]
+    assert "clean calls" in up and "ceiling" in up, "recovery does not say why or toward what"
+
+
+def test_every_refusal_path_resets_the_clean_streak():
+    # A streak interrupted by a refusal must not count toward probing upward.
+    source = open(m.__file__, encoding="utf8").read()
+    body = source[source.index("while cursor <= end:"):source.index("clear_gaps(cursor, hi)")]
+    assert body.count("clean = 0") >= 4, "a refusal path leaves the streak running"
