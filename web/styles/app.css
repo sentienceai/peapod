@@ -220,8 +220,16 @@ table.board tbody tr.is-first td:first-child { color: var(--accent); }
 }
 .modal-head .crumb { color: var(--text-muted); }
 .modal-head .who-addr { color: var(--text); font-weight: var(--w-medium); }
-.modal-close { margin-left: auto; background: none; border: 0; color: var(--text-muted); font-size: 18px; cursor: pointer; padding: 0 var(--s-2); }
-.modal-close:hover { color: var(--text); }
+/* A close control has to look like one. This was a borderless glyph the same colour as
+   the muted label beside it, which is why it read as decoration and people reached for
+   the back button. It now has a border, a real 28px hit area, and a focus ring — and it
+   is what receives focus when the dialog opens. */
+.modal-close { margin-left: auto; width: 28px; height: 28px; display: inline-flex;
+  align-items: center; justify-content: center; background: var(--raised);
+  border: 1px solid var(--line); border-radius: 6px; color: var(--text-body);
+  font-size: 16px; line-height: 1; cursor: pointer; padding: 0; }
+.modal-close:hover { color: var(--text); border-color: #38342f; }
+.modal-close:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
 .modal-body { display: grid; grid-template-columns: 268px minmax(0, 1fr); gap: 0; }
 .rail { border-right: 1px solid var(--line); padding: var(--s-5); display: flex; flex-direction: column; gap: var(--s-5); }
@@ -351,32 +359,57 @@ table.mini td:first-child { text-align: left; }
    a card grid. What differs is the bar across the bottom of each card, which holds
    evidence rather than a score and a purchase. */
 
-.hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 46%);
-  gap: var(--s-6); align-items: center; padding: var(--s-7) 0 var(--s-6); }
-.hero h1 { font-size: clamp(26px, 3.2vw, 40px); font-weight: var(--w-semi);
-  line-height: 1.12; letter-spacing: -0.02em; color: var(--text); margin: 0 0 var(--s-3); }
+/* Vertical rhythm, using the pitch measured off the reference: 37 / 57 / 39 / 31.
+   37 above the hero, 39 from the hero to the controls, 12 between the two control rows
+   because they are one pair rather than two sections, 31 before the cards, and 57 for the
+   one real section break further down. The hero used to run to about 300px — half a
+   1300px viewport before any content. It is now about 150. */
+.hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 340px);
+  gap: var(--s-5); align-items: center; padding: 37px 0 0; }
+.hero h1 { font-size: clamp(21px, 2.2vw, 28px); font-weight: var(--w-semi);
+  line-height: 1.15; letter-spacing: -0.02em; color: var(--text); margin: 0; }
 .hero h1 em { font-style: normal; color: var(--accent); }
-.hero p { margin: 0; max-width: 54ch; color: var(--text-muted);
-  font-size: var(--t-body); line-height: 1.55; }
+.hero-sub { margin: var(--s-2) 0 0; color: var(--text-body);
+  font-size: var(--t-body); line-height: 1.45; }
+.hero .caveat { margin: 6px 0 0; max-width: 84ch; font-size: var(--t-small);
+  line-height: 1.45; }
 
-/* The deck is decoration, and it is the only decoration on the page: three real cards
-   from the ranking, tilted and overlapped the way the reference stacks them. */
-.hero-deck { position: relative; height: 200px; }
-.deckcard { position: absolute; width: 58%; padding: var(--s-3); border-radius: 10px;
+/* The deck is the page's only decoration: three real cards from the ranking, overlapped
+   the way the reference stacks them. Short enough that it cannot drive the hero's height. */
+.hero-deck { position: relative; height: 104px; }
+.deckcard { position: absolute; width: 56%; padding: var(--s-2); border-radius: 8px;
   background: var(--surface); border: 1px solid var(--line);
-  display: flex; flex-direction: column; gap: var(--s-1); }
-.deckcard:nth-child(1) { left: 0; top: 34px; transform: rotate(-4deg); opacity: 0.55; }
-.deckcard:nth-child(2) { left: 22%; top: 0; transform: rotate(0deg); z-index: 2; }
-.deckcard:nth-child(3) { left: 44%; top: 30px; transform: rotate(4deg); opacity: 0.55; }
-.deck-addr { font-size: var(--t-small); color: var(--text-muted); }
-.deck-fig { font-size: var(--t-lead); }
-.deckcard .spark { width: 100%; height: 48px; }
-@media (max-width: 900px) { .hero { grid-template-columns: 1fr; } .hero-deck { display: none; } }
+  display: flex; flex-direction: column; gap: 2px; }
+.deckcard:nth-child(1) { left: 0; top: 18px; transform: rotate(-4deg); opacity: 0.5; }
+.deckcard:nth-child(2) { left: 22%; top: 0; z-index: 2; }
+.deckcard:nth-child(3) { left: 44%; top: 16px; transform: rotate(4deg); opacity: 0.5; }
+.deck-addr { font-size: var(--t-micro); color: var(--text-muted); }
+.deck-fig { font-size: var(--t-body); }
+.deckcard .spark { width: 100%; height: 28px; }
+
+@media (max-width: 980px) { .hero { grid-template-columns: 1fr; } .hero-deck { display: none; } }
 
 .pill--sort select { min-width: 140px; }
 
+.hero + .controls { margin-top: 39px; }
+.controls + .pills { margin-top: var(--s-3); }
 .cardgrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--s-3); margin-top: var(--s-4); }
+  gap: var(--s-3); margin-top: 31px; }
+.pills + .table-wrap { margin-top: 31px; }
+.cardgrid + .more, .table-wrap + .more { margin-top: 0; }
+#footnote { margin-top: 57px; }
+
+/* The criterion, beside the filter that uses it rather than above the cards. */
+.pill--note { padding: 0; position: relative; }
+.pill--note > summary { cursor: pointer; padding: 6px var(--s-3); list-style: none;
+  color: var(--text-muted); }
+.pill--note > summary::-webkit-details-marker { display: none; }
+.pill--note > summary::after { content: ' ?'; }
+.pill--note[open] > summary { color: var(--text); }
+.pill--note > p { position: absolute; right: 0; top: calc(100% + 6px); z-index: 5;
+  width: min(46ch, 78vw); margin: 0; padding: var(--s-3);
+  background: var(--raised); border: 1px solid var(--line); border-radius: 8px;
+  color: var(--text-body); font-size: var(--t-small); line-height: 1.5; }
 @media (max-width: 1180px) { .cardgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 640px) { .cardgrid { grid-template-columns: 1fr; } }
 

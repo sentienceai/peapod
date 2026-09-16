@@ -36,9 +36,8 @@
   <section class="hero">
     <div class="hero-copy">
       <h1>Every trader on the chain, <em>and whether it was luck.</em></h1>
-      <p>Realized profit on round-trips closed on-chain, with each win rate tested
-        against what a coin-flipper would produce over the same number of closes.
-        There is no execution here. This is the record, not a signal.</p>
+      <p class="hero-sub">Realized profit on round-trips closed on-chain. No execution here.</p>
+      <p class="caveat" id="caveat"></p>
     </div>
     <div class="hero-deck" id="hero-deck" aria-hidden="true"></div>
   </section>
@@ -92,9 +91,12 @@
         <option value="above">beyond chance</option>
       </select>
     </label>
+    <span class="spacer"></span>
+    <details class="pill pill--note">
+      <summary>How the bar is measured</summary>
+      <p id="criterion"></p>
+    </details>
   </div>
-
-  <p class="caveat" id="caveat"></p>
 
   <section class="cardgrid" id="grid" aria-label="Traders"></section>
   <div class="table-wrap" id="listwrap" hidden>

@@ -323,19 +323,23 @@ function renderRanges(d) {
  *   absent           genuinely not in this window
  *
  * @param {string} address
+ * @param {HTMLElement | null} [from] what to hand focus back to on close
  */
-export async function openDetail(address) {
+export async function openDetail(address, from) {
+  wire();
   const shard = address.slice(2, 4);
   const res = await fetch(`/data/address/${shard}/${address}.json`);
   if (!res.ok) {
     renderAbsent(address);
     el('modal').hidden = false;
+    takeFocus(from);
     return;
   }
   const d = await res.json();
   if (d.status === 'no_round_trips') {
     renderNoRoundTrips(d);
     el('modal').hidden = false;
+    takeFocus(from);
     return;
   }
   range = Infinity;
@@ -347,6 +351,7 @@ export async function openDetail(address) {
   renderChart(d);
   renderTable(d);
   el('modal').hidden = false;
+  takeFocus(from);
 }
 
 /** @param {string} address */
@@ -412,7 +417,77 @@ function renderNoRoundTrips(d) {
   el('subtable').replaceChildren(box);
 }
 
+/**
+ * Close, and put focus back where it came from.
+ *
+ * Returning focus is not a nicety. Someone who opened this from the keyboard is otherwise
+ * dropped at the top of the document and has to tab back through the whole page to reach
+ * the row they were reading.
+ */
 export function closeDetail() {
   el('modal').hidden = true;
+  const back = opener;
+  opener = null;
+  back?.focus?.();
+}
 
+/** @type {HTMLElement | null} */
+let opener = null;
+let wired = false;
+
+/** Everything inside the modal that can hold focus, in document order. */
+function focusables() {
+  const all = el('modal').querySelectorAll(
+    'button, a[href], input, select, textarea, [tabindex]');
+  return Array.from(all).filter((n) => {
+    const e = /** @type {any} */ (n);
+    return !e.hidden && !e.disabled && e.tabIndex !== -1;
+  });
+}
+
+/**
+ * Wire the three ways out, once, here rather than on each page.
+ *
+ * These used to be wired by index.js, so the modal on any other page opened and could not
+ * be closed by escape, by the backdrop or by the button — only by the browser's back
+ * button. A dialog that owns its open state should own its close state too; leaving it to
+ * callers means every new page has to remember, and forgetting is invisible until someone
+ * is trapped in it.
+ */
+function wire() {
+  if (wired) return;
+  wired = true;
+  el('modal-close').addEventListener('click', () => closeDetail());
+  // Backdrop only: a click that started inside the dialog must not close it.
+  el('modal').addEventListener('click', (e) => {
+    if (e.target === el('modal')) closeDetail();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (el('modal').hidden) return;
+    if (e.key === 'Escape') { e.preventDefault?.(); closeDetail(); return; }
+    if (e.key !== 'Tab') return;
+    // Keep Tab inside the dialog: aria-modal tells a screen reader the rest of the page
+    // is inert, and tabbing out of it would make that a lie.
+    const items = focusables();
+    if (!items.length) return;
+    const first = items[0];
+    const last = items[items.length - 1];
+    const here = /** @type {any} */ (document).activeElement;
+    if (e.shiftKey && (here === first || !items.includes(here))) {
+      e.preventDefault?.();
+      /** @type {any} */ (last).focus?.();
+    } else if (!e.shiftKey && here === last) {
+      e.preventDefault?.();
+      /** @type {any} */ (first).focus?.();
+    }
+  });
+}
+
+/**
+ * Remember what to give focus back to, and move focus into the dialog.
+ * @param {HTMLElement | null | undefined} from
+ */
+function takeFocus(from) {
+  opener = from ?? /** @type {any} */ (document).activeElement ?? null;
+  /** @type {any} */ (el('modal-close')).focus?.();
 }

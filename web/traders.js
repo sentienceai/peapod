@@ -171,7 +171,7 @@ function evidenceBar(r) {
   const cta = node('button', 'ev-cta', 'View trades');
   cta.type = 'button';
   cta.setAttribute('aria-label', `View trades for ${r.address}`);
-  cta.onclick = (e) => { e.stopPropagation?.(); void openDetail(r.address); };
+  cta.onclick = (e) => { e.stopPropagation?.(); void openDetail(r.address, cta); };
 
   bar.append(left, cta);
   return bar;
@@ -183,9 +183,9 @@ function traderCard(r, anchor) {
   card.tabIndex = 0;
   card.setAttribute('role', 'link');
   card.setAttribute('aria-label', `Open ${r.address}`);
-  card.onclick = () => { void openDetail(r.address); };
+  card.onclick = () => { void openDetail(r.address, card); };
   card.onkeydown = (e) => {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); void openDetail(r.address); }
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); void openDetail(r.address, card); }
   };
 
   const head = node('div', 'tcard-head');
@@ -246,9 +246,9 @@ function renderList(rows, anchor) {
     tr.tabIndex = 0;
     tr.setAttribute('role', 'link');
     tr.setAttribute('aria-label', `Open ${r.address}`);
-    tr.onclick = () => { void openDetail(r.address); };
+    tr.onclick = () => { void openDetail(r.address, tr); };
     tr.onkeydown = (e) => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); void openDetail(r.address); }
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); void openDetail(r.address, tr); }
     };
     tr.append(node('td', 'rank', String(r.rank)));
     const who = node('td');
@@ -325,16 +325,26 @@ function renderPresets() {
   }
 }
 
+/**
+ * Scope stays above the ranking, but as one line rather than a wall.
+ *
+ * It used to be a five-line paragraph wedged between the filters and the cards, which is
+ * where a reader is looking for content, so it was skipped exactly by the people it is
+ * there for. The numbers that bound the ranking stay in the hero where scope is read
+ * before rank; the method behind the evidence bar moves into a disclosure beside the
+ * filter that uses it.
+ */
 function renderCaveat() {
   const c = state.data.coverage;
   const p = el('caveat');
   p.replaceChildren();
+  p.append(node('b', undefined,
+    `${c.addresses_qualifying.toLocaleString('en-US')} of `
+    + `${c.addresses_seen.toLocaleString('en-US')} addresses `));
   p.append(document.createTextNode(
-    `Realized PnL on completed round-trips only, over ${c.window_label}, across `
-    + `${c.universe}. ${c.addresses_qualifying.toLocaleString('en-US')} of `
-    + `${c.addresses_seen.toLocaleString('en-US')} addresses closed a round-trip `
-    + `(${c.qualifying_pct.toFixed(1)}%); the rest are out of scope, not estimated. `));
-  p.append(node('b', undefined, CRITERION));
+    `closed a round-trip over ${c.window_label} across ${c.universe}. `
+    + 'The rest are out of scope, not estimated.'));
+  el('criterion').textContent = CRITERION;
 }
 
 function renderFootnote() {

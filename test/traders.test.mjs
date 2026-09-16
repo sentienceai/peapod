@@ -121,10 +121,16 @@ test('presets and filters change the set, and the caveat states the criterion', 
   assert.notDeepEqual(after.map((/** @type {any} */ c) => c.attributes['aria-label']), before);
   tabs[0].onclick?.(/** @type {any} */ ({}));
 
+  // Scope stays above the ranking. The method behind the bar moved into a disclosure
+  // beside the filter that uses it, rather than a paragraph between filters and cards.
   const caveat = get('caveat').textContent;
-  assert.match(caveat, /round-trips only/i);
-  assert.match(caveat, /coin-flip null/);
-  assert.match(caveat, /It measures the rate, not the profit\./);
+  assert.match(caveat, /closed a round-trip/i);
+  assert.match(caveat, /out of scope, not estimated/);
+  assert.ok(caveat.length < 220, `the caveat is a wall again: ${caveat.length} chars`);
+
+  const criterion = get('criterion').textContent;
+  assert.match(criterion, /coin-flip null/);
+  assert.match(criterion, /It measures the rate, not the profit\./);
 });
 
 test('the page says there is no execution rather than implying there is', () => {
@@ -193,4 +199,62 @@ test('a refused wallet prompt is a refusal, not a connection', async () => {
   await assert.rejects(() => connect({ async request() { return ['not-an-address']; } }),
     /no account authorised/);
   await assert.rejects(() => connect(null), /no wallet provider/);
+});
+
+test('the modal closes three ways and hands focus back', async () => {
+  const { openDetail } = await import('../web/lib/detail.js');
+  const doc = /** @type {any} */ (globalThis.document);
+  const card = /** @type {any} */ (get('grid').byClass('tcard')[0]);
+  const modal = get('modal');
+
+  // 1. The close button. It has to be reachable AND look like a control.
+  await openDetail(board.rows[0].address, card);
+  assert.equal(modal.hidden, false);
+  assert.equal(doc.activeElement, get('modal-close'),
+    'opening the dialog left focus outside it');
+  get('modal-close').dispatchEvent({ type: 'click' });
+  assert.equal(modal.hidden, true, 'the close button did not close the dialog');
+  assert.equal(doc.activeElement, card, 'focus was not returned to the card that opened it');
+
+  // 2. Escape.
+  await openDetail(board.rows[1].address, card);
+  doc.dispatchEvent({ type: 'keydown', key: 'Escape' });
+  assert.equal(modal.hidden, true, 'escape did not close the dialog');
+  assert.equal(doc.activeElement, card);
+
+  // 3. The backdrop — but only the backdrop.
+  await openDetail(board.rows[2].address, card);
+  get('rail').dispatchEvent({ type: 'click', bubbles: true });
+  assert.equal(modal.hidden, false, 'a click inside the dialog closed it');
+  modal.dispatchEvent({ type: 'click' });
+  assert.equal(modal.hidden, true, 'the backdrop did not close the dialog');
+  assert.equal(doc.activeElement, card);
+});
+
+test('escape does nothing while the dialog is already closed', async () => {
+  const doc = /** @type {any} */ (globalThis.document);
+  const before = doc.activeElement;
+  assert.equal(get('modal').hidden, true);
+  doc.dispatchEvent({ type: 'keydown', key: 'Escape' });
+  assert.equal(doc.activeElement, before, 'a stray escape moved focus');
+});
+
+test('tab is trapped inside the dialog', async () => {
+  const { openDetail } = await import('../web/lib/detail.js');
+  const doc = /** @type {any} */ (globalThis.document);
+  const card = /** @type {any} */ (get('grid').byClass('tcard')[0]);
+  await openDetail(board.rows[0].address, card);
+
+  const items = get('modal').querySelectorAll(
+    'button, a[href], input, select, textarea, [tabindex]');
+  assert.ok(items.length > 2, `the trap found ${items.length} focusable elements`);
+
+  // Forward off the end wraps to the start; back off the start wraps to the end.
+  items[items.length - 1].focus();
+  doc.dispatchEvent({ type: 'keydown', key: 'Tab' });
+  assert.equal(doc.activeElement, items[0], 'tab escaped the dialog at the end');
+  doc.dispatchEvent({ type: 'keydown', key: 'Tab', shiftKey: true });
+  assert.equal(doc.activeElement, items[items.length - 1], 'shift-tab escaped at the start');
+
+  get('modal-close').dispatchEvent({ type: 'click' });
 });

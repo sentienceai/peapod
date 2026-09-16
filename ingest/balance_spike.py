@@ -138,10 +138,25 @@ def fetch(url: str, addrs: list[str], workers: int) -> None:
                     raise
                 time.sleep(2 ** attempt)
 
+    # Values are uint256. They do not fit an i64 and polars will not widen one, so they
+    # are carried as decimal strings and parsed at replay. An earlier run fetched all
+    # 6,400 ranges and then died on DataFrame construction against a single 4.3e43 value.
+    schema = ["token", "src", "dst", "value", "block", "log_index", "n_topics"]
+    part = 0
+
+    def flush(buf):
+        nonlocal part
+        if not buf:
+            return
+        pl.DataFrame(buf, schema=schema, orient="row").write_parquet(
+            OUT / f"transfers-{part:04d}.parquet")
+        part += 1
+        buf.clear()
+
     jobs = iter([(side, lo, hi) for lo, hi in ranges for side in ("out", "in")])
     pool = ThreadPoolExecutor(max_workers=workers)
     inflight = {pool.submit(work, j) for j in islice(jobs, workers * 2)}
-    rows, done_n, started = [], 0, time.time()
+    rows, done_n, started, total = [], 0, time.time(), 0
     try:
         while inflight:
             done, inflight = wait(inflight, return_when=FIRST_COMPLETED)
@@ -149,24 +164,27 @@ def fetch(url: str, addrs: list[str], workers: int) -> None:
                 side, lo, hi, logs = fut.result()
                 for lg in logs:
                     if len(lg["topics"]) != 3:
-                        rows.append((lg["address"], "", "", 0, int(lg["blockNumber"], 16),
+                        rows.append((lg["address"], "", "", "0", int(lg["blockNumber"], 16),
                                      int(lg["logIndex"], 16), len(lg["topics"])))
                         continue
                     rows.append((lg["address"],
                                  "0x" + lg["topics"][1][26:], "0x" + lg["topics"][2][26:],
-                                 int(lg["data"][:66], 16) if len(lg["data"]) >= 66 else 0,
+                                 str(int(lg["data"][:66], 16)) if len(lg["data"]) >= 66 else "0",
                                  int(lg["blockNumber"], 16), int(lg["logIndex"], 16), 3))
                 done_n += 1
                 if done_n % 500 == 0:
-                    print(f"  {done_n:,}/{len(ranges)*2:,} calls  {len(rows):,} logs  "
+                    total += len(rows)
+                    flush(rows)
+                    print(f"  {done_n:,}/{len(ranges)*2:,} calls  {total:,} logs  "
                           f"{done_n/(time.time()-started):.1f} calls/s", flush=True)
             for j in islice(jobs, len(done)):
                 inflight.add(pool.submit(work, j))
     finally:
         pool.shutdown(wait=False, cancel_futures=True)
 
-    df = pl.DataFrame(rows, schema=["token", "src", "dst", "value", "block",
-                                    "log_index", "n_topics"], orient="row")
+    total += len(rows)
+    flush(rows)
+    df = pl.concat([pl.read_parquet(p) for p in sorted(OUT.glob("transfers-*.parquet"))])
     df = df.unique(subset=["block", "log_index"]).sort(["block", "log_index"])
     df.write_parquet(OUT / "transfers.parquet")
     (OUT / "addrs.json").write_text(json.dumps({"addrs": addrs, "head": head}))
@@ -188,10 +206,11 @@ def reconcile(url: str, workers: int) -> None:
             df["token"], df["src"], df["dst"], df["value"], df["block"]):
         if src == dst:
             continue          # a self-transfer moves nothing; counting both sides is a bug
+        v = int(value)        # uint256, carried as a decimal string; Python ints are exact
         if src in addrs:
-            events[(src, token)].append((block, -value))
+            events[(src, token)].append((block, -v))
         if dst in addrs:
-            events[(dst, token)].append((block, value))
+            events[(dst, token)].append((block, v))
 
     checks = []
     for (addr, token), evs in events.items():

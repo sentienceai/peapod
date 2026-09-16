@@ -10,7 +10,7 @@
  */
 
 import { sparkline } from './lib/spark.js';
-import { closeDetail, openDetail } from './lib/detail.js';
+import { openDetail } from './lib/detail.js';
 import { setTokenLogos, tokenCell } from './lib/token.js';
 import { copyButton } from './lib/copy.js';
 
@@ -189,9 +189,9 @@ function podiumCard(r, place) {
   card.setAttribute('role', 'link');
   card.setAttribute('aria-label', `Open ${r.address}`);
   card.style.cursor = 'pointer';
-  card.onclick = () => { void openDetail(r.address); };
+  card.onclick = () => { void openDetail(r.address, card); };
   card.onkeydown = (e) => {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); void openDetail(r.address); }
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); void openDetail(r.address, card); }
   };
   const top = node('div', 'pcard-top');
   const who = node('div', 'pcard-addr');
@@ -229,9 +229,9 @@ function render() {
     tr.setAttribute('role', 'link');
     tr.setAttribute('aria-label', `Open ${r.address}`);
     tr.style.cursor = 'pointer';
-    tr.onclick = () => { void openDetail(r.address); };
+    tr.onclick = () => { void openDetail(r.address, tr); };
     tr.onkeydown = (e) => {
-      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); void openDetail(r.address); }
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); void openDetail(r.address, tr); }
     };
     tr.append(node('td', 'rank', String(i + 4)));
     const who = node('td');
@@ -322,8 +322,5 @@ el('min-win').addEventListener('change', (e) => {
   render();
 });
 
-el('modal-close').addEventListener('click', closeDetail);
-el('modal').addEventListener('click', (e) => { if (e.target === el('modal')) closeDetail(); });
-addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDetail(); });
 
 await load();

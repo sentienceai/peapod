@@ -156,13 +156,34 @@ class Node {
     return null;
   }
 
-  /** @param {string} sel */
+  /**
+   * Attribute selectors, tag names, and comma-separated lists of either.
+   *
+   * The modal's focus trap asks for 'button, a[href], input, select, textarea, [tabindex]'.
+   * A stub that returned [] for that would report an empty trap and pass every assertion
+   * about it while the real page trapped nothing.
+   * @param {string} sel
+   */
   querySelectorAll(sel) {
-    const m = sel.match(/^\[([\w-]+)\]$/);
-    if (!m) return [];
-    const key = m[1].replace(/^data-/, '').replace(/-(\w)/g, (_, c) => c.toUpperCase());
-    return this.descendants().filter((n) => n.dataset[key] !== undefined
-      || n.attributes[m[1]] !== undefined);
+    /** @param {Node} n @param {string} part */
+    const matches = (n, part) => {
+      const attr = part.match(/^([\w-]*)\[([\w-]+)\]$/);
+      if (attr) {
+        return (!attr[1] || n.tag === attr[1])
+          && (n.attributes[attr[2]] !== undefined
+            || n.dataset[attr[2].replace(/^data-/, '').replace(/-(\w)/g,
+              (_, c) => c.toUpperCase())] !== undefined);
+      }
+      return /^[\w-]+$/.test(part) && n.tag === part;
+    };
+    const parts = sel.split(',').map((x) => x.trim()).filter(Boolean);
+    return this.descendants().filter((n) => parts.some((part) => matches(n, part)));
+  }
+
+  /** Focus, as the browser tracks it, so focus return can be asserted. */
+  focus() {
+    const d = /** @type {any} */ (globalThis.document);
+    if (d) d.activeElement = this;
   }
 
   /** Every node beneath this one, for assertions. */
@@ -202,16 +223,48 @@ export async function install(htmlUrl) {
   const html = await readFile(htmlUrl, 'utf8');
   /** @type {Map<string, Node>} */
   const byId = new Map();
-  for (const match of html.matchAll(/<(\w+)([^>]*\bid="([^"]+)"[^>]*)>/g)) {
-    const node = new Node(match[1]);
-    // Carry the attributes the pages read back off the element, so a control declared
-    // with value="10" in the markup behaves here as it would in a browser.
-    for (const attr of match[2].matchAll(/([\w-]+)="([^"]*)"/g)) {
-      node.attributes[attr[1]] = attr[2];
-      if (attr[1] === 'value') node.value = attr[2];
-      if (attr[1] === 'class') node.className = attr[2];
+
+  /**
+   * Build the tree of id'd elements, not just a flat map of them.
+   *
+   * This used to create one detached node per id="...", so el('modal').descendants() was
+   * empty and anything that searched inside a container found nothing. A focus trap tested
+   * that way reports zero focusable elements and passes every assertion about it, and a
+   * backdrop-click test passes because the click never reaches the backdrop either. The
+   * scan now tracks open and close tags and nests each id'd element inside the nearest
+   * id'd element enclosing it, which is the structure the pages actually query.
+   */
+  const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
+    'link', 'meta', 'source', 'track', 'wbr']);
+  /** @type {{tag: string, node: Node|null}[]} */
+  const stack = [];
+  for (const m of html.matchAll(/<(\/?)([a-zA-Z][\w-]*)([^>]*?)(\/?)>/g)) {
+    const [, closing, rawTag, attrs, selfClose] = m;
+    const tag = rawTag.toLowerCase();
+    if (closing) {
+      for (let i = stack.length - 1; i >= 0; i -= 1) {
+        if (stack[i].tag === tag) { stack.length = i; break; }
+      }
+      continue;
     }
-    byId.set(match[3], node);
+    const id = attrs.match(/\bid="([^"]+)"/);
+    /** @type {Node|null} */
+    let node = null;
+    if (id) {
+      node = new Node(tag);
+      // Carry the attributes the pages read back off the element, so a control declared
+      // with value="10" in the markup behaves here as it would in a browser.
+      for (const attr of attrs.matchAll(/([\w-]+)="([^"]*)"/g)) {
+        node.attributes[attr[1]] = attr[2];
+        if (attr[1] === 'value') node.value = attr[2];
+        if (attr[1] === 'class') node.className = attr[2];
+      }
+      if (/\bhidden\b/.test(attrs)) node.hidden = true;
+      const parent = [...stack].reverse().find((f) => f.node)?.node;
+      if (parent) parent.append(node);
+      byId.set(id[1], node);
+    }
+    if (!VOID.has(tag) && !selfClose) stack.push({ tag, node });
   }
 
   globalThis.document = /** @type {any} */ ({});
@@ -220,6 +273,13 @@ export async function install(htmlUrl) {
     createElement: (/** @type {string} */ tag) => new Node(tag),
     createTextNode: (/** @type {unknown} */ text) => String(text),
     createElementNS: (/** @type {string} */ _ns, /** @type {string} */ tag) => new Node(tag),
+    /** @type {Node | null} */
+    activeElement: null,
+    /** @param {{type: string}} event */
+    dispatchEvent(event) {
+      for (const l of document.listeners) if (l.type === event.type) l.fn({ ...event });
+      return true;
+    },
     /** @type {any[]} */
     listeners: [],
     /**
