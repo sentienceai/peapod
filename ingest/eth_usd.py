@@ -190,7 +190,6 @@ def stage_select(url: str, root: Path, lo: int, hi: int) -> None:
                      "swaps": counts[pid], "price": px, "depth_usd": depth,
                      "block": s["block"]})
     rows.sort(key=lambda r: -r["depth_usd"])
-    OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "candidates.json").write_text(json.dumps(rows[:40], indent=1))
     print(f"\n{'pool':<12}{'fee':>8}{'swaps':>9}{'+/-1% depth':>16}{'price':>12}")
     for r in rows[:8]:
@@ -216,13 +215,20 @@ def stage_series(url: str, root: Path, lo: int, hi: int) -> None:
     second = next(c for c in cands if c["pool_id"] != ref["pool_id"])
     session = requests.Session()
 
+    # NAMED, TYPED COLUMNS EVEN WHEN THERE ARE NO ROWS. pl.DataFrame([]) has no columns at
+    # all, so the .unique(subset=[...]) below raised `unable to find column "block"` rather
+    # than producing an empty frame. A window with no swaps in it is not an error and it is
+    # not rare: the cross-check pool trades far less than the reference, and a cold volume
+    # prices whatever narrow window the Pons tape covers on its first tick.
+    schema = {"block": pl.Int64, "log_index": pl.Int64, "sqrt_price": pl.String,
+              "liquidity": pl.String, "price": pl.Float64}
     for tag, pool in (("reference", ref), ("second", second)):
         swaps = fetch_swaps(url, [pool["pool_id"]], lo, hi, session)
         rows = [{"block": s["block"], "log_index": s["log_index"],
                  "sqrt_price": str(s["sqrt_price"]), "liquidity": str(s["liquidity"]),
                  "price": price_from(s["sqrt_price"], pool["eth0"])}
                 for s in swaps if s["sqrt_price"] > 0]
-        df = (pl.DataFrame(rows).unique(subset=["block", "log_index"])
+        df = (pl.DataFrame(rows, schema=schema).unique(subset=["block", "log_index"])
               .sort(["block", "log_index"]))
         df.write_parquet(OUT / f"{tag}.parquet")
         print(f"{tag} {pool['pool_id'][:10]}: {df.height:,} priced swaps", flush=True)
@@ -231,6 +237,15 @@ def stage_series(url: str, root: Path, lo: int, hi: int) -> None:
     bt = block_times().sort("block")
     import numpy as np  # noqa: PLC0415
     df = pl.read_parquet(OUT / "reference.parquet")
+    # Two observations is the minimum that makes a series: one interval to describe, and
+    # something to interpolate between. Below that the arithmetic underneath the summary is
+    # all on empty arrays — np.diff of one row, then .max() of nothing. There is no build
+    # to protect here either way: the "eth series is present and moving" gate wants over a
+    # thousand points, so a short window is refused with a figure rather than a traceback.
+    if df.height < 2:
+        print(f"only {df.height} priced swap(s) in the reference pool over "
+              f"{lo:,}..{hi:,}; too short to make a series, so none is written")
+        return
     ts = np.interp(df["block"].to_numpy().astype(np.int64),
                    bt["block"].to_numpy().astype(np.int64),
                    bt["ts"].to_numpy().astype(np.int64)).astype(np.int64)
@@ -315,6 +330,16 @@ def main() -> int:
     # The band arithmetic is vendored in engine/. It is only needed to CHOOSE the
     # reference pool, so it is imported for that stage alone — importing it for every
     # stage is what made a container fail on `--stage series`, which never touches it.
+    # EVERY STAGE CREATES ITS OWN OUTPUT DIRECTORY. This mkdir lived in --stage select
+    # alone, so --stage series — the one the cycle runs — fetched the reference pool's
+    # swaps over the network and then died writing them:
+    #
+    #   FileNotFoundError: No such file or directory (os error 2):
+    #     /app/ingest/out/eth_usd/reference.parquet
+    #
+    # Vendoring the selection fixed the READ this stage does and left the WRITE, which is
+    # the same cold-volume assumption one line further down.
+    OUT.mkdir(parents=True, exist_ok=True)
     if args.stage == "select":
         sys.path.insert(0, str(HERE.parent / "engine"))
         import importlib  # noqa: PLC0415

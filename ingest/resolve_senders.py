@@ -60,7 +60,14 @@ HERE = Path(__file__).resolve().parent
 SWAPS = [HERE / "out" / "swaps_tx", HERE / "out" / "pons_swaps"]
 # Each source writes its own tree. Merging two providers into one directory would make
 # the cross-check impossible: agreement can only be asserted between sets kept apart.
-SOURCE = os.environ.get("PEAPOD_SOURCE", "public")
+#
+# THE SOURCE IS THE ENDPOINT, not a separate variable that can disagree with it. It was
+# `os.environ.get("PEAPOD_SOURCE", "public")` while the build defaulted the same variable
+# to "edge", so a container with neither set resolved 87,868 transactions into tx_from and
+# then built from tx_from_edge, which did not exist. Both defaults were defensible on their
+# own; nothing made them agree. A tree named after the endpoint that filled it cannot drift
+# from one, and PEAPOD_SOURCE still overrides for a deliberate side-by-side comparison.
+SOURCE = os.environ.get("PEAPOD_SOURCE") or ENDPOINT
 _suffix = "" if SOURCE == "public" else f"_{SOURCE}"
 OUT = HERE / "out" / f"tx_from{_suffix}"
 CHECKPOINT = HERE / "out" / f"tx_from{_suffix}.checkpoint.json"
@@ -209,10 +216,20 @@ def main() -> int:
     swaps = pl.concat([pl.read_parquet(p, columns=["block", "tx_hash"]) for p in parts])
     wanted = set(swaps["tx_hash"].to_list())
 
+    # ALREADY RESOLVED IN ANY TREE, not just the one this run writes to.
+    #
+    # The output tree is named after the endpoint, so correcting that name would otherwise
+    # orphan the tree beside it and re-resolve every block in it — on the deployed volume
+    # that is 87,868 transactions and the better part of an hour, thrown away to fix a
+    # directory name. A resolved block is resolved whoever answered; the work stays where
+    # it was written and the fold reads every tree.
     done_blocks: set[int] = set()
     OUT.mkdir(parents=True, exist_ok=True)
-    for existing in sorted(OUT.glob("part-*.parquet")):
-        done_blocks.update(pl.read_parquet(existing)["block"].to_list())
+    for tree in sorted(HERE.glob("out/tx_from*")):
+        if not tree.is_dir():
+            continue
+        for existing in sorted(tree.glob("part-*.parquet")):
+            done_blocks.update(pl.read_parquet(existing, columns=["block"])["block"].to_list())
 
     # Newest first: at any moment the resolved set is a complete recent window, which is
     # the only shape that supports an honest answer about what an address has held.

@@ -218,15 +218,25 @@ def main() -> int:
     tapes = {
         "swaps_tx": (HERE / "out" / "swaps_tx", HERE / "out" / "days" / "swaps_rwa"),
         "pons_swaps": (HERE / "out" / "pons_swaps", HERE / "out" / "days" / "swaps_pons"),
-        "tx_from_edge": (HERE / "out" / "tx_from_edge", HERE / "out" / "days" / "tx_from"),
-        "tx_from_pons": (HERE / "out" / "tx_from_pons",
-                         HERE / "out" / "days" / "tx_from_pons"),
     }
+    # WHATEVER THE SENDER TREES ARE CALLED. These were two hardcoded names, and the
+    # resolver writes a tree named after the endpoint that filled it — so the one tree that
+    # actually had data in it was not in this list, and partitions reported "nothing at
+    # tx_from_edge, skipped" while tx_from sat beside it holding every resolved
+    # transaction on the volume.
+    for tree in sorted((HERE / "out").glob("tx_from*")):
+        if tree.is_dir():
+            tapes[tree.name] = (tree, HERE / "out" / "days" / tree.name)
+
     for name, (src, dst) in tapes.items():
         if args.only and args.only != name:
             continue
-        if not src.exists():
-            print(f"{name}: nothing at {src}, skipped")
+        # A DIRECTORY IS NOT DATA. The swap ingest creates its output directory before it
+        # fetches anything, so an `exists()` test passes over an empty one and migrate()
+        # then raises FileNotFoundError("nothing to migrate") — a stage failing because an
+        # earlier stage succeeded and found no rows.
+        if not sorted(src.glob("part-*.parquet")) and not sorted(src.rglob("*.parquet")):
+            print(f"{name}: no parts at {src}, skipped")
             continue
         report = migrate(src, dst, clock)
         ok = report["source_rows"] == report["written"]

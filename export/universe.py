@@ -108,14 +108,32 @@ def _read_swaps(paths, columns: list[str], what: str) -> pl.DataFrame:
         raise SystemExit(f"{what} tape is missing a column the fold needs: {exc}") from exc
 
 
+def senders() -> pl.DataFrame:
+    """Every resolved transaction sender, from every tree that holds any.
+
+    ALL THE TREES, NOT THE ONE NAMED BY --source. The resolver names its output after the
+    endpoint that filled it, and has done so under three different names across this
+    project's life: tx_from, tx_from_edge, tx_from_pons. Reading one meant a build could
+    look in an empty directory while twelve minutes of resolved transactions sat in the one
+    beside it, and a rename could strand work that was already paid for. A sender is a fact
+    about a transaction — which provider answered the question does not change the answer,
+    and identical rows collapse on tx_hash.
+
+    The three trees carry three different column sets, so the two columns that matter are
+    named rather than concatenated wholesale.
+    """
+    parts = sorted(p for d in sorted(INGEST.glob("tx_from*")) if d.is_dir()
+                   for p in d.glob("part-*.parquet"))
+    if not parts:
+        raise SystemExit(f"no resolved transactions in any tx_from* tree under {INGEST}")
+    return (pl.concat([pl.read_parquet(p, columns=["tx_hash", "tx_from"]) for p in parts])
+            .unique(subset=["tx_hash"]))
+
+
 def rwa(root: Path, source: str = "edge") -> pl.DataFrame:
-    suffix = "" if source == "public" else f"_{source}"
     swaps = _read_swaps(sorted((INGEST / "swaps_tx").glob("part-*.parquet")),
                         RWA_COLUMNS, "RWA swap")
-    parts = sorted((INGEST / f"tx_from{suffix}").glob("part-*.parquet"))
-    if not parts:
-        raise SystemExit(f"no resolved transactions for source '{source}'")
-    senders = pl.concat([pl.read_parquet(p) for p in parts]).unique(subset=["tx_hash"])
+    senders_ = senders()
     pools = _pools()
     tok = _tokens()
     t0 = tok.select(pl.col("address").alias("currency0"), pl.col("symbol").alias("s0"),
@@ -128,7 +146,7 @@ def rwa(root: Path, source: str = "edge") -> pl.DataFrame:
                                    .then(pl.col("s0")).otherwise(pl.col("s1")))
             .filter((pl.col("k0") == "rwa_spot") | (pl.col("k1") == "rwa_spot"))
             .select("pool_id", "ticker", "rwa0", "d0", "d1"))
-    df = swaps.join(meta, on="pool_id", how="inner").join(senders, on="tx_hash", how="inner")
+    df = swaps.join(meta, on="pool_id", how="inner").join(senders_, on="tx_hash", how="inner")
     bn, bts = _block_times(root)
     ts = np.interp(df["block"].to_numpy().astype(np.int64), bn, bts).astype(np.int64)
     d0 = df["d0"].fill_null(18).to_numpy()
@@ -183,17 +201,8 @@ def pons(root: Path, source: str = "edge") -> pl.DataFrame:
               "refuse the build")
         return EMPTY_TRADES
     swaps = _read_swaps(tape, BASE_COLUMNS, "Pons swap")
-    # The identity resolver covers both tapes into one table. tx_from_pons is the older
-    # split output and is still read where it exists, so a volume carrying one does not
-    # have to re-resolve transactions it already knows.
-    suffix = "" if source == "public" else f"_{source}"
-    parts = sorted((INGEST / f"tx_from{suffix}").glob("part-*.parquet")) + \
-        sorted((INGEST / "tx_from_pons").glob("part-*.parquet"))
-    if not parts:
-        raise SystemExit("no resolved transactions for the Pons tape")
-    senders = (pl.concat([pl.read_parquet(p, columns=["tx_hash", "tx_from"]) for p in parts])
-               .unique(subset=["tx_hash"]))
-    df = swaps.join(senders, on="tx_hash", how="inner").filter(
+    senders_ = senders()
+    df = swaps.join(senders_, on="tx_hash", how="inner").filter(
         pl.col("pool_id").is_in(list(universe)))
     bn, bts = _block_times(root)
     ts = np.interp(df["block"].to_numpy().astype(np.int64), bn, bts).astype(np.int64)
