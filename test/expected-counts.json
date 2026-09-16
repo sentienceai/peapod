@@ -14,5 +14,6 @@
   "export/test_build_output.py": 17,
   "export/test_windows.py": 8,
   "ingest/test_dedup.py": 11,
-  "ingest/test_eth_usd.py": 0
+  "ingest/test_eth_usd.py": 0,
+  "ingest/test_partitions.py": 0
 }

@@ -41,6 +41,7 @@ import polars as pl
 import requests
 
 from dedup import Deduplicator, tx_key
+from partitions import record_block_times
 
 # The endpoint and its pacing are configuration, not constants, so moving to a paid
 # provider is an environment change rather than a code change. The defaults are the free
@@ -108,11 +109,18 @@ def post(payload, timeout=90):
     return SESSION.post(RPC, json=payload, timeout=timeout)
 
 
-def resolve_blocks(blocks: list[int], wanted: set[str]) -> tuple[list[dict], list[int]]:
-    """(rows for transactions we care about, blocks that did not come back).
+def resolve_blocks(blocks: list[int], wanted: set[str]
+                   ) -> tuple[list[dict], list[int], list[tuple[int, int]]]:
+    """(rows for transactions we care about, blocks that did not come back, block times).
 
     Returns every transaction in each block filtered to `wanted`, the swap transactions.
     Nothing is inferred: a block that will not load is recorded and retried, never guessed.
+
+    THE TIMESTAMP COMES FREE. `blockTimestamp` is 0x0 on every log from this endpoint, so
+    a swap cannot say what day it happened and day partitioning had to interpolate, which
+    is wrong by about a hundred seconds and files roughly 0.14% of rows on the wrong side
+    of a midnight. The whole block is already being fetched to read tx.from, and it
+    carries its own timestamp. It was being decoded and discarded.
     """
     payload = [{"jsonrpc": "2.0", "id": i, "method": "eth_getBlockByNumber",
                 "params": [hex(b), True]} for i, b in enumerate(blocks)]
@@ -140,6 +148,7 @@ def resolve_blocks(blocks: list[int], wanted: set[str]) -> tuple[list[dict], lis
             continue
         rows: list[dict] = []
         seen: set[int] = set()
+        times: list[tuple[int, int]] = []
         for entry in body:
             idx = entry.get("id")
             result = entry.get("result")
@@ -149,6 +158,9 @@ def resolve_blocks(blocks: list[int], wanted: set[str]) -> tuple[list[dict], lis
                 continue
             seen.add(blocks[idx])
             block_hash = result.get("hash")
+            raw_ts = result.get("timestamp")
+            if isinstance(raw_ts, str) and raw_ts not in ("0x0", "0x"):
+                times.append((blocks[idx], int(raw_ts, 16)))
             for tx in result.get("transactions") or []:
                 h = tx.get("hash")
                 if h in wanted:
@@ -160,8 +172,8 @@ def resolve_blocks(blocks: list[int], wanted: set[str]) -> tuple[list[dict], lis
                         "block_hash": block_hash,
                     })
         missing = [b for b in blocks if b not in seen]
-        return rows, missing
-    return [], list(blocks)
+        return rows, missing, times
+    return [], list(blocks), []
 
 
 def load_checkpoint() -> dict:
@@ -212,6 +224,7 @@ def main() -> int:
 
     state = load_checkpoint()
     buffer: list[dict] = []
+    clock_buffer: list[tuple[int, int]] = []
     unresolved: list[int] = []
     seen = Deduplicator(key_of=tx_key, track_conflicts=False)
     began = time.time()
@@ -219,6 +232,11 @@ def main() -> int:
 
     def flush():
         nonlocal buffer, last_flush
+        # Block times go down with the rows they were read alongside, so a crash cannot
+        # leave a checkpoint claiming blocks whose timestamps were never persisted.
+        if clock_buffer:
+            record_block_times(clock_buffer)
+            clock_buffer.clear()
         if buffer:
             pl.DataFrame(buffer).write_parquet(OUT / f"part-{state['part']:05d}.parquet")
             state["part"] += 1
@@ -233,9 +251,13 @@ def main() -> int:
             print("reached --max-hours; stopping cleanly", flush=True)
             break
         chunk = todo[i:i + BATCH]
-        rows, missing = resolve_blocks(chunk, wanted)
+        rows, missing, times = resolve_blocks(chunk, wanted)
         buffer.extend(r for r in rows if seen.accept(r))
         unresolved.extend(missing)
+        clock_buffer.extend(times)
+        if len(clock_buffer) >= 20_000:
+            record_block_times(clock_buffer)
+            clock_buffer.clear()
 
         if len(buffer) >= PART_ROWS or time.time() - last_flush >= FLUSH_SECONDS:
             flush()
