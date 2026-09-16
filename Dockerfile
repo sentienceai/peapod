@@ -22,7 +22,11 @@ COPY . .
 # survive a deploy: the tape, the partitions, and the database.
 # PEAPOD_LP_TERMINAL is deliberately unset: the registry the build needs is vendored in
 # registry/, so there is nothing to seed before the first cycle can run.
-ENV PEAPOD_PY=/opt/venv/bin/python \
+# HOST explicitly: a container that binds loopback answers every healthcheck run inside
+# itself and 502s every request from the platform's proxy. The server detects containers
+# anyway; this makes it declarative rather than inferred.
+ENV HOST=0.0.0.0 \
+    PEAPOD_PY=/opt/venv/bin/python \
     PEAPOD_DB=/data/var/peapod.db \
     PEAPOD_DATA=/data \
     PYTHONPATH=/app/ingest:/app/export \

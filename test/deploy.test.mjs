@@ -15,8 +15,22 @@ import { readFile, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
 
 const root = fileURLToPath(new URL('../', import.meta.url));
+
+/** A non-loopback IPv4 of this machine, or null if there is none to test against. */
+function externalAddress() {
+  const { networkInterfaces } = require('node:os');
+  for (const list of Object.values(networkInterfaces())) {
+    for (const n of list ?? []) {
+      if (n.family === 'IPv4' && !n.internal) return n.address;
+    }
+  }
+  return null;
+}
 
 /** @param {Record<string,string>} env */
 async function boot(env) {
@@ -110,4 +124,72 @@ test('the build needs no lp-terminal checkout, because the registry is vendored'
     assert.ok(!/\/Users\/\w+\/canopy/.test(body), `${f} reads from ~/canopy`);
     assert.ok(!/out\/raw\/pools/.test(body), `${f} reads the full upstream pool registry`);
   }
+});
+
+
+test('the bind address follows the environment, and HOST always wins', async () => {
+  const { resolveHost } = await import('../net-host.mjs');
+  const never = () => false;
+  // A laptop: `npm run dev` must not put the site on the cafe wifi.
+  assert.equal(resolveHost({}, never).host, '127.0.0.1');
+  // A container: the only client is the platform's proxy, arriving over the container
+  // network. Loopback there answers every check made INSIDE the container and 502s
+  // every request from outside — a deploy that reports success and serves nothing.
+  for (const marker of ['RAILWAY_ENVIRONMENT', 'RAILWAY_SERVICE_ID', 'FLY_APP_NAME',
+    'RENDER', 'KUBERNETES_SERVICE_HOST', 'DYNO']) {
+    assert.equal(resolveHost({ [marker]: 'x' }, never).host, '0.0.0.0', marker);
+  }
+  assert.equal(resolveHost({}, () => true).host, '0.0.0.0', '/.dockerenv');
+  // Explicit always wins, in both directions.
+  assert.equal(resolveHost({ HOST: '127.0.0.1', RAILWAY_ENVIRONMENT: 'x' }, never).host,
+    '127.0.0.1');
+  assert.equal(resolveHost({ HOST: '0.0.0.0' }, never).host, '0.0.0.0');
+});
+
+test('a container build is reachable from off the loopback interface', async (t) => {
+  // THIS IS THE TEST THAT WAS MISSING. The existing boot test fetches localhost from the
+  // same machine, which succeeds whether the server bound 127.0.0.1 or 0.0.0.0 — so it
+  // passed while the deploy 502'd. Catching it means connecting over an address that is
+  // not loopback.
+  const external = externalAddress();
+  if (!external) return t.skip('no non-loopback IPv4 on this machine');
+
+  const dir = await mkdtemp(join(tmpdir(), 'peapod-bind-'));
+  const s = await boot({ PEAPOD_DB: join(dir, 'peapod.db'), PEAPOD_CYCLE: 'off',
+    RAILWAY_ENVIRONMENT: 'test' });
+  try {
+    const res = await fetch(`http://${external}:${s.port}/api/manifest`);
+    assert.equal(res.status, 200,
+      `bound to loopback: unreachable at ${external}:${s.port}\n${s.log()}`);
+    assert.match(s.log(), /peapod on http:\/\/0\.0\.0\.0:/);
+  } finally {
+    s.child.kill('SIGKILL');
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('a local run stays on loopback and is not reachable from outside', async (t) => {
+  // The other direction matters too: the container fix must not put a developer's
+  // machine on the network.
+  const external = externalAddress();
+  if (!external) return t.skip('no non-loopback IPv4 on this machine');
+
+  const dir = await mkdtemp(join(tmpdir(), 'peapod-local-'));
+  const s = await boot({ PEAPOD_DB: join(dir, 'peapod.db'), PEAPOD_CYCLE: 'off' });
+  try {
+    assert.match(s.log(), /peapod on http:\/\/127\.0\.0\.1:/);
+    await assert.rejects(() => fetch(`http://${external}:${s.port}/api/manifest`),
+      'a local dev server is listening on every interface');
+  } finally {
+    s.child.kill('SIGKILL');
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('production on loopback says so instead of looking healthy', async () => {
+  const src = await readFile(new URL('../server.mjs', import.meta.url), 'utf8');
+  assert.match(src, /WARNING: listening on loopback in production/);
+  // And the image sets it explicitly, so it is not a variable anyone has to remember.
+  const docker = await readFile(new URL('../Dockerfile', import.meta.url), 'utf8');
+  assert.match(docker, /HOST=0\.0\.0\.0/);
 });

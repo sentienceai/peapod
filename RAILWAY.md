@@ -25,6 +25,10 @@ Size it **20 GB**. Today's footprint is about 1.1 GB (814 MB tape, 256 MB databa
 The URL contains the key, so there is no separate token. Set it as a Railway variable;
 `.env` is gitignored and must stay that way.
 
+**`HOST` is not needed.** The image sets `HOST=0.0.0.0`, and the server defaults to it
+whenever it detects a container or a platform marker, so you can delete the `HOST`
+variable if you added one to unblock a 502. An explicit `HOST` still wins if you set it.
+
 Nothing else. No database add-on, no object storage, and **no registry to seed** — the
 1.3 MB of pool and token data the build needs is vendored in `registry/`.
 
@@ -79,6 +83,10 @@ curl https://<service>.up.railway.app/api/manifest
 
 - `{"build": null, "empty": true}` — up, nothing built yet. Expected on a fresh volume.
 - `{"build": "20260916T044645Z", ...}` — the timestamp of the last committed cycle.
+- **502 from Railway with a deploy that succeeded** — the process is listening on
+  loopback, so the proxy cannot reach it. The startup log says what it bound to:
+  `peapod on http://0.0.0.0:8080 (HOST is set)` is right;
+  `peapod on http://127.0.0.1:8080` is not, and the server warns about it in production.
 
 If `build` stops advancing, the gates are rejecting builds. The logs name which gate, and
 the store keeps serving the last good one.

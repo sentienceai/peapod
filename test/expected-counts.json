@@ -1,7 +1,7 @@
 {
   "test/boundary.test.mjs": 4,
   "test/counts.test.mjs": 3,
-  "test/deploy.test.mjs": 3,
+  "test/deploy.test.mjs": 7,
   "test/findings.test.mjs": 8,
   "test/kernel.test.mjs": 6,
   "test/leaderboard.test.mjs": 34,

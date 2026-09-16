@@ -16,9 +16,10 @@ import { watch } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolveHost } from './net-host.mjs';
 
 const root = fileURLToPath(new URL('./web/', import.meta.url));
-const host = process.env.HOST || '127.0.0.1';
+const { host, why: hostWhy } = resolveHost();
 const port = Number(process.env.PORT || 3000);
 const dev = process.env.NODE_ENV !== 'production';
 
@@ -251,8 +252,18 @@ if (dev) {
 }
 
 server.listen(port, host, () => {
-  console.log(`peapod on http://${host}:${port}`);
+  const bound = /** @type {any} */ (server.address());
+  console.log(`peapod on http://${bound.address}:${bound.port} (${hostWhy})`);
+  if (bound.address === '127.0.0.1' && process.env.NODE_ENV === 'production') {
+    // A production process on loopback answers every check made inside the container and
+    // 502s every request from outside it. Say so rather than letting it look healthy.
+    console.warn('WARNING: listening on loopback in production. A platform proxy cannot '
+      + 'reach this. Set HOST=0.0.0.0.');
+  }
 });
+
+// What it actually bound to, for anything that needs to assert it from outside.
+export const listening = () => /** @type {any} */ (server.address());
 
 process.on('SIGTERM', () => {
   for (const client of clients) client.end();
