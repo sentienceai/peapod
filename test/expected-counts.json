@@ -8,7 +8,7 @@
   "test/palette.test.mjs": 5,
   "test/render.test.mjs": 13,
   "test/tick-math-sweep.test.mjs": 6,
-  "test/traders.test.mjs": 14,
+  "test/traders.test.mjs": 16,
   "test/wait-for-pid.test.mjs": 7,
   "export/test_bandwalk.py": 8,
   "export/test_build_output.py": 17,

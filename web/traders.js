@@ -300,7 +300,9 @@ function render() {
 
   const deck = el('hero-deck');
   deck.replaceChildren();
-  for (const r of rows.slice(0, 3)) {
+  // Three or none. A stack of one is not a stack, it is a card that failed to render.
+  deck.hidden = rows.length < 3;
+  for (const r of (rows.length < 3 ? [] : rows.slice(0, 3))) {
     const mini = node('div', 'deckcard');
     mini.append(node('span', 'deck-addr', shortAddr(r.address)));
     mini.append(signedMoney(r.realized, 'deck-fig'));

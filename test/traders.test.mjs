@@ -285,3 +285,28 @@ test('the badge says how much of an address it can actually see', async () => {
     assert.ok(shown.includes(`${row.round_trips} closed`));
   }
 });
+
+test('the card bar cannot be squeezed by the content above it', async () => {
+  const css = await readFile(new URL('../web/styles/app.css', import.meta.url), 'utf8');
+  const bar = css.slice(css.indexOf('.tcard-bar {'), css.indexOf('.tcard-bar.v-above'));
+  // The bar is a flex item in a column with a min-height. Without flex:none it is the
+  // thing that shrinks when head + body overflow, and overflow:hidden then clips it.
+  assert.match(bar, /flex:\s*none/, 'the bottom bar can still be squashed and clipped');
+  assert.match(bar, /height:\s*46px/);
+  const head = css.slice(css.indexOf('.tcard-head {'), css.indexOf('.tcard-who'));
+  assert.match(head, /flex:\s*none/, 'the header can still be squashed');
+});
+
+test('the deck never drives the hero height, and is all three cards or none', async () => {
+  const css = await readFile(new URL('../web/styles/app.css', import.meta.url), 'utf8');
+  const deck = css.slice(css.indexOf('.hero-deck {'), css.indexOf('.deckcard {'));
+  // In the grid it set the row height even when the text was shorter, and the 57px gap
+  // was then measured below the deck rather than below the last line of text.
+  assert.match(deck, /position:\s*absolute/, 'the deck is back in flow and will pad the hero');
+  const hero = css.slice(css.indexOf('.hero {'), css.indexOf('.hero h1'));
+  assert.ok(!/grid-template-columns/.test(hero), 'the hero is a grid again');
+
+  const deckEl = get('hero-deck');
+  assert.equal(deckEl.hidden, false);
+  assert.equal(deckEl.byClass('deckcard').length, 3, 'a partial stack reads as a failure');
+});
