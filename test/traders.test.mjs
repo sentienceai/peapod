@@ -21,7 +21,7 @@ const { get } = await install(new URL('../web/traders.html', import.meta.url));
 await import('../web/traders.js');
 
 const board = JSON.parse(
-  await readFile(new URL('../web/data/leaderboard/rwa-usdg-7d.json', import.meta.url), 'utf8'),
+  await readFile(new URL('../web/data/leaderboard/all-7d.json', import.meta.url), 'utf8'),
 );
 
 const cards = () => get('grid').byClass('tcard');
@@ -105,28 +105,24 @@ test('card sparklines split at zero rather than colouring by the final value', a
   assert.notEqual(idOf(svg), idOf(second), 'two sparklines on a page share clip ids');
 });
 
-test('presets and filters change the set, and the caveat states the criterion', () => {
-  const tabs = get('presets').byTag('button');
-  assert.deepEqual(tabs.map((/** @type {any} */ b) => b.textContent),
-    ['Top 100', 'Beyond chance', 'Most active', 'Best on volume', 'Traded last']);
-
-  const before = cards().map((/** @type {any} */ c) => c.attributes['aria-label']);
-  tabs[1].onclick?.(/** @type {any} */ ({}));
-  const after = cards();
-  assert.ok(after.length > 0, 'the beyond-chance preset emptied the grid');
-  for (const c of after) {
-    assert.equal(c.byClass('ev-label')[0].textContent, 'Beyond chance',
-      'the preset let through a record that is not beyond chance');
-  }
-  assert.notDeepEqual(after.map((/** @type {any} */ c) => c.attributes['aria-label']), before);
-  tabs[0].onclick?.(/** @type {any} */ ({}));
+test('the scope tabs are offered and the caveat states scope before ranking', () => {
+  const cats = get('categories').byTag('button');
+  assert.deepEqual(cats.map((/** @type {any} */ b) => b.textContent), ['All', 'RWA', 'Pons']);
+  const quotes = get('quotes').byTag('button');
+  assert.deepEqual(quotes.map((/** @type {any} */ b) => b.textContent), ['All', 'USDG', 'ETH']);
 
   // Scope stays above the ranking. The method behind the bar moved into a disclosure
   // beside the filter that uses it, rather than a paragraph between filters and cards.
   const caveat = get('caveat').textContent;
   assert.match(caveat, /closed a round-trip/i);
   assert.match(caveat, /out of scope, not estimated/);
-  assert.ok(caveat.length < 220, `the caveat is a wall again: ${caveat.length} chars`);
+  // Both universes, both counts, the window, and how the dollars are made.
+  assert.match(caveat, /tokenized-equity pools/);
+  assert.match(caveat, /Pons pools/);
+  assert.match(caveat, /ETH-quoted legs convert at the trade's own timestamp/);
+  // It lives in the hero now, above the controls. What it must not become again is a
+  // paragraph between the filters and the cards, so it stays bounded.
+  assert.ok(caveat.length < 520, `the caveat is a wall again: ${caveat.length} chars`);
 
   const criterion = get('criterion').textContent;
   assert.match(criterion, /coin-flip null/);
@@ -273,8 +269,6 @@ test('the badge says how much of an address it can actually see', async () => {
   assert.equal(coverage(5, 0), 0, 'a zero-volume address must not divide by zero');
   assert.equal(coverage(150, 100), 0, 'coverage must not go negative');
 
-  const tabs = get('presets').byTag('button');
-  tabs[0].onclick?.(/** @type {any} */ ({}));
   for (const c of get('grid').byClass('tcard').slice(0, 8)) {
     const addr = c.attributes['aria-label'].replace('Open ', '');
     const row = board.rows.find((/** @type {any} */ r) => r.address === addr);
@@ -309,4 +303,98 @@ test('the deck never drives the hero height, and is all three cards or none', as
   const deckEl = get('hero-deck');
   assert.equal(deckEl.hidden, false);
   assert.equal(deckEl.byClass('deckcard').length, 3, 'a partial stack reads as a failure');
+});
+
+test('a scope refolds the matching rather than filtering rows', async () => {
+  // 68 of the top 100 trade BOTH universes. If a scope filtered rows, the Pons table
+  // would still show those addresses carrying the profit they made on RWA. Each scope is
+  // its own build, so the same address has DIFFERENT numbers under different scopes.
+  const read = async (/** @type {string} */ f) => JSON.parse(
+    await readFile(new URL(`../web/data/leaderboard/${f}`, import.meta.url), 'utf8'));
+  const all = await read('all-7d.json');
+  const rwa = await read('rwa-7d.json');
+  const pons = await read('pons-7d.json');
+
+  const byAddr = (/** @type {any} */ b) => new Map(
+    b.rows.map((/** @type {any} */ r) => [r.address, r]));
+  const A = byAddr(all); const R = byAddr(rwa); const P = byAddr(pons);
+  const inBoth = [...A.keys()].filter((a) => R.has(a) && P.has(a));
+  assert.ok(inBoth.length > 20, `only ${inBoth.length} addresses appear in both scopes`);
+  for (const a of inBoth.slice(0, 25)) {
+    assert.notEqual(A.get(a).realized, R.get(a).realized,
+      `${a} has identical PnL under All and RWA — the scope filtered rows`);
+    assert.ok(R.get(a).round_trips < A.get(a).round_trips,
+      `${a} kept all its round-trips under the RWA scope`);
+  }
+  // RWA pools all quote USDG, so an rwa-eth scope would be empty and is not built.
+  const index = await read('index.json');
+  assert.equal(index.views.filter((/** @type {any} */ v) => v.scope === 'rwa-eth').length, 0);
+  assert.ok(pons.coverage.universe.includes('Pons'));
+  assert.ok(rwa.coverage.universe.includes('tokenized-equity'));
+});
+
+test('the RWA tab says its success rate is small magnitudes, not better trading', async () => {
+  const rwa = JSON.parse(
+    await readFile(new URL('../web/data/leaderboard/rwa-7d.json', import.meta.url), 'utf8'));
+  const all = JSON.parse(
+    await readFile(new URL('../web/data/leaderboard/all-7d.json', import.meta.url), 'utf8'));
+  // The thing that needs saying: RWA is in profit far more often, on a ceiling two orders
+  // of magnitude lower. Without the note it reads as the safer place to trade.
+  assert.ok(rwa.distribution.in_profit_pct > all.distribution.in_profit_pct + 10);
+  assert.ok(rwa.distribution.percentiles['100'] < all.distribution.percentiles['100'] / 50);
+  const note = rwa.coverage.magnitude_note;
+  assert.ok(note, 'the RWA scope ships no magnitude note');
+  assert.match(note, /reflects how little is at stake, not better trading/);
+  assert.ok(!all.coverage.magnitude_note, 'the All scope should not carry the RWA note');
+});
+
+test('the distribution is on the page, above the ranking', async () => {
+  const stats = get('dist').byClass('dstat');
+  assert.ok(stats.length >= 4, 'the field distribution is not rendered');
+  const text = get('dist').textContent;
+  const d = board.distribution;
+  assert.ok(text.includes('Median'), 'the median is not shown');
+  assert.ok(text.includes(`${d.in_profit_pct.toFixed(1)}%`), 'the in-profit rate is not shown');
+  assert.ok(text.includes(`${(d.top1pct_share * 100).toFixed(0)}%`),
+    'the top-1% concentration is not shown');
+  assert.ok(text.includes(d.at_a_loss.toLocaleString('en-US')),
+    'how many lost money is not shown');
+  // Half made under a dollar. That is the finding; the top row is an outlier.
+  assert.ok(Math.abs(d.percentiles['50']) < 5, `median moved to ${d.percentiles['50']}`);
+  assert.ok(d.top1pct_share > 0.4, 'top-1% concentration fell below the reported level');
+});
+
+test('the hero leads with the field, not with the best number', async () => {
+  // The headline is static markup, so it is read from the file. The stub creates nodes
+  // for id'd elements but does not carry their authored text.
+  const html = await readFile(new URL('../web/traders.html', import.meta.url), 'utf8');
+  const h1 = html.slice(html.indexOf('<h1'), html.indexOf('</h1>'));
+  const sub = get('hero-sub').textContent;
+  assert.match(h1, /Every trader on the chain/);
+  assert.ok(!/\$/.test(h1), 'the headline quotes a figure');
+  assert.match(sub, /Half of those who closed a round-trip made under/);
+  assert.match(sub, /top 1% took/);
+  assert.match(sub, /no execution here/i);
+});
+
+test('an address detail carries its percentile and the field it is read against', async () => {
+  const { readdir } = await import('node:fs/promises');
+  const root = new URL('../web/data/address/', import.meta.url);
+  let found = null;
+  outer: for (const shard of (await readdir(root)).slice(0, 20)) {
+    for (const name of await readdir(new URL(`${shard}/`, root))) {
+      const d = JSON.parse(await readFile(new URL(`${shard}/${name}`, root), 'utf8'));
+      if (d.summary.round_trips > 5) { found = d; break outer; }
+    }
+  }
+  assert.ok(found, 'no qualifying address file found');
+  // A dollar figure alone does not say whether it beat anyone: the median qualifier made
+  // under a dollar, so $40 is not a small result here.
+  assert.equal(typeof found.summary.percentile, 'number');
+  assert.ok(found.summary.percentile >= 0 && found.summary.percentile <= 100);
+  assert.ok(found.field.qualifying > 1000, 'the field context is missing');
+  assert.ok(found.field.at_a_loss_pct > 0, 'the loss context is missing');
+  // Which universes this address traded is a fact about it, not a grid category.
+  assert.ok(Array.isArray(found.universes) && found.universes.length > 0);
+  for (const u of found.universes) assert.ok(['rwa', 'pons'].includes(u));
 });

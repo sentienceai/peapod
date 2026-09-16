@@ -507,3 +507,16 @@ table.mini td:first-child { text-align: left; }
 
 /* The card avatar is 36px on the reference, not the 28px used in table rows. */
 .tcard .avatar { width: 36px; height: 36px; border-radius: 8px; font-size: var(--t-small); }
+
+/* The field, above the ranking. The top row is an outlier by two orders of magnitude and
+   reads as the story; this says what the field actually did before the table can imply
+   otherwise. */
+.dist { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 22px;
+  margin-top: 13px; padding: var(--s-3) 0; border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line); }
+.dstat { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.dstat-k { font-size: var(--t-micro); color: var(--text-muted); }
+.dstat strong { font-size: var(--t-lead); font-weight: var(--w-semi); color: var(--text); }
+.dstat-sub { font-size: var(--t-micro); color: var(--text-muted); }
+.warn-note { color: var(--warn); font-weight: var(--w-regular); }
+@media (max-width: 900px) { .dist { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

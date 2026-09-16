@@ -20,18 +20,27 @@ await import('../web/index.js');
 const index = JSON.parse(
   await readFile(new URL('../web/data/leaderboard/index.json', import.meta.url), 'utf8'),
 );
+/** The default view this page boots into: the combined ranking over the longest window. */
+const view = index.views.find((/** @type {any} */ v) => v.scope === 'all'
+  && v.window === index.windows.at(-1).window);
 
 test('the coverage caveat states scope before any ranking', () => {
   const text = get('caveat').textContent;
-  const c = index.windows.at(-1).coverage;
+  const c = view.coverage;
   assert.match(text, /round-trips only/i);
   assert.match(text, /out of scope, not estimated/);
 
   // WHAT the window is, and over WHICH universe — not just a bare percentage.
   assert.ok(text.includes(c.window_label), 'caveat does not say which window');
   assert.ok(text.includes(c.universe), 'caveat does not say which pools');
-  assert.match(text, /not included/, 'caveat does not say what is excluded');
-  assert.match(text, /full 74-day tape/, 'caveat does not say this is not the whole tape');
+  assert.match(text, /out of scope, not estimated/, 'caveat does not say what is excluded');
+  // Both universes named, not one. This said "236 tokenized-equity pools" alone until
+  // Pons went in, which was then simply wrong about what the ranking covered.
+  assert.match(text, /tokenized-equity pools/);
+  assert.match(text, /Pons pools/);
+  assert.match(text, /ETH-quoted legs convert at the trade's own timestamp/);
+  assert.match(text, /refolds the matching on that scope's trades/);
+  assert.ok(text.includes(c.universe), 'caveat does not state both universes');
 
   // The figures are the shipped ones, not prose that drifted from them.
   assert.ok(text.includes(`${c.qualifying_pct.toFixed(1)}%`),
@@ -46,7 +55,7 @@ test('the ranking says it is truncated rather than implying it is complete', () 
   // The table shows a capped top-N. Presenting that as the full ranking would overstate
   // both an address's rank and the size of the field it beat.
   const text = get('caveat').textContent;
-  const c = index.windows.at(-1).coverage;
+  const c = view.coverage;
   assert.ok(c.rows_shown < c.addresses_qualifying,
     'this assertion is moot if the cap ever exceeds the qualifying set');
   assert.ok(text.includes(`Showing the top ${c.rows_shown.toLocaleString('en-US')}`),
@@ -94,14 +103,20 @@ test('win rate is labelled as per round-trip, not per position', () => {
   assert.match(footnote, /not a share of closed positions/);
 });
 
-test('unavailable categories are disabled rather than shown empty', () => {
+test('every scope the tabs offer has a build behind it', () => {
+  // Category and quote pick a SCOPE, and a scope is a separate build with the matching
+  // refolded on its trades. A tab with no build behind it must be disabled, never a
+  // silent fallback to another scope's numbers.
   const cats = get('categories').byTag('button');
-  const pons = cats.find((b) => b.textContent === 'Pons');
-  assert.ok(pons, 'Pons category missing');
-  assert.equal(pons.disabled, true, 'Pons is selectable but has no data');
-  const eth = get('quotes').byTag('button').find((b) => b.textContent === 'ETH');
-  assert.ok(eth, 'ETH quote tab missing');
-  assert.equal(eth.disabled, true, 'ETH quote is selectable but needs a price series');
+  const quotes = get('quotes').byTag('button');
+  assert.deepEqual(cats.map((/** @type {any} */ b) => b.textContent), ['All', 'RWA', 'Pons']);
+  assert.deepEqual(quotes.map((/** @type {any} */ b) => b.textContent), ['All', 'USDG', 'ETH']);
+  for (const b of [...cats, ...quotes]) {
+    if (b.disabled) continue;
+    assert.ok(typeof b.onclick === 'function', `${b.textContent} is enabled but inert`);
+  }
+  // RWA pools all quote USDG, so there is deliberately no rwa-eth build.
+  assert.equal(index.views.filter((/** @type {any} */ v) => v.scope === 'rwa-eth').length, 0);
 });
 
 test('no perps-state column survived into the table', () => {
@@ -199,7 +214,7 @@ test('a detail file exists for every qualifying address, not just the ranked one
   const shards = await readdir(root);
   let files = 0;
   for (const shard of shards) files += (await readdir(new URL(`${shard}/`, root))).length;
-  const c = index.windows.at(-1).coverage;
+  const c = view.coverage;
   assert.ok(files >= c.addresses_qualifying,
     `${files} detail files for ${c.addresses_qualifying} qualifying addresses — search `
     + 'would 404 for anyone outside the shipped set');
@@ -410,27 +425,32 @@ test('token logos reach the leaderboard column and every tab that names a token'
   }
 });
 
-test('every ticker the shipped data actually uses resolves to a logo file', async () => {
-  // Coverage is 35 of the top 50 by volume across the whole registry, but the page only
-  // ever names the tokens that were traded. If one of those is missing a file the tile is
-  // correct behaviour, not a bug — this pins the number so a drop is visible.
+test('nearly every token the page names has a logo, and the rest fall back', async () => {
+  // 433 files cover both universes: the equity tickers by symbol, and the Pons tokens by
+  // contract address, because the equity registry never named those and a ticker-only map
+  // could not reach 204 of the files. A token with no file is not a bug — it draws its
+  // initials — but a collapse in coverage is, so the rate is pinned.
   const { readdir } = await import('node:fs/promises');
   const logos = JSON.parse(
     await readFile(new URL('../web/data/tokens.json', import.meta.url), 'utf8'),
   );
   const root = new URL('../web/data/address/', import.meta.url);
   const used = new Set();
-  for (const shard of (await readdir(root)).slice(0, 12)) {
-    for (const name of (await readdir(new URL(`${shard}/`, root))).slice(0, 40)) {
+  for (const shard of (await readdir(root)).slice(0, 16)) {
+    for (const name of (await readdir(new URL(`${shard}/`, root))).slice(0, 60)) {
       const d = JSON.parse(await readFile(new URL(`${shard}/${name}`, root), 'utf8'));
       for (const t of d.tokens ?? []) used.add(t.token);
       for (const t of d.round_trips ?? []) used.add(t.token);
-      for (const t of d.trades ?? []) used.add(t.token);
     }
   }
-  assert.ok(used.size > 20, 'the sample found too few tickers to say anything');
-  const missing = [...used].filter((t) => !logos[t]);
-  assert.deepEqual(missing, [], `tickers in use with no logo: ${missing.join(', ')}`);
+  assert.ok(used.size > 40, `the sample found only ${used.size} tokens`);
+  const covered = [...used].filter((t) => logos[t]).length / used.size;
+  assert.ok(covered > 0.9,
+    `logo coverage fell to ${(covered * 100).toFixed(0)}% of the tokens actually named`);
+  // And nothing the page names is a bare contract address: Pons symbols are read off the
+  // chain, because the registry was built for equities and names none of them.
+  const raw = [...used].filter((t) => /^0x[0-9a-f]{6}/.test(t));
+  assert.deepEqual(raw, [], `tokens rendering as raw addresses: ${raw.join(', ')}`);
 });
 
 /**

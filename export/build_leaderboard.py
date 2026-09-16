@@ -142,6 +142,7 @@ def fold(trades: pl.DataFrame):
     wins = defaultdict(int)
     trips = defaultdict(int)
     tokens = defaultdict(set)
+    universes = defaultdict(set)
     unmatched = defaultdict(float)
     series = defaultdict(list)
     detail = defaultdict(list)     # completed round-trips, for the detail view
@@ -153,9 +154,9 @@ def fold(trades: pl.DataFrame):
     first_seen = {}
     last_seen = {}
 
-    for addr, tick, qty, quote_delta, ts in zip(
-            trades["tx_from"], trades["ticker"], trades["qty"].to_numpy(),
-            trades["quote_delta"].to_numpy(), trades["ts"].to_numpy()):
+    for addr, tick, cat, qty, quote_delta, ts in zip(
+            trades["addr"], trades["label"], trades["cat"], trades["qty"].to_numpy(),
+            trades["usd"].to_numpy(), trades["ts"].to_numpy()):
         notional = abs(quote_delta)
         total[addr] += notional
         tokens[addr].add(tick)
@@ -165,7 +166,10 @@ def fold(trades: pl.DataFrame):
                             "price": notional / abs(float(qty)) if abs(qty) > DUST else 0.0})
         first_seen.setdefault(addr, int(ts))
         last_seen[addr] = int(ts)
-        key = (addr, tick)
+        universes[addr].add(cat)
+        # Books never cross a universe: an RWA ticker and a Pons pool are different
+        # inventory, and matching across them would invent a round-trip.
+        key = (addr, cat, tick)
         if qty > 0:
             buys[addr] += 1
             books[key].append([qty, notional / qty if qty > DUST else 0.0, int(ts)])
@@ -196,7 +200,8 @@ def fold(trades: pl.DataFrame):
     return {"realized": realized, "matched": matched, "total": total, "wins": wins,
             "trips": trips, "tokens": tokens, "unmatched": unmatched, "series": series,
             "detail": detail, "holds": holds, "buys": buys, "sells": sells,
-            "changes": changes, "first": first_seen, "last": last_seen, "moves": moves}
+            "changes": changes, "first": first_seen, "last": last_seen, "moves": moves,
+            "universes": universes}
 
 
 def spark(points, lo, hi, n=SPARK_POINTS):
@@ -307,7 +312,18 @@ def slim_provenance(provenance: dict) -> dict:
     }
 
 
-def write_address(addr: str, state, lo: int, hi: int, out: Path, provenance: dict) -> None:
+def percentile_of(value: float, ranked) -> float:
+    """Where this address sits in the qualifying field, as a percentile.
+
+    A dollar figure alone does not say whether it beat anyone. The median qualifying
+    address made 83 cents, so $40 is not a small result here and $1,000 is not a modest one.
+    """
+    import bisect  # noqa: PLC0415
+    return bisect.bisect_left(ranked, value) / max(len(ranked), 1) * 100
+
+
+def write_address(addr: str, state, lo: int, hi: int, out: Path, provenance: dict,
+                  ranked=None, context=None) -> None:
     """One address's detail, whether or not it qualifies for the ranking.
 
     SEARCH MUST WORK FOR EVERY ADDRESS THAT TRADED, not just the ones shown. The ranking is
@@ -359,6 +375,8 @@ def write_address(addr: str, state, lo: int, hi: int, out: Path, provenance: dic
             "style": style_of(median_hold),
             "style_basis": "derived from median hold only",
             "first_ts": state["first"].get(addr), "last_ts": state["last"].get(addr),
+            "percentile": percentile_of(state["realized"][addr], ranked)
+            if (ranked and state["trips"][addr] > 0) else None,
         },
         "labels": [dict(l, earned=l["id"] in earned) for l in LABELS],
         "sequence": [1 if t["realized"] > 0 else 0 for t in trips][-120:],
@@ -372,6 +390,11 @@ def write_address(addr: str, state, lo: int, hi: int, out: Path, provenance: dic
             ({"token": k, **v, "win_rate": v["wins"] / max(v["round_trips"], 1) * 100}
              for k, v in per_token.items()),
             key=lambda x: -x["realized"]),
+        # Which universes this address traded. Not a category on the grid — it is not
+        # something a reader acts on there — but it is a fact about this address.
+        "universes": sorted(state["universes"].get(addr, [])),
+        # The field, so a dollar figure can be read against what everyone else did.
+        "field": context or {},
         "provenance": slim_provenance(provenance),
     }
     if not qualifies:
@@ -423,16 +446,27 @@ def write_token_logos(tokens: pl.DataFrame, web: Path) -> dict:
         by_ticker[row["symbol"]].append(row["address"].lower())
     mapping = {t: files[a[0]] for t, a in by_ticker.items()
                if len(a) == 1 and a[0] in files}
+    # Also key by contract address. 204 of the logo files are for tokens the equity
+    # registry never named — Pons tokens whose symbol had to be read off the chain — and
+    # a ticker-only map cannot reach them.
+    from token_decimals import symbols as chain_symbols  # noqa: PLC0415
+    for addr, name in files.items():
+        mapping.setdefault(addr, name)
+    for a, sy in chain_symbols().items():
+        if a.lower() in files:
+            mapping.setdefault(sy, files[a.lower()])
     ambiguous = sorted(t for t, a in by_ticker.items() if len(a) > 1)
     (web / "data" / "tokens.json").write_text(json.dumps(mapping, sort_keys=True))
-    print(f"token logos: {len(mapping):,} of {len(by_ticker):,} tickers resolve to a file; "
-          f"{len(files):,} files on disk; ambiguous tickers skipped: {ambiguous}")
+    tickers = sum(1 for k in mapping if not k.startswith("0x"))
+    print(f"token logos: {len(files):,} files -> {tickers:,} tickers and "
+          f"{len(mapping) - tickers:,} contract addresses; ambiguous skipped: {ambiguous}")
     return mapping
 
 
 def main() -> int:
     import sys
     sys.path.insert(0, str(HERE))
+    from universe import SCOPES, apply_scope, combined  # noqa: PLC0415
     from upstream import lp_terminal  # noqa: PLC0415
     ap = argparse.ArgumentParser()
     ap.add_argument("--source", default="edge")
@@ -442,86 +476,152 @@ def main() -> int:
     web = HERE.parent / "web"
     write_token_logos(
         pl.read_parquet(root / "out" / "raw" / "tokens" / "part-00000.parquet"), web)
-    df = load(root, args.source)
-    trades = netted(df)
+
+    trades = combined(root, args.source)
     lo, hi = int(trades["ts"].min()), int(trades["ts"].max())
     span_h = (hi - lo) / 3600
+    by_cat = trades.group_by("cat").agg(pl.col("addr").n_unique().alias("addrs"),
+                                        pl.len().alias("changes"))
     print(f"resolved window: {span_h:.1f} hours, {len(trades):,} position changes, "
-          f"{trades['tx_from'].n_unique():,} addresses")
+          f"{trades['addr'].n_unique():,} addresses")
+    for r in by_cat.sort("cat").iter_rows(named=True):
+        print(f"    {r['cat']:<5} {r['changes']:>9,} changes  {r['addrs']:>7,} addresses")
 
     OUT.mkdir(parents=True, exist_ok=True)
-    meta = json.loads((HERE.parent / "web" / "data" / "meta.json").read_text())
-    windows = {"1d": 24, "7d": 168, "all": math.ceil(span_h)}
-    index = {"provenance": meta["provenance"], "windows": [], "categories": [],
-             "generated_from": args.source}
+    meta = json.loads((web / "data" / "meta.json").read_text())
+    windows = {"1d": 24, "7d": 168}
+    index = {"provenance": meta["provenance"], "generated_from": args.source,
+             "scopes": [], "windows": [], "views": []}
 
     for name, hours in windows.items():
-        if hours > span_h + 0.5 and name != "all":
+        if hours > span_h + 0.5:
             continue
-        w = trades.filter(pl.col("ts") >= hi - hours * 3600)
-        wlo = int(w["ts"].min())
-        state = fold(w)
-        rows, qualifying_total = build(state, wlo, hi)
-        addresses = w["tx_from"].n_unique()
-        qualifying = qualifying_total
-        total_vol = sum(state["total"].values())
-        matched_vol = sum(state["matched"].values())
-        payload = {
-            "window": name,
-            "hours": round((hi - wlo) / 3600, 1),
-            "from_ts": wlo, "to_ts": hi,
-            "category": "rwa", "quote": "USDG",
-            "coverage": {
-                "window_label": {"1d": "the last 24 hours", "7d": "the last 7 days",
-                                 "all": "the whole resolved window"}.get(name, name),
-                "universe": "236 tokenized-equity pools quoting USDG",
-                "universe_note": "Pons pools are not included, and this is the resolved "
-                                 "window rather than the full 74-day tape.",
-                "rows_shown": len(rows),
-                "addresses_seen": addresses,
-                "addresses_qualifying": qualifying,
-                "qualifying_pct": qualifying / max(addresses, 1) * 100,
-                "matched_flow_pct": matched_vol / max(total_vol, 1) * 100,
-                "total_volume_usd": total_vol,
-                "matched_volume_usd": matched_vol,
-                "note": "Realized PnL is round-trips only: bought and sold on-chain. "
-                        "Holdings acquired any other way are out of scope, not estimated.",
-                "truncation_note": f"Ranked rows are capped at {ROW_LIMIT:,}; the full "
-                                   "qualifying set is larger and the page states both.",
-            },
-            "rows": rows,
-            "provenance": meta["provenance"],
-        }
-        path = OUT / f"rwa-usdg-{name}.json"
-        path.write_text(json.dumps(payload, separators=(",", ":"), allow_nan=False))
-        if name == "all":
+        w_all = trades.filter(pl.col("ts") >= hi - hours * 3600)
+        wlo = int(w_all["ts"].min())
+        for scope in SCOPES:
+            # A scope refolds the FIFO on its own trades. Filtering rows instead would
+            # leave a "Pons" table whose numbers still contained RWA profit, because 68
+            # of the top 100 trade both.
+            w = apply_scope(w_all, scope)
+            if not w.height:
+                continue
+            state = fold(w)
+            rows, qualifying = build(state, wlo, hi)
+            addresses = w["addr"].n_unique()
+            total_vol = sum(state["total"].values())
+            matched_vol = sum(state["matched"].values())
+            realized = [state["realized"][a] for a in state["trips"] if state["trips"][a] > 0]
+            arr = np.array(realized) if realized else np.zeros(1)
+            wins = int((arr > 0).sum())
+            payload = {
+                "scope": scope["id"], "scope_label": scope["label"],
+                "window": name,
+                "hours": round((hi - wlo) / 3600, 1),
+                "from_ts": wlo, "to_ts": hi,
+                "coverage": coverage_block(scope, name, rows, addresses, qualifying,
+                                           total_vol, matched_vol, arr, wins),
+                "distribution": distribution_block(arr, wins),
+                "rows": rows,
+                "provenance": meta["provenance"],
+            }
+            path = OUT / f"{scope['id']}-{name}.json"
+            path.write_text(json.dumps(payload, separators=(",", ":"), allow_nan=False))
+            index["views"].append({"scope": scope["id"], "window": name,
+                                   "file": path.name, "rows": len(rows),
+                                   "coverage": payload["coverage"],
+                                   "distribution": payload["distribution"]})
+            print(f"  {name:>3} {scope['id']:<10} {addresses:>7,} traded  "
+                  f"{qualifying:>6,} qualify  top ${arr.max():>11,.0f}  "
+                  f"p50 ${np.median(arr):>8,.2f}  -> {path.name}")
+
+        if name == "7d":
+            state = fold(w_all)
+            rows_all, qual_all = build(state, wlo, hi)
+            ranked = sorted((state["realized"][a] for a in state["trips"]
+                             if state["trips"][a] > 0))
             detail_dir = OUT.parent / "address"
             everyone = sorted(state["total"])
+            ctx = {"qualifying": qual_all, "traded": len(everyone),
+                   "median": float(np.median(ranked)) if ranked else 0.0,
+                   "at_a_loss_pct": float(np.mean(np.array(ranked) < 0) * 100) if ranked else 0.0}
             for a in everyone:
-                write_address(a, state, wlo, hi, detail_dir, meta["provenance"])
-            ranked = sum(1 for a in everyone if state["trips"][a] > 0)
+                write_address(a, state, wlo, hi, detail_dir, meta["provenance"],
+                              ranked=ranked, context=ctx)
             print(f"        wrote {len(everyone):,} address files "
-                  f"({ranked:,} qualifying, {len(everyone) - ranked:,} with no round-trip)"
-                  f" -> web/data/address/")
-        index["windows"].append({"window": name, "hours": payload["hours"],
-                                 "file": f"rwa-usdg-{name}.json",
-                                 "rows": len(rows), "coverage": payload["coverage"]})
-        print(f"  {name:>4}: {payload['hours']:>5.1f}h  {addresses:>6,} addresses, "
-              f"{qualifying:>5,} qualify ({payload['coverage']['qualifying_pct']:.1f}%), "
-              f"matched flow {payload['coverage']['matched_flow_pct']:.1f}%  -> {path.name}")
+                  f"({qual_all:,} qualifying, {len(everyone) - qual_all:,} with no "
+                  f"round-trip) -> web/data/address/")
 
-    index["categories"] = [
-        {"id": "rwa", "label": "RWA", "available": True,
-         "note": "Tokenized equities. All 236 pools quote in USDG."},
-        {"id": "pons", "label": "Pons", "available": False,
-         "note": "Identity resolution not finished. Not shown rather than shown empty."},
-    ]
-    index["quotes"] = [{"id": "usdg", "label": "USDG", "available": True},
-                       {"id": "eth", "label": "ETH", "available": False,
-                        "note": "Pons pools quote in native ETH; needs a price series."}]
+    index["scopes"] = [{"id": s["id"], "label": s["label"], "cat": s["cat"],
+                        "quote": s["quote"]} for s in SCOPES]
+    index["windows"] = [{"window": n, "label": {"1d": "24h", "7d": "7d"}[n]}
+                        for n in windows if any(v["window"] == n for v in index["views"])]
     (OUT / "index.json").write_text(json.dumps(index, separators=(",", ":"), allow_nan=False))
     print(f"\nwrote {OUT}/index.json")
     return 0
+
+
+UNIVERSE_TEXT = ("236 tokenized-equity pools quoting USDG and 90 Pons pools quoting "
+                 "ETH or USDG")
+
+
+def coverage_block(scope, name, rows, addresses, qualifying, total_vol, matched_vol,
+                   arr, wins) -> dict:
+    """What the ranking covers, stated before the ranking is read."""
+    universe = {
+        "rwa": "236 tokenized-equity pools quoting USDG",
+        "pons": "90 Pons pools quoting ETH or USDG",
+    }.get(scope["cat"] or "", UNIVERSE_TEXT)
+    if scope["quote"]:
+        universe += f", restricted to pools quoting {scope['quote']}"
+    block = {
+        "window_label": {"1d": "the last 24 hours", "7d": "the last 7 days"}[name],
+        "universe": universe,
+        "rows_shown": len(rows),
+        "addresses_seen": addresses,
+        "addresses_qualifying": qualifying,
+        "qualifying_pct": qualifying / max(addresses, 1) * 100,
+        "matched_flow_pct": matched_vol / max(total_vol, 1) * 100,
+        "total_volume_usd": total_vol,
+        "matched_volume_usd": matched_vol,
+        "note": "Realized PnL is round-trips only: bought and sold on-chain. Holdings "
+                "acquired any other way are out of scope, not estimated.",
+        "usd_note": "ETH-quoted legs convert at the trade's own timestamp from this "
+                    "chain's ETH/USD series, never at a closing rate.",
+        "scope_note": "Switching category or quote refolds the matching on that scope's "
+                      "trades. It does not filter rows: most of the top of this table "
+                      "trades both universes, so a filtered row would still carry the "
+                      "profit it made elsewhere.",
+        "truncation_note": f"Ranked rows are capped at {ROW_LIMIT:,}; the full qualifying "
+                           "set is larger and the page states both.",
+    }
+    # A high in-profit rate on a small-magnitude universe is not better trading, and the
+    # RWA tab reads exactly that way without being told so.
+    if scope["cat"] == "rwa":
+        block["magnitude_note"] = (
+            f"{wins / max(len(arr), 1) * 100:.1f}% of qualifying RWA addresses are in "
+            f"profit against 53.4% on Pons, but the best RWA result in this window is "
+            f"${arr.max():,.0f} against ${188638:,.0f} on Pons. The higher success rate "
+            "reflects how little is at stake, not better trading.")
+    return block
+
+
+def distribution_block(arr, wins) -> dict:
+    """The shape of the field, because the top row is an outlier and reads as the story."""
+    pos = arr[arr > 0]
+    order = np.sort(arr)[::-1]
+    top1 = order[:max(len(order) // 100, 1)]
+    return {
+        "qualifying": int(len(arr)),
+        "percentiles": {str(p): float(np.percentile(arr, p))
+                        for p in (100, 99, 95, 75, 50, 25, 5, 1, 0)},
+        "in_profit": wins,
+        "in_profit_pct": float(wins / max(len(arr), 1) * 100),
+        "at_a_loss": int((arr < 0).sum()),
+        "at_a_loss_pct": float((arr < 0).mean() * 100),
+        "total_won": float(pos.sum()) if len(pos) else 0.0,
+        "total_lost": float(arr[arr < 0].sum()) if (arr < 0).any() else 0.0,
+        "top1pct_share": float(top1.sum() / pos.sum()) if len(pos) and pos.sum() else 0.0,
+    }
 
 
 if __name__ == "__main__":

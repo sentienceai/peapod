@@ -35,26 +35,19 @@
 <div class="shell">
   <section class="hero">
     <div class="hero-copy">
-      <h1>Every trader on the chain, <em>and whether it was luck.</em></h1>
-      <p class="hero-sub">Realized profit on round-trips closed on-chain. No execution here.</p>
+      <h1 id="hero-h1">Every trader on the chain. <em>Most of them made nothing.</em></h1>
+      <p class="hero-sub" id="hero-sub"></p>
       <p class="caveat" id="caveat"></p>
     </div>
     <div class="hero-deck" id="hero-deck" aria-hidden="true"></div>
   </section>
 
   <div class="controls">
-    <div class="tabset" id="presets" role="tablist" aria-label="Preset"></div>
+    <div class="tabset" id="categories" role="tablist" aria-label="Universe"></div>
+    <span class="divider"></span>
+    <div class="tabset tabset--segmented" id="quotes" role="tablist" aria-label="Quote asset"></div>
     <span class="spacer"></span>
-    <label class="pill pill--sort">Sort
-      <select id="sort">
-        <option value="realized">Realized</option>
-        <option value="evidence">Strength of evidence</option>
-        <option value="win_rate">Win rate</option>
-        <option value="round_trips">Round-trips</option>
-        <option value="matched_volume">Matched volume</option>
-        <option value="last_ts">Most recent</option>
-      </select>
-    </label>
+    <div class="tabset tabset--segmented" id="windows" role="tablist" aria-label="Window"></div>
     <div class="toggle" id="unit" role="group" aria-label="Show as dollars or percent">
       <button type="button" data-unit="abs" aria-pressed="true">$</button>
       <button type="button" data-unit="pct" aria-pressed="false">%</button>
@@ -66,6 +59,16 @@
   </div>
 
   <div class="pills">
+    <label class="pill pill--sort">Sort
+      <select id="sort">
+        <option value="realized">Realized</option>
+        <option value="evidence">Strength of evidence</option>
+        <option value="win_rate">Win rate</option>
+        <option value="round_trips">Round-trips</option>
+        <option value="matched_volume">Matched volume</option>
+        <option value="last_ts">Most recent</option>
+      </select>
+    </label>
     <label class="pill">Realized
       <select id="f-realized">
         <option value="-1e12">any</option><option value="0">above zero</option>
@@ -97,6 +100,8 @@
       <p id="criterion"></p>
     </details>
   </div>
+
+  <section class="dist" id="dist" aria-label="How the field is distributed"></section>
 
   <section class="cardgrid" id="grid" aria-label="Traders"></section>
   <div class="table-wrap" id="listwrap" hidden>

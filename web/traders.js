@@ -84,20 +84,21 @@ function ago(ts, anchor) {
 const zOf = (/** @type {any} */ r) => (r.round_trips
   ? ((r.wins / r.round_trips) - 0.5) * 2 * Math.sqrt(r.round_trips) : 0);
 
-const PRESETS = [
-  { id: 'top', label: 'Top 100', sort: 'realized', where: () => true },
-  { id: 'evidence', label: 'Beyond chance', sort: 'evidence',
-    where: (/** @type {any} */ r) => chanceBand(r.wins, r.round_trips).verdict === 'above' },
-  { id: 'active', label: 'Most active', sort: 'round_trips', where: () => true },
-  { id: 'efficient', label: 'Best on volume', sort: 'efficiency',
-    where: (/** @type {any} */ r) => r.matched_volume > 0 },
-  { id: 'recent', label: 'Traded last', sort: 'last_ts', where: () => true },
+const CATEGORIES = [
+  { id: 'all', label: 'All' }, { id: 'rwa', label: 'RWA' }, { id: 'pons', label: 'Pons' },
+];
+/** @type {{id: string | null, label: string}[]} */
+const QUOTES = [
+  { id: null, label: 'All' }, { id: 'USDG', label: 'USDG' }, { id: 'ETH', label: 'ETH' },
 ];
 
 const PAGE = 24;
 const state = {
+  /** @type {any} */ index: null,
   /** @type {any} */ data: null,
-  preset: 'top',
+  cat: 'all',
+  /** @type {string | null} */ quote: null,
+  window: '7d',
   sort: 'realized',
   unit: 'abs',
   view: 'grid',
@@ -105,6 +106,22 @@ const state = {
   query: '',
   filters: { realized: -1e12, trips: 1, win: 0, evidence: 'any' },
 };
+
+/**
+ * Category and quote pick a SCOPE, and a scope is a different build — the matching is
+ * refolded on that scope's trades. Filtering the rows instead would leave a Pons table
+ * whose numbers still contained RWA profit, because most of the top trades both.
+ */
+function scopeId() {
+  const parts = [];
+  if (state.cat !== 'all' || state.quote) parts.push(state.cat);
+  if (state.quote) parts.push(state.quote.toLowerCase());
+  return parts.length ? parts.join('-') : 'all';
+}
+
+/** @param {string} id @param {string} win */
+const viewFor = (id, win) => state.index.views.find(
+  (/** @type {any} */ v) => v.scope === id && v.window === win);
 
 /** @param {any} r */
 function sortKey(r) {
@@ -120,10 +137,8 @@ function sortKey(r) {
 }
 
 function visible() {
-  const preset = PRESETS.find((p) => p.id === state.preset) ?? PRESETS[0];
   const f = state.filters;
   return state.data.rows
-    .filter((/** @type {any} */ r) => preset.where(r))
     .filter((/** @type {any} */ r) => r.realized >= f.realized
       && r.round_trips >= f.trips && r.win_rate >= f.win)
     .filter((/** @type {any} */ r) => {
@@ -311,39 +326,74 @@ function render() {
   }
 }
 
-function renderPresets() {
-  const bar = el('presets');
+/**
+ * @param {string} id @param {{id: any, label: string}[]} items
+ * @param {() => any} get @param {(v: any) => void} set
+ */
+function renderTabs(id, items, get, set) {
+  const bar = el(id);
   bar.replaceChildren();
-  for (const p of PRESETS) {
-    const b = node('button', state.preset === p.id ? 'is-active' : undefined, p.label);
+  for (const it of items) {
+    const active = get() === it.id;
+    const b = node('button', undefined, it.label);
     b.type = 'button';
     b.setAttribute('role', 'tab');
-    b.setAttribute('aria-selected', String(state.preset === p.id));
-    b.onclick = () => {
-      state.preset = p.id;
-      state.sort = p.sort;
-      state.limit = PAGE;
-      /** @type {HTMLSelectElement} */ (el('sort')).value =
-        ['realized', 'evidence', 'win_rate', 'round_trips', 'matched_volume', 'last_ts']
-          .includes(p.sort) ? p.sort : 'realized';
-      renderPresets();
-      render();
-    };
+    b.setAttribute('aria-selected', String(active));
+    // A scope with no trades is not offered rather than offered empty.
+    const ok = id !== 'categories' || viewFor(it.id === 'all' && !state.quote ? 'all'
+      : [it.id === 'all' ? null : it.id, state.quote ? state.quote.toLowerCase() : null]
+        .filter(Boolean).join('-'), state.window);
+    if (!ok) b.disabled = true;
+    b.onclick = () => { set(it.id); state.limit = PAGE; void load(); };
     bar.append(b);
   }
 }
 
+function renderControls() {
+  renderTabs('categories', CATEGORIES, () => state.cat, (v) => { state.cat = v; });
+  renderTabs('quotes', QUOTES, () => state.quote, (v) => { state.quote = v; });
+  renderTabs('windows', state.index.windows.map((/** @type {any} */ w) => (
+    { id: w.window, label: w.label })), () => state.window, (v) => { state.window = v; });
+}
+
 /**
- * Scope stays above the ranking, but as one line rather than a wall.
+ * The shape of the field, above the ranking.
  *
- * It used to be a five-line paragraph wedged between the filters and the cards, which is
- * where a reader is looking for content, so it was skipped exactly by the people it is
- * there for. The numbers that bound the ranking stay in the hero where scope is read
- * before rank; the method behind the evidence bar moves into a disclosure beside the
- * filter that uses it.
+ * The top row is an outlier by two orders of magnitude and reads as the story. It is not:
+ * half of everyone who closed a round-trip made under a dollar, and the top 1% took half
+ * of everything won. The distribution says so before the table can imply otherwise.
+ */
+function renderDistribution() {
+  const d = state.data.distribution;
+  const host = el('dist');
+  host.replaceChildren();
+  /** @param {string} k @param {HTMLElement|string} v @param {string} [sub] */
+  const stat = (k, v, sub) => {
+    const b = node('div', 'dstat');
+    b.append(node('span', 'dstat-k', k));
+    const val = node('strong');
+    if (typeof v === 'string') val.textContent = v; else val.append(v);
+    b.append(val);
+    if (sub) b.append(node('span', 'dstat-sub', sub));
+    return b;
+  };
+  const p = d.percentiles;
+  host.append(stat('Best', signedMoney(p['100']), `of ${d.qualifying.toLocaleString('en-US')} who closed a trade`));
+  host.append(stat('Median', signedMoney(p['50']), 'half of them made less'));
+  host.append(stat('In profit', `${d.in_profit_pct.toFixed(1)}%`,
+    `${d.at_a_loss.toLocaleString('en-US')} lost money`));
+  host.append(stat('Top 1% took', `${(d.top1pct_share * 100).toFixed(0)}%`,
+    `of ${money(d.total_won)} won`));
+  host.append(stat('Lost', signedMoney(d.total_lost), 'across the field'));
+}
+
+/**
+ * Scope before ranking: both universes, both counts, the window, and how the money is
+ * denominated. Plus, on the RWA tab, why its success rate is not what it looks like.
  */
 function renderCaveat() {
   const c = state.data.coverage;
+  const d = state.data.distribution;
   const p = el('caveat');
   p.replaceChildren();
   p.append(node('b', undefined,
@@ -351,8 +401,22 @@ function renderCaveat() {
     + `${c.addresses_seen.toLocaleString('en-US')} addresses `));
   p.append(document.createTextNode(
     `closed a round-trip over ${c.window_label} across ${c.universe}. `
-    + 'The rest are out of scope, not estimated.'));
-  el('criterion').textContent = CRITERION;
+    + 'The rest are out of scope, not estimated. '));
+  p.append(document.createTextNode(c.usd_note + ' '));
+  if (c.magnitude_note) {
+    // A high success rate on a small-magnitude universe reads as safety. It is not.
+    p.append(node('b', 'warn-note', c.magnitude_note));
+  }
+  el('criterion').textContent = `${CRITERION} ${c.scope_note}`;
+
+  const sub = el('hero-sub');
+  sub.replaceChildren();
+  sub.append(document.createTextNode(
+    `${c.addresses_seen.toLocaleString('en-US')} traded over ${c.window_label}. `
+    + `Half of those who closed a round-trip made under `
+    + `${money(Math.abs(d.percentiles['50']))}; the top 1% took `
+    + `${(d.top1pct_share * 100).toFixed(0)}% of everything won. `
+    + 'Realized profit only, no execution here.'));
 }
 
 function renderFootnote() {
@@ -362,9 +426,9 @@ function renderFootnote() {
     'Elapsed times are measured from the end of the tape, not from now, because the data '
     + 'is a fixed historical window.'));
   f.append(node('p', undefined,
-    'There is no execution here and no trade is copied. The strongest record on this page '
-    + `closed ${money(Math.max(...state.data.rows.map((/** @type {any} */ r) => r.realized)))} `
-    + 'over the window.'));
+    'There is no execution here and no trade is copied. Category and quote refold the '
+    + 'matching on that scope\'s trades rather than filtering rows, because most of the '
+    + 'top of this table trades both universes.'));
 }
 
 /** @param {string} id @param {(v: string) => void} fn */
@@ -373,16 +437,21 @@ function onSelect(id, fn) {
   s.onchange = () => { fn(s.value); state.limit = PAGE; render(); };
 }
 
-const index = await fetch('/data/leaderboard/index.json').then((r) => r.json());
+/** Fetch the current scope's build and redraw everything that depends on it. */
+async function load() {
+  const view = viewFor(scopeId(), state.window) ?? viewFor('all', state.window);
+  state.data = await fetch(`/data/leaderboard/${view.file}`).then((r) => r.json());
+  renderControls();
+  renderCaveat();
+  renderDistribution();
+  renderFootnote();
+  render();
+}
+
+state.index = await fetch('/data/leaderboard/index.json').then((r) => r.json());
 setTokenLogos(await fetch('/data/tokens.json')
   .then((r) => (r.ok ? r.json() : {})).catch(() => ({})));
-const entry = index.windows.find((/** @type {any} */ w) => w.window === '7d') ?? index.windows.at(-1);
-state.data = await fetch(`/data/leaderboard/${entry.file}`).then((r) => r.json());
-
-renderPresets();
-renderCaveat();
-renderFootnote();
-render();
+await load();
 mountWallet(el('wallet'));
 
 onSelect('sort', (v) => { state.sort = v; });

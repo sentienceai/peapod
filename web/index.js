@@ -62,15 +62,29 @@ function signedPct(n) {
 const shortAddr = (a) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
 const index = await fetch('/data/leaderboard/index.json').then((r) => r.json());
+/**
+ * This page is the combined ranking's simple view: one scope per category tab, the same
+ * builds the traders page reads. A scope is a separate build because the matching is
+ * refolded on its trades — filtering rows would leave a Pons table carrying RWA profit.
+ * @param {string} scope @param {string} win
+ */
+const viewFor = (scope, win) => index.views.find(
+  (/** @type {any} */ v) => v.scope === scope && v.window === win);
+const CATS = [{ id: 'all', label: 'All' }, { id: 'rwa', label: 'RWA' },
+  { id: 'pons', label: 'Pons' }];
+const QUOTES = [{ id: '', label: 'All' }, { id: 'usdg', label: 'USDG' },
+  { id: 'eth', label: 'ETH' }];
+const scopeId = () => [state.category === 'all' && !state.quote ? 'all' : state.category,
+  state.quote].filter(Boolean).join('-');
 // Logos are decoration over data that already renders; a failed map leaves every
 // token on its initials tile rather than failing the page.
 setTokenLogos(await fetch('/data/tokens.json')
   .then((r) => (r.ok ? r.json() : {})).catch(() => ({})));
 
 const state = {
-  window: index.windows.at(-1)?.window ?? 'all',
-  category: 'rwa',
-  quote: 'usdg',
+  window: index.windows.at(-1)?.window ?? '7d',
+  category: 'all',
+  quote: '',
   unit: 'abs',
   sort: 'realized',
   dir: -1,
@@ -85,25 +99,25 @@ const state = {
 function buildTabs() {
   const cats = el('categories');
   cats.replaceChildren();
-  for (const c of index.categories) {
+  for (const c of CATS) {
     const b = node('button', undefined, c.label);
     b.setAttribute('role', 'tab');
     b.setAttribute('aria-selected', String(c.id === state.category));
-    if (!c.available) {
-      b.disabled = true;
-      b.title = c.note;
-    } else {
-      b.onclick = () => { state.category = c.id; void load(); };
-    }
+    // A scope with no build is not offered rather than offered empty.
+    if (!viewFor([c.id === 'all' && !state.quote ? 'all' : c.id, state.quote]
+      .filter(Boolean).join('-'), state.window)) b.disabled = true;
+    else b.onclick = () => { state.category = c.id; void load(); };
     cats.append(b);
   }
   const quotes = el('quotes');
   quotes.replaceChildren();
-  for (const q of index.quotes) {
+  for (const q of QUOTES) {
     const b = node('button', undefined, q.label);
     b.setAttribute('role', 'tab');
     b.setAttribute('aria-selected', String(q.id === state.quote));
-    if (!q.available) { b.disabled = true; b.title = q.note ?? ''; }
+    if (!viewFor([state.category === 'all' && !q.id ? 'all' : state.category, q.id]
+      .filter(Boolean).join('-'), state.window)) b.disabled = true;
+    else b.onclick = () => { state.quote = q.id; void load(); };
     quotes.append(b);
   }
   const wins = el('windows');
@@ -140,7 +154,11 @@ function renderCaveat() {
   // be the whole set.
   p.append(node('b', undefined, `Showing the top ${n(c.rows_shown)}`));
   p.append(document.createTextNode('. '));
-  p.append(document.createTextNode(c.universe_note + ' Holdings acquired any other way — bridged, issued, transferred in — are out of scope, not estimated.'));
+  p.append(document.createTextNode(`${c.usd_note} Holdings acquired any other way `
+    + '— bridged, issued, transferred in — are out of scope, not estimated. '
+    + c.scope_note));
+  // A high success rate on a small-magnitude universe reads as safety. It is not.
+  if (c.magnitude_note) p.append(node('b', 'warn-note', ` ${c.magnitude_note}`));
 }
 
 const COLUMNS = [
@@ -279,8 +297,8 @@ function renderFootnote() {
 /* ------------------------------------------------------------------- boot */
 
 async function load() {
-  const entry = index.windows.find((/** @type {any} */ w) => w.window === state.window)
-    ?? index.windows.at(-1);
+  const entry = viewFor(scopeId(), state.window) ?? viewFor('all', state.window)
+    ?? index.views.at(-1);
   state.data = await fetch(`/data/leaderboard/${entry.file}`).then((r) => r.json());
   buildTabs();
   renderCaveat();
