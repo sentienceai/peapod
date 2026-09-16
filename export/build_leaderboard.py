@@ -46,7 +46,8 @@ def load(root: Path, source: str) -> pl.DataFrame:
 
     pools = pl.concat([pl.read_parquet(p)
                        for p in sorted((root / "out" / "raw" / "pools").glob("part-*.parquet"))])
-    tok = pl.read_parquet(root / "out" / "raw" / "tokens" / "part-00000.parquet")
+    from registry import tokens as _tokens  # noqa: PLC0415
+    tok = _tokens()
     t0 = tok.select(pl.col("address").alias("currency0"), pl.col("symbol").alias("s0"),
                     pl.col("decimals").alias("d0"), pl.col("kind").alias("k0"))
     t1 = tok.select(pl.col("address").alias("currency1"), pl.col("symbol").alias("s1"),
@@ -434,7 +435,7 @@ def write_address(addr: str, state, lo: int, hi: int, out: Path | None, provenan
         json.dumps(payload, separators=(",", ":"), allow_nan=False, default=plain))
 
 
-def write_token_logos(tokens: pl.DataFrame, web: Path) -> dict:
+def write_token_logos(tokens: pl.DataFrame, web: Path, store=None) -> dict:
     """Map ticker -> logo filename, for the tickers where that map is unambiguous.
 
     The logo files are named by contract address; the shipped data names tokens by
@@ -463,6 +464,10 @@ def write_token_logos(tokens: pl.DataFrame, web: Path) -> dict:
             mapping.setdefault(sy, files[a.lower()])
     ambiguous = sorted(t for t, a in by_ticker.items() if len(a) > 1)
     (web / "data" / "tokens.json").write_text(json.dumps(mapping, sort_keys=True))
+    # Also into the store: the container has no checked-in web/data, so a page
+    # that fetched the file would silently lose every logo before the first cycle.
+    if store is not None:
+        store.put_leaderboard("tokens", "tokens", mapping)
     tickers = sum(1 for k in mapping if not k.startswith("0x"))
     print(f"token logos: {len(files):,} files -> {tickers:,} tickers and "
           f"{len(mapping) - tickers:,} contract addresses; ambiguous skipped: {ambiguous}")
@@ -473,14 +478,17 @@ def main() -> int:
     import sys
     sys.path.insert(0, str(HERE))
     from universe import SCOPES, apply_scope, combined  # noqa: PLC0415
-    from upstream import lp_terminal  # noqa: PLC0415
     ap = argparse.ArgumentParser()
     ap.add_argument("--source", default="edge")
     args = ap.parse_args()
 
     import gates as gatemod  # noqa: PLC0415
     from store import Store, new_build_id  # noqa: PLC0415
-    root = lp_terminal()
+    # The registry is vendored, so this build no longer needs an lp-terminal checkout.
+    # The path is still honoured when it is set, because a machine that has the full
+    # registry should read the real thing rather than a 1.3 MB subset of it.
+    root = Path(os.environ.get("PEAPOD_LP_TERMINAL", "")).expanduser() \
+        if os.environ.get("PEAPOD_LP_TERMINAL") else HERE.parent
     web = HERE.parent / "web"
     store = Store(Path(os.environ.get("PEAPOD_DB", str(HERE.parent / "var" / "peapod.db"))))
     build_id = new_build_id()
@@ -490,8 +498,7 @@ def main() -> int:
     # One transaction for the whole cycle. WAL gives readers the previous build until this
     # commits, so a crash halfway rolls back rather than serving half a ranking.
     store.begin()
-    write_token_logos(
-        pl.read_parquet(root / "out" / "raw" / "tokens" / "part-00000.parquet"), web)
+    write_token_logos(__import__("registry").tokens(), web, store)
 
     trades = combined(root, args.source)
     lo, hi = int(trades["ts"].min()), int(trades["ts"].max())

@@ -117,11 +117,12 @@ def main() -> int:
     from upstream import lp_terminal  # noqa: PLC0415
     root = lp_terminal()
     # Only the pools the leaderboard prices, not all 384,930 on the chain.
-    basket = json.loads(Path("/Users/sentientai/canopy/data/pons-basket.json").read_text())
+    import sys as _s; _s.path.insert(0, str(HERE.parent / "export"))
+    from registry import basket as _basket, pools as _pools, tokens as _tokens  # noqa: PLC0415
+    basket = _basket()
     ids = {t["pair"] for t in basket["tokens"] if t.get("pair")}
-    pools = pl.concat([pl.read_parquet(p)
-                       for p in sorted((root / "out" / "raw" / "pools").glob("part-*.parquet"))])
-    tok = pl.read_parquet(root / "out" / "raw" / "tokens" / "part-00000.parquet")
+    pools = _pools()
+    tok = _tokens()
     have = {a for a, d in zip(tok["address"], tok["decimals"]) if d is not None}
     # Only the 90 Pons pools. Everything the RWA side prices already has decimals in the
     # registry; filtering 384,930 pools with two large is_in lists takes minutes and finds

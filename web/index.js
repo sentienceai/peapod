@@ -61,7 +61,8 @@ function signedPct(n) {
 /** @param {string} a */
 const shortAddr = (a) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
-const index = await fetch('/api/leaderboard/index').then((r) => r.json());
+const index = await fetch('/api/leaderboard/index')
+  .then((r) => r.json()).catch(() => null) || { views: [], windows: [], scopes: [] };
 /**
  * This page is the combined ranking's simple view: one scope per category tab, the same
  * builds the traders page reads. A scope is a separate build because the matching is
@@ -78,7 +79,7 @@ const scopeId = () => [state.category === 'all' && !state.quote ? 'all' : state.
   state.quote].filter(Boolean).join('-');
 // Logos are decoration over data that already renders; a failed map leaves every
 // token on its initials tile rather than failing the page.
-setTokenLogos(await fetch('/data/tokens.json')
+setTokenLogos(await fetch('/api/leaderboard/tokens/tokens')
   .then((r) => (r.ok ? r.json() : {})).catch(() => ({})));
 
 const state = {

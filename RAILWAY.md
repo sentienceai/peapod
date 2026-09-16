@@ -5,70 +5,106 @@ have to see the same disk — which is why the schedule is a timer inside the pr
 rather than a separate cron service. A second Railway service cannot mount this one's
 volume.
 
+**An empty volume is the normal first-boot state.** The container comes up, serves an
+empty state, and the first cycle fills it. Nothing has to be seeded for it to start.
+
 ## What you need to create
 
-**1. A Railway project with one service from this repo.**
-Railway reads `railway.json` and builds the `Dockerfile`. No build settings to configure.
+**1. A service from this repo.** Railway reads `railway.json` and builds the `Dockerfile`.
 
-**2. A volume, mounted at `/data`.**
-Settings → Volumes → New Volume → mount path `/data`.
+**2. A volume mounted at `/data`.** Settings → Volumes → New Volume → mount path `/data`.
+Size it **20 GB**. Today's footprint is about 1.1 GB (814 MB tape, 256 MB database).
 
-Size it at **20 GB** to start. Today's footprint is about 1.2 GB (814 MB of tape and
-partitions, 256 MB database, 76 MB registry). The transfer index, if it is ever built,
-takes it to roughly 40 GB — resize then, not now.
+**3. Two variables.**
 
-**3. Environment variables.**
+| Variable | Value |
+|---|---|
+| `GOLDSKY_EDGE_URL` | the full Edge endpoint URL from your `.env` |
+| `PEAPOD_CYCLE_MINUTES` | `15` |
 
-| Variable | Value | Why |
-|---|---|---|
-| `GOLDSKY_EDGE_URL` | the full Edge endpoint URL from `.env` | the only credential the cycle needs |
-| `PEAPOD_CYCLE_MINUTES` | `15` | tick interval; `PEAPOD_CYCLE=off` disables it |
-| `PEAPOD_DB` | `/data/var/peapod.db` | already set in the Dockerfile; override only to move it |
+The URL contains the key, so there is no separate token. Set it as a Railway variable;
+`.env` is gitignored and must stay that way.
 
-`GOLDSKY_EDGE_URL` already contains the key, so there is no separate token. **Set it as a
-Railway variable, never in the repository** — `.env` is gitignored and must stay that way.
+Nothing else. No database add-on, no object storage, and **no registry to seed** — the
+1.3 MB of pool and token data the build needs is vendored in `registry/`.
 
-Nothing else is required. There is no database add-on, no Redis, no object storage.
+## Getting the tape onto the volume
 
-**4. Seed the volume once.** Two things have to be there before the first build:
+The tape is ~814 MB of ingested chain data. You have two options.
 
-- **The registry** at `/data/registry/out/` — `raw/pools`, `raw/tokens`,
-  `block_times.parquet`. About 76 MB, and it lives in `~/lp-terminal`, outside this repo.
-- **The tape** at `/data/ingest-out/` — about 814 MB. Without it the first cycle would
-  re-ingest 62M blocks from scratch.
+### Option A — do nothing (recommended for a first deploy)
+
+Leave the volume empty. The first cycles ingest from the chain. It is unattended and takes
+several hours to catch up; the site serves an empty state until the first build commits,
+then fills in. Costs roughly $9–20 of Goldsky requests once.
+
+### Option B — copy the local tape up
+
+Faster if you already have it. Volumes are reachable over **`sftp`** through the service —
+`railway ssh` gives an interactive shell but is not a pipe, and **`railway run` executes
+locally with Railway's variables injected, not in the container**. That is what broke the
+previous version of this file: `railway run mkdir -p /data` ran against your Mac's
+read-only root.
 
 ```sh
-# from this machine, with the Railway CLI linked to the service
-railway run --service peapod bash -c 'mkdir -p /data/registry/out/raw'
-tar czf - -C ~/lp-terminal out/raw/pools out/raw/tokens out/block_times.parquet \
-  | railway run --service peapod bash -c 'tar xzf - -C /data/registry'
-tar czf - -C ~/peapod/ingest out \
-  | railway run --service peapod bash -c 'tar xzf - -C /data && mv /data/out /data/ingest-out'
+railway link            # pick project comfortable-manifestation, service vivacious-respect
+railway volume browse   # opens an sftp session onto /data
 ```
 
-If the registry is missing the entrypoint says so on boot and builds fail loudly rather
-than silently producing an empty ranking.
+Then inside that session:
 
-## What it costs
+```
+put -r /Users/sentientai/peapod/ingest/out  /data/ingest-out
+```
 
-Hobby is $5/month including $5 of usage. A cycle is about a minute of CPU every fifteen,
-and the service is otherwise idle serving reads. Goldsky is roughly $21/month at this
-chain's activity, billed separately — and driven by how much the chain trades, not by how
-often we poll, so the 15-minute cadence costs the same as hourly.
+Or, if you prefer to stage a single archive:
+
+```sh
+tar czf /tmp/tape.tgz -C ~/peapod/ingest out
+# upload /tmp/tape.tgz to /data via the sftp session, then:
+railway ssh
+  cd /data && tar xzf tape.tgz && mv out ingest-out && rm tape.tgz && exit
+```
+
+`railway ssh` works once the container is up, which it now is regardless of what is on the
+volume. That was the deadlock: the server exited when there was no database, the container
+restarted about once a second, and `railway ssh` could never attach — it needed data to
+start and needed to start to receive data.
 
 ## Checking it
 
 ```sh
-curl https://<your-service>.up.railway.app/api/manifest
+curl https://<service>.up.railway.app/api/manifest
 ```
 
-`build` is the timestamp of the last committed cycle. If it stops advancing, the gates are
-rejecting builds — the logs say which gate and the site keeps serving the last good one.
+- `{"build": null, "empty": true}` — up, nothing built yet. Expected on a fresh volume.
+- `{"build": "20260916T044645Z", ...}` — the timestamp of the last committed cycle.
+
+If `build` stops advancing, the gates are rejecting builds. The logs name which gate, and
+the store keeps serving the last good one.
+
+## Refreshing the registry
+
+Only needed when the chain lists a token the vendored registry has never seen. On a
+machine with the full lp-terminal checkout:
+
+```sh
+PEAPOD_LP_TERMINAL=~/lp-terminal uv run python export/registry.py --refresh
+```
+
+Commit the result. `PEAPOD_LP_TERMINAL` also overrides the vendored copy at build time, so
+a machine with the full registry reads the real thing.
+
+## What it costs
+
+Hobby is $5/month including $5 of usage: about a minute of CPU every fifteen, idle
+otherwise. Goldsky is roughly $21/month, billed separately and driven by how much the chain
+trades rather than how often we poll — so 15 minutes costs the same as hourly.
 
 ## Pointing a local dev server at it
 
 ```sh
-PEAPOD_STORE=https://<your-service>.up.railway.app npm run dev
+PEAPOD_STORE=https://<service>.up.railway.app npm run dev
 ```
 
 No dataset, no credentials. See `STORE.md`.

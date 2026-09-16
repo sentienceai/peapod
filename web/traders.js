@@ -460,12 +460,29 @@ async function load() {
   render();
 }
 
-state.index = await fetch('/api/leaderboard/index').then((r) => r.json());
 state.manifest = await fetch('/api/manifest').then((r) => r.json()).catch(() => ({}));
-setTokenLogos(await fetch('/data/tokens.json')
+state.index = await fetch('/api/leaderboard/index').then((r) => r.json()).catch(() => null);
+
+/**
+ * Before the first build exists there is nothing to rank, and that is a state rather than
+ * an error. A fresh deploy serves this until a cycle lands, instead of a page that throws
+ * on an index it has not got.
+ */
+if (!state.index?.views?.length) {
+  el('hero-sub').textContent = state.manifest?.detail
+    || 'No build yet. The first cycle will fill this.';
+  for (const id of ['dist', 'grid', 'listwrap', 'more']) el(id).hidden = true;
+  el('caveat').textContent = '';
+  el('empty').hidden = false;
+  el('empty').textContent = 'Nothing has been built yet. This page fills itself on the '
+    + 'next cycle; nothing here is cached or stale.';
+  mountWallet(el('wallet'));
+} else {
+setTokenLogos(await fetch('/api/leaderboard/tokens/tokens')
   .then((r) => (r.ok ? r.json() : {})).catch(() => ({})));
 await load();
 mountWallet(el('wallet'));
+}
 
 onSelect('sort', (v) => { state.sort = v; });
 onSelect('f-realized', (v) => { state.filters.realized = Number(v); });

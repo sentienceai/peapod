@@ -23,6 +23,15 @@ export class Api {
   constructor(path) {
     this.db = new DatabaseSync(path, { readOnly: true });
     this.db.exec('PRAGMA query_only=1');
+    // Opening a path that does not exist SUCCEEDS — you get a handle onto an empty
+    // database, and every query then fails with "no such table" at request time instead
+    // of at open time. So the schema is the thing that decides whether a store is there.
+    const table = this.db.prepare(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='address'").get();
+    if (!table) {
+      this.db.close();
+      throw new Error(`no peapod schema at ${path}`);
+    }
   }
 
   /** @param {string} key */

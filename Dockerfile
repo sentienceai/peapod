@@ -20,9 +20,12 @@ COPY . .
 
 # The volume mounts at /data. ingest/out and var are the only directories that must
 # survive a deploy: the tape, the partitions, and the database.
+# PEAPOD_LP_TERMINAL is deliberately unset: the registry the build needs is vendored in
+# registry/, so there is nothing to seed before the first cycle can run.
 ENV PEAPOD_PY=/opt/venv/bin/python \
     PEAPOD_DB=/data/var/peapod.db \
     PEAPOD_DATA=/data \
+    PYTHONPATH=/app/ingest:/app/export \
     NODE_ENV=production \
     PORT=8080
 

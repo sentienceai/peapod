@@ -75,10 +75,13 @@ class BlockClock:
                 measured = pl.concat([pl.read_parquet(p) for p in parts]).unique(
                     subset=["block"])
         fallback = None
-        if fallback_root is not None:
-            path = fallback_root / "out" / "block_times.parquet"
-            if path.exists():
-                fallback = pl.read_parquet(path).select("block", "ts")
+        try:
+            import sys as _s  # noqa: PLC0415
+            _s.path.insert(0, str(HERE.parent / "export"))
+            from registry import block_times  # noqa: PLC0415
+            fallback = block_times().select("block", "ts")
+        except Exception:  # noqa: BLE001
+            pass
         return cls(measured, fallback)
 
     def ts_of(self, blocks: np.ndarray) -> np.ndarray:

@@ -44,7 +44,7 @@ PONS_SWAPS = OUT / "pons_swaps"
 PONS_FROM = OUT / "tx_from_pons"
 PM = "0x8366a39cc670b4001a1121b8f6a443a643e40951"
 SWAP = "0x40e9cecb9f5f1f1c5b9c97dec2917b7ee92e57ba5563708daca94dd84ad7112f"
-BASKET = Path("/Users/sentientai/canopy/data/pons-basket.json")
+BASKET = None
 DUST = 1e-12
 
 # Quote assets we can denominate in without a price series.
@@ -76,11 +76,12 @@ def word(data: str, i: int) -> int:
 
 def pool_universe(root: Path):
     """Pons pools whose quote side we can denominate in, with the quote's side and decimals."""
-    basket = json.loads(BASKET.read_text())
+    from registry import basket as _basket  # noqa: PLC0415
+    basket = _basket()
     ids = [t["pair"] for t in basket["tokens"] if t.get("pair")]
-    pools = pl.concat([pl.read_parquet(p)
-                       for p in sorted((root / "out" / "raw" / "pools").glob("part-*.parquet"))])
-    tok = pl.read_parquet(root / "out" / "raw" / "tokens" / "part-00000.parquet")
+    from registry import pools as _pools, tokens as _tokens  # noqa: PLC0415
+    pools = _pools()
+    tok = _tokens()
     sym = dict(zip(tok["address"].to_list(), tok["symbol"].to_list()))
     have = pools.filter(pl.col("pool_id").is_in(ids))
     universe = {}
@@ -99,7 +100,8 @@ def stage_ingest(root: Path, days: float):
     print(f"pons pools with a denominable quote: {len(ids)} "
           f"({sum(1 for v in universe.values() if v['quote'] == 'ETH')} ETH, "
           f"{sum(1 for v in universe.values() if v['quote'] == 'USDG')} USDG)")
-    bt = pl.read_parquet(root / "out" / "block_times.parquet").sort("block")
+    from registry import block_times as _bt  # noqa: PLC0415
+    bt = _bt().sort("block")
     bn = bt["block"].to_numpy().astype(np.int64)
     bts = bt["ts"].to_numpy().astype(np.int64)
     end_block = int(bn.max())
@@ -271,7 +273,8 @@ def stage_report(root: Path):
         raise SystemExit("no resolved pons transactions; run --stage resolve first")
     senders = pl.concat([pl.read_parquet(p) for p in parts]).unique(subset=["tx_hash"])
     df = swaps.join(senders, on="tx_hash", how="inner")
-    bt = pl.read_parquet(root / "out" / "block_times.parquet").sort("block")
+    from registry import block_times as _bt  # noqa: PLC0415
+    bt = _bt().sort("block")
     bn, bts = bt["block"].to_numpy().astype(np.int64), bt["ts"].to_numpy().astype(np.int64)
     ts = np.interp(df["block"].to_numpy().astype(np.int64), bn, bts)
     span = (ts.max() - ts.min()) / 3600

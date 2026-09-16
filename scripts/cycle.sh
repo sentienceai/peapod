@@ -14,9 +14,10 @@
 set -uo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-: "${PEAPOD_LP_TERMINAL:=$HOME/lp-terminal}"
+# PEAPOD_LP_TERMINAL is optional: the registry is vendored. When it IS set and valid,
+# the loaders read the full upstream copy instead of the 1.3 MB subset.
 : "${PEAPOD_DB:=$PWD/var/peapod.db}"
-export PEAPOD_LP_TERMINAL PEAPOD_DB PYTHONPATH="ingest:export"
+export PEAPOD_DB PYTHONPATH="ingest:export"
 
 PY="${PEAPOD_PY:-.venv/bin/python}"
 LOCK="var/cycle.lock"

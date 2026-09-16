@@ -451,7 +451,11 @@ test('the dev server can run against a deployed store with no local data', async
 
   // Read-only, and nothing of ours travels with the request: path and query, no headers,
   // no credentials, no cookies.
-  const proxyFn = src.slice(src.indexOf('async function proxy('), src.indexOf('let buildCache'));
+  // Slice the proxy function itself, not everything up to some later landmark: an
+  // earlier version of this ran to `let buildCache` and started matching unrelated code
+  // as soon as a function was inserted between them.
+  const from = src.indexOf('async function proxy(');
+  const proxyFn = src.slice(from, src.indexOf('\n}\n', from));
   assert.ok(!/headers:/.test(proxyFn), 'the proxy forwards headers upstream');
   assert.ok(!/GOLDSKY|API_KEY|Authorization/i.test(proxyFn));
   assert.match(proxyFn, /createHash/, 'proxied reads are not cached');
@@ -462,7 +466,11 @@ test('the dev server can run against a deployed store with no local data', async
   // four times the bytes.
   assert.match(proxyFn, /gzipSync/);
 
-  // With neither a store nor an upstream it says so and names both options, rather than
-  // serving an empty site that looks broken.
-  assert.match(src, /build one with export\/build_leaderboard\.py, or point this server/);
+  // With neither a store nor an upstream it SERVES AN EMPTY STATE and says so. It used
+  // to exit, which on a fresh deploy meant the container restarted about once a second
+  // and could never be attached to or seeded: it needed data to start and needed to
+  // start to receive data.
+  assert.match(src, /serving an empty state; the first cycle will fill it/);
+  assert.ok(!/process\.exit\(1\)/.test(src), 'the server still exits when the store is missing');
+  assert.match(src, /function emptyState/);
 });

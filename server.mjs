@@ -42,16 +42,44 @@ const cacheDir = fileURLToPath(new URL('./var/proxy-cache/', import.meta.url));
 let api = null;
 /** @type {any} */
 let apiRoute = null;
-if (!upstream) {
+/** @type {string | null} */
+let storeError = null;
+
+/**
+ * Open the store, or serve without one.
+ *
+ * THIS USED TO EXIT. On a fresh deploy the volume is empty, so there was no database, so
+ * the server exited, so the container restarted about once a second, so `railway ssh`
+ * could never attach to seed the volume. The container needed data to start and needed to
+ * start to receive data. Exiting on missing data is right for a developer who mistyped a
+ * path and wrong for a process whose whole job is to come up and then be filled.
+ *
+ * So a missing store is a STATE, not a failure: /api/manifest answers 200 with build null,
+ * the healthcheck passes, the page renders its empty state, and the first cycle fills it.
+ * It is also retried on each request, so the server starts serving the moment a build
+ * lands without needing a restart.
+ */
+function openStore() {
   try {
-    const mod = await import('./web-api.mjs');
+    const mod = /** @type {any} */ (globalThis).__peapodApi;
     api = new mod.Api(dbPath);
     apiRoute = mod.route;
+    storeError = null;
+    return true;
   } catch (err) {
-    console.error(`no store at ${dbPath}: ${/** @type {Error} */ (err).message}`);
-    console.error('build one with export/build_leaderboard.py, or point this server at a '
-      + 'deployed one:  PEAPOD_STORE=https://<host> npm run dev');
-    process.exit(1);
+    api = null;
+    storeError = /** @type {Error} */ (err).message;
+    return false;
+  }
+}
+
+if (!upstream) {
+  /** @type {any} */ (globalThis).__peapodApi = await import('./web-api.mjs');
+  if (!openStore()) {
+    console.warn(`no store at ${dbPath} yet (${storeError})`);
+    console.warn('serving an empty state; the first cycle will fill it. To build one now: '
+      + 'export/build_leaderboard.py. To develop against a deployed one: '
+      + 'PEAPOD_STORE=https://<host> npm run dev');
   }
 } else {
   console.log(`proxying /api to ${upstream} (read-only)`);
@@ -85,6 +113,26 @@ async function proxy(pathname, search) {
     await writeFile(file, body).catch(() => {});
   }
   return { status: res.status, body, type: 'application/json', gzip: true };
+}
+
+/**
+ * What /api answers before the first build exists.
+ *
+ * The manifest is a 200 so the deploy healthcheck passes — the service IS healthy, it
+ * simply has nothing yet — and it says so in a field the page can read. Everything else is
+ * a 503 with the same explanation, which is honest: not found is wrong when the answer is
+ * "not yet".
+ * @param {URL} url
+ */
+function emptyState(url) {
+  const body = {
+    build: null, built_at: null, addresses: 0, qualifying: 0,
+    windows: [], scopes: [], empty: true,
+    detail: `no store at ${dbPath} yet; the first cycle will build one`,
+  };
+  const manifest = url.pathname.replace(/\/$/, '').endsWith('/manifest');
+  return { status: manifest ? 200 : 503, body: JSON.stringify(body),
+           type: 'application/json' };
 }
 
 /** @type {{value: string, at: number}} */
@@ -127,9 +175,12 @@ const server = http.createServer(async (req, res) => {
     const path = decodeURIComponent(url.pathname);
 
     if (path.startsWith('/api')) {
+      // Retry the open on each request: a store that appears after boot should start
+      // being served without a restart.
+      if (!upstream && !api) openStore();
       const out = upstream
         ? await proxy(path, url.search)
-        : apiRoute(api, url);
+        : (api ? apiRoute(api, url) : emptyState(url));
       const headers = /** @type {Record<string, string>} */ ({
         'Content-Type': `${out.type}; charset=utf-8`,
         'Content-Length': String(Buffer.byteLength(out.body)),
@@ -182,6 +233,8 @@ const server = http.createServer(async (req, res) => {
     res.end(req.method === 'HEAD' ? undefined : body);
   } catch (error) {
     const missing = /** @type {NodeJS.ErrnoException} */ (error).code === 'ENOENT';
+    // A 500 with no explanation cost an afternoon of deploy debugging. Say what broke.
+    if (!missing) console.error('request failed:', error);
     res.writeHead(missing ? 404 : 500);
     res.end(missing ? 'Not found' : 'Server error');
   }

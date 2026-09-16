@@ -33,7 +33,7 @@ INGEST = HERE.parent / "ingest" / "out"
 sys.path.insert(0, str(HERE.parent / "ingest"))
 Q96 = 2 ** 96
 DUST = 1e-12
-BASKET = Path("/Users/sentientai/canopy/data/pons-basket.json")
+
 QUOTES = {"USDG": 6, "ETH": 18}
 
 
@@ -51,16 +51,26 @@ def _block_times(root: Path) -> tuple[np.ndarray, np.ndarray]:
     return clock.blocks, clock.times
 
 
+def _pools():
+    from registry import pools  # noqa: PLC0415
+    return pools()
+
+
+def _tokens():
+    from registry import tokens  # noqa: PLC0415
+    return tokens()
+
+
 def _decimals(root: Path) -> dict[str, int]:
     from token_decimals import known  # noqa: PLC0415
-    tok = pl.read_parquet(root / "out" / "raw" / "tokens" / "part-00000.parquet")
+    tok = _tokens()
     base = {a: int(d) for a, d in zip(tok["address"], tok["decimals"]) if d is not None}
     return known(base)
 
 
 def _symbols(root: Path) -> dict[str, str]:
     from token_decimals import symbols  # noqa: PLC0415
-    tok = pl.read_parquet(root / "out" / "raw" / "tokens" / "part-00000.parquet")
+    tok = _tokens()
     base = {a: s for a, s in zip(tok["address"], tok["symbol"]) if s}
     return symbols(base)
 
@@ -73,9 +83,8 @@ def rwa(root: Path, source: str = "edge") -> pl.DataFrame:
     if not parts:
         raise SystemExit(f"no resolved transactions for source '{source}'")
     senders = pl.concat([pl.read_parquet(p) for p in parts]).unique(subset=["tx_hash"])
-    pools = pl.concat([pl.read_parquet(p)
-                       for p in sorted((root / "out" / "raw" / "pools").glob("part-*.parquet"))])
-    tok = pl.read_parquet(root / "out" / "raw" / "tokens" / "part-00000.parquet")
+    pools = _pools()
+    tok = _tokens()
     t0 = tok.select(pl.col("address").alias("currency0"), pl.col("symbol").alias("s0"),
                     pl.col("decimals").alias("d0"), pl.col("kind").alias("k0"))
     t1 = tok.select(pl.col("address").alias("currency1"), pl.col("symbol").alias("s1"),
@@ -110,11 +119,9 @@ def rwa(root: Path, source: str = "edge") -> pl.DataFrame:
 
 
 def pons(root: Path) -> pl.DataFrame:
-    basket = json.loads(BASKET.read_text())
-    ids = [t["pair"] for t in basket["tokens"] if t.get("pair")]
-    pools = pl.concat([pl.read_parquet(p)
-                       for p in sorted((root / "out" / "raw" / "pools").glob("part-*.parquet"))])
-    tok = pl.read_parquet(root / "out" / "raw" / "tokens" / "part-00000.parquet")
+    from registry import basket as pons_basket  # noqa: PLC0415
+    ids = [t["pair"] for t in pons_basket()["tokens"] if t.get("pair")]
+    pools = _pools()
     sym = _symbols(root)
     dec = _decimals(root)
     universe = {}

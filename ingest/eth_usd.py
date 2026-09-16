@@ -95,9 +95,9 @@ def decode_swap(log: dict) -> dict:
 
 def candidates(root: Path) -> tuple[list[str], dict[str, dict]]:
     """Every pool pairing native ETH with USDG, and which side ETH is on."""
-    pools = pl.concat([pl.read_parquet(p)
-                       for p in sorted((root / "out" / "raw" / "pools").glob("part-*.parquet"))])
-    tok = pl.read_parquet(root / "out" / "raw" / "tokens" / "part-00000.parquet")
+    from registry import pools as _pools, tokens as _tokens  # noqa: PLC0415
+    pools = _pools()
+    tok = _tokens()
     usdg = {r["address"] for r in tok.iter_rows(named=True) if r["symbol"] == "USDG"}
     meta: dict[str, dict] = {}
     for r in pools.iter_rows(named=True):
@@ -207,7 +207,8 @@ def stage_series(url: str, root: Path, lo: int, hi: int) -> None:
         df.write_parquet(OUT / f"{tag}.parquet")
         print(f"{tag} {pool['pool_id'][:10]}: {df.height:,} priced swaps", flush=True)
 
-    bt = pl.read_parquet(root / "out" / "block_times.parquet").sort("block")
+    from registry import block_times  # noqa: PLC0415
+    bt = block_times().sort("block")
     import numpy as np  # noqa: PLC0415
     df = pl.read_parquet(OUT / "reference.parquet")
     ts = np.interp(df["block"].to_numpy().astype(np.int64),
@@ -236,7 +237,8 @@ def stage_check(root: Path) -> None:
 
     # 1. A second, independent pool on the same chain. If two pools that share no
     #    liquidity disagree, the reference is being pushed around and is not usable.
-    bt = pl.read_parquet(root / "out" / "block_times.parquet").sort("block")
+    from registry import block_times  # noqa: PLC0415
+    bt = block_times().sort("block")
     sec = pl.read_parquet(OUT / "second.parquet")
     sts = np.interp(sec["block"].to_numpy().astype(np.int64),
                     bt["block"].to_numpy().astype(np.int64),
@@ -289,7 +291,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--stage", required=True, choices=["select", "series", "check"])
     args = ap.parse_args()
-    root = Path(os.environ.get("PEAPOD_LP_TERMINAL", str(Path.home() / "lp-terminal")))
+    root = Path(os.environ.get("PEAPOD_LP_TERMINAL") or HERE.parent).expanduser()
     # lp-terminal's liquidity_math is the single source for the band arithmetic; peapod's
     # BigInt port is checked against it rather than replacing it.
     sys.path.insert(0, str(root / "engine"))
