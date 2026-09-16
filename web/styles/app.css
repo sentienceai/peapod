@@ -67,7 +67,7 @@ a { color: inherit; text-decoration: none; }
 }
 /* The coverage caveat. Sits above every control so scope is read before any ranking. */
 .caveat { margin: 0; max-width: 78ch; color: var(--text-muted); font-size: var(--t-body); }
-.caveat b { color: var(--text-body); font-weight: var(--w-medium); }
+:where(.caveat) b { color: var(--text-body); font-weight: var(--w-medium); }
 
 /* ------------------------------------------------------------ control bar */
 
@@ -98,7 +98,7 @@ a { color: inherit; text-decoration: none; }
 .search { display: flex; align-items: center; gap: var(--s-2); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: var(--s-2) var(--s-3); min-width: 200px; }
 .search input { font: inherit; font-size: var(--t-small); background: transparent; border: 0; color: var(--text-body); width: 100%; }
 .search input::placeholder { color: var(--text-muted); }
-.search span { color: var(--text-muted); }
+.search .icon { color: var(--text-muted); }
 
 .pills { display: flex; flex-wrap: wrap; gap: var(--s-2); margin-top: var(--s-3); }
 .pill {
@@ -131,7 +131,7 @@ a { color: inherit; text-decoration: none; }
 .spark { width: 100%; height: 64px; display: block; }
 .pcard-figure { margin-top: auto; }
 .pcard-figure strong { display: block; font-size: var(--t-lead); font-weight: var(--w-semi); letter-spacing: -0.01em; }
-.pcard-figure span { display: block; font-size: var(--t-micro); color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.07em; margin-top: 2px; }
+.pcard-figure .label { display: block; font-size: var(--t-micro); color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.07em; margin-top: 2px; }
 .pcard-sub { font-size: var(--t-small); color: var(--text-muted); }
 
 /* ------------------------------------------------------------------ table */
@@ -239,27 +239,27 @@ table.board tbody tr.is-first td:first-child { color: var(--accent-soft); }
 .rail { border-right: 1px solid var(--line); padding: var(--s-5); display: flex; flex-direction: column; gap: var(--s-5); }
 .rail-id { display: flex; align-items: center; gap: var(--s-3); }
 .rail-id .avatar { width: 36px; height: 36px; font-size: var(--t-small); }
-.rail-id b { display: block; color: var(--text); font-size: var(--t-num); font-weight: var(--w-medium); }
+:where(.rail-id) b { display: block; color: var(--text); font-size: var(--t-num); font-weight: var(--w-medium); }
 .rail-id small { color: var(--text-muted); font-size: var(--t-micro); }
 
 .rail-figure strong { display: block; font-size: 26px; font-weight: var(--w-semi); letter-spacing: -0.02em; }
-.rail-figure span { display: block; margin-top: 2px; font-size: var(--t-micro); color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.07em; }
+.rail-figure .label { display: block; margin-top: 2px; font-size: var(--t-micro); color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.07em; }
 
 .rail-block { border-top: 1px solid var(--line); padding-top: var(--s-4); }
 .rail-block h4 { margin: 0 0 var(--s-3); font-size: var(--t-micro); font-weight: var(--w-medium); text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-muted); }
 .rail-row { display: flex; justify-content: space-between; gap: var(--s-3); font-size: var(--t-small); padding: 3px 0; }
-.rail-row span { color: var(--text-muted); }
-.rail-row b { font-weight: var(--w-regular); color: var(--text-body); }
+.rail-row .label { color: var(--text-muted); }
+:where(.rail-row) b { font-weight: var(--w-regular); color: var(--text-body); }
 
 .label-item { border: 1px solid var(--line); border-radius: 8px; padding: var(--s-3); margin-bottom: var(--s-2); }
 .label-item[data-earned='true'] { border-color: color-mix(in srgb, var(--accent-soft) 28%, var(--line)); }
-.label-item b { display: block; font-size: var(--t-small); color: var(--text-body); font-weight: var(--w-medium); }
-.label-item[data-earned='true'] b { color: var(--accent-soft); }
+:where(.label-item) b { display: block; font-size: var(--t-small); color: var(--text-body); font-weight: var(--w-medium); }
+:where(.label-item[data-earned='true']) b { color: var(--accent-soft); }
 .label-item small { display: block; margin-top: 3px; font-size: var(--t-micro); color: var(--text-muted); line-height: 1.4; }
 .label-item[data-earned='false'] { opacity: 0.45; }
 
 .scope-note { font-size: var(--t-small); color: var(--text-muted); line-height: 1.5; }
-.scope-note b { color: var(--text-body); font-weight: var(--w-medium); }
+:where(.scope-note) b { color: var(--text-body); font-weight: var(--w-medium); }
 
 .pane { padding: var(--s-5); display: flex; flex-direction: column; gap: var(--s-4); }
 .metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-4); }
@@ -289,8 +289,8 @@ table.board tbody tr.is-first td:first-child { color: var(--accent-soft); }
   font-size: var(--t-small); white-space: nowrap; transform: translate(-50%, -120%);
 }
 .tip[hidden] { display: none !important; }
-.tip b { display: block; color: var(--text); }
-.tip span { color: var(--text-muted); font-size: var(--t-micro); }
+:where(.tip) b { display: block; color: var(--text); }
+.tip .label { color: var(--text-muted); font-size: var(--t-micro); }
 
 .subtabs { display: flex; gap: var(--s-4); border-bottom: 1px solid var(--line); }
 .subtabs button { font: inherit; font-size: var(--t-small); background: none; border: 0; border-bottom: 2px solid transparent; color: var(--text-muted); padding: var(--s-2) 0; cursor: pointer; text-transform: uppercase; letter-spacing: 0.06em; }
@@ -368,7 +368,7 @@ table.mini td:first-child { text-align: left; }
    because they are one pair rather than two sections, 31 before the cards, and 57 for the
    one real section break further down. The hero used to run to about 300px — half a
    1300px viewport before any content. It is now about 150. */
-.hero { position: relative; padding: 37px 360px 0 0; }
+.hero { position: relative; min-height: 116px; padding: 37px 360px 0 0; }
 .hero h1 { font-size: clamp(20px, 2vw, 26px); font-weight: var(--w-semi);
   line-height: 1.15; letter-spacing: -0.02em; color: var(--text); margin: 0; }
 .hero h1 em { font-style: normal; color: var(--accent-soft); }
@@ -379,20 +379,20 @@ table.mini td:first-child { text-align: left; }
 
 /* The deck is the page's only decoration: three real cards from the ranking, overlapped
    the way the reference stacks them. Short enough that it cannot drive the hero's height. */
-.hero-deck { position: absolute; right: 0; top: 30px; width: 340px; height: 165px;
+.hero-deck { position: absolute; right: 0; top: 18px; width: 320px; height: 120px;
   pointer-events: none; }
-.deckcard { position: absolute; width: 184px; height: 118px; overflow: hidden;
+.deckcard { position: absolute; width: 168px; height: 98px; overflow: hidden;
   padding: var(--s-2); border-radius: 8px; box-sizing: border-box;
   background: var(--surface); border: 1px solid var(--line);
   display: flex; flex-direction: column; gap: 2px; }
-.deckcard:nth-child(1) { left: 0; top: 30px; z-index: 1;
-  transform: rotate(-5deg); opacity: 0.45; }
-.deckcard:nth-child(2) { left: 78px; top: 4px; z-index: 3; }
-.deckcard:nth-child(3) { left: 156px; top: 26px; z-index: 2;
-  transform: rotate(5deg); opacity: 0.45; }
+.deckcard:nth-child(1) { left: 0; top: 20px; z-index: 1;
+  transform: rotate(-5deg); opacity: 0.4; }
+.deckcard:nth-child(2) { left: 74px; top: 0; z-index: 3; }
+.deckcard:nth-child(3) { left: 148px; top: 18px; z-index: 2;
+  transform: rotate(5deg); opacity: 0.4; }
 .deck-addr { font-size: var(--t-micro); color: var(--text-muted); }
 .deck-fig { font-size: var(--t-body); }
-.deckcard .spark { width: 100%; height: 40px; flex: none; }
+.deckcard .spark { width: 100%; height: 30px; flex: none; }
 @media (max-width: 1100px) { .hero { padding-right: 0; } .hero-deck { display: none; } }
 
 
@@ -431,19 +431,30 @@ table.mini td:first-child { text-align: left; }
   padding: 13px var(--s-3) 0; min-height: 61px; }
 .tcard-who { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: var(--s-1); }
 .tcard-addr { display: flex; align-items: center; }
-.tcard-addr b { font-weight: var(--w-medium); font-size: var(--t-num); color: var(--text); }
+:where(.tcard-addr) b { font-weight: var(--w-medium); font-size: var(--t-num); color: var(--text); }
 .tcard-toks { display: flex; gap: var(--s-1); flex-wrap: wrap; }
 .tcard-ago { font-size: var(--t-micro); color: var(--text-muted); white-space: nowrap; }
 
 .tcard-body { flex: 1 1 auto; min-height: 0; display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 52%);
-  gap: var(--s-2); padding: 0 var(--s-3) var(--s-3); align-items: end; }
-.tcard-figs { display: flex; flex-direction: column; }
-.tcard-figs strong { font-size: var(--t-lead); font-weight: var(--w-semi); line-height: 1.2; }
-.tcard-second { color: var(--text-body); margin-top: var(--s-2); }
-.tcard-label { font-size: var(--t-micro); color: var(--text-muted); }
-.tcard-spark { min-width: 0; }
-.tcard-spark .spark { width: 100%; height: 100px; display: block; }
+  grid-template-columns: minmax(0, 48%) minmax(0, 52%);
+  gap: var(--s-3); padding: var(--s-2) var(--s-3) var(--s-3); align-items: center; }
+.tcard-figs { display: flex; flex-direction: column; min-width: 0; }
+/* The PnL is the largest thing on the card: it is what the card is about. */
+.tcard-figs strong { font-size: 22px; font-weight: var(--w-semi); line-height: 1.15;
+  letter-spacing: -0.02em; white-space: nowrap; }
+.tcard-second { font-size: var(--t-num); color: var(--text-body); margin-top: var(--s-3); }
+.tcard-label { font-size: var(--t-micro); color: var(--text-muted); margin-top: 1px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* The verdict and what it is scored over, in the column that has room for words. In the
+   46px bar "Beyond chance" truncated to "Beyond ch". */
+.tcard-verdict { margin-top: var(--s-3); font-size: var(--t-micro); font-weight: var(--w-medium); }
+.tcard-verdict.v-above { color: var(--up); }
+.tcard-verdict.v-below { color: var(--down); }
+.tcard-verdict.v-within, .tcard-verdict.v-none { color: var(--text-muted); }
+.tcard-record { margin-top: 1px; font-size: 10px; color: var(--text-muted);
+  letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tcard-spark { min-width: 0; align-self: stretch; display: flex; align-items: center; }
+.tcard-spark .spark { width: 100%; height: 84px; display: block; }
 
 /* The bottom bar. Tinted by the verdict, the way the reference tints by score, but the
    tint is reporting a test result rather than a rating. */
@@ -455,9 +466,10 @@ table.mini td:first-child { text-align: left; }
    at all. Lifted toward the positive green, which keeps both swatches as the source. */
 .tcard-bar.v-above { background: color-mix(in srgb, var(--up-fill) 72%, var(--up) 28%); }
 .tcard-bar.v-below { background: color-mix(in srgb, var(--down-fill) 76%, var(--down) 24%); }
-.ev { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-.ev-head { display: flex; align-items: baseline; gap: var(--s-1); }
-.ev-head b { font-size: 16px; font-weight: var(--w-semi); color: var(--text); }
+.ev { flex: 1; min-width: 0; display: grid; align-items: center;
+  grid-template-columns: auto minmax(28px, 1fr); gap: var(--s-2); }
+.ev-head { display: flex; align-items: baseline; gap: 3px; white-space: nowrap; }
+:where(.ev-head) b { font-size: 16px; font-weight: var(--w-semi); color: var(--text); }
 .ev-of, .ev-n { font-size: var(--t-micro); color: var(--text-muted); }
 .ev-track { position: relative; height: 6px; border-radius: 3px;
   background: rgba(255, 255, 255, 0.06); overflow: hidden; }
@@ -467,7 +479,7 @@ table.mini td:first-child { text-align: left; }
   background: var(--text); border-radius: 1px; }
 .v-above .ev-mark { background: var(--up); }
 .v-below .ev-mark { background: var(--down); }
-.ev-foot { display: flex; align-items: baseline; gap: var(--s-2); }
+.ev-foot { display: none; }
 .ev-label { font-size: var(--t-micro); color: var(--text-body); }
 /* On a green panel the verdict is carried by the panel; the label goes light. */
 .v-above .ev-label, .v-below .ev-label { color: var(--text); }
@@ -476,7 +488,7 @@ table.mini td:first-child { text-align: left; }
 .v-text-below { color: var(--down); }
 .v-text-within, .v-text-none { color: var(--text-muted); }
 
-.ev-cta { flex: none; padding: 6px 12px; border-radius: 6px; cursor: pointer;
+.ev-cta { flex: none; padding: 5px 10px; border-radius: 6px; cursor: pointer;
   border: 1px solid var(--line); background: var(--surface); color: var(--text-body);
   font: inherit; font-size: var(--t-small); }
 .ev-cta:hover { color: var(--text); border-color: var(--line); background: var(--raised); }
@@ -516,7 +528,12 @@ table.mini td:first-child { text-align: left; }
   border-bottom: 1px solid var(--line); }
 .dstat { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .dstat-k { font-size: var(--t-micro); color: var(--text-muted); }
-.dstat strong { font-size: var(--t-lead); font-weight: var(--w-semi); color: var(--text); }
+/* Size and weight only. Setting a colour on a bare `strong` inside a class makes a
+   (0,1,1) rule that beats `.up` at (0,1,0), so every signed figure in this row rendered
+   neutral and its direction glyph inherited the same neutral. Unsigned values take the
+   colour from a class of their own, at the same specificity as the sign classes. */
+.dstat strong { font-size: var(--t-lead); font-weight: var(--w-semi); }
+.dstat-plain { color: var(--text); }
 .dstat-sub { font-size: var(--t-micro); color: var(--text-muted); }
 .warn-note { color: var(--warn); font-weight: var(--w-regular); }
 @media (max-width: 900px) { .dist { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -579,8 +596,21 @@ table.mini td:first-child { text-align: left; }
 /* Numbers align. Every monetary figure, percentage and address is tabular, which is
    what makes a column of them scannable. */
 .board, .tcard-figs, .dstat strong, .ev-head b, .deck-fig, .statusbar,
-.token-ticker, .addr, .tcard-addr b { font-variant-numeric: tabular-nums; }
+.token-ticker, .addr, :where(.tcard-addr) b { font-variant-numeric: tabular-nums; }
 
 /* Radius, matching the reference's rounded-xl on cards and a tighter one on controls. */
 .tcard, .deckcard, .pcard { border-radius: var(--r-card); }
 .pill, .toggle, .tabset--segmented, .search { border-radius: var(--r-control); }
+
+/* One line of subtitle, as the reference has, with the method behind a disclosure.
+   Eleven lines of body text above the fold is eleven lines nobody reads. */
+.sub-link { color: var(--accent-soft); text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent-soft) 40%, transparent); }
+.sub-link:hover { color: var(--text); border-bottom-color: var(--accent-soft); }
+.pill--note > div { position: absolute; right: 0; top: calc(100% + 6px); z-index: 5;
+  width: min(62ch, 86vw); margin: 0; padding: var(--s-4);
+  background: var(--raised); border: 1px solid var(--line); border-radius: var(--r-control);
+  color: var(--text-body); font-size: var(--t-small); line-height: 1.55;
+  max-height: 60vh; overflow-y: auto; }
+.pill--note > div p { margin: 0 0 var(--s-3); }
+.pill--note > div p:last-child { margin-bottom: 0; }

@@ -163,7 +163,7 @@ function evidenceBar(r) {
   const left = node('div', 'ev');
   const head = node('div', 'ev-head');
   head.append(node('b', undefined, `${(b.rate * 100).toFixed(1)}%`));
-  head.append(node('span', 'ev-of', 'win rate'));
+  head.append(node('span', 'ev-of', 'win'));
   left.append(head);
 
   // Track: the shaded region is where a coin-flipper with this many closes lands.
@@ -182,16 +182,9 @@ function evidenceBar(r) {
 
   const foot = node('div', 'ev-foot');
   foot.append(node('span', 'ev-label', b.label));
-  foot.append(node('span', 'ev-n', `${r.round_trips} closed`));
-  // A badge over 12% of someone's flow is not the claim a badge over 95% is.
-  const cov = coverage(r.out_of_scope_volume, r.total_volume);
-  const covered = node('span', 'ev-n', `${cov.toFixed(0)}% covered`);
-  covered.title = `${cov.toFixed(1)}% of this address's selling had an on-chain buy behind `
-    + 'it. The rest has no cost basis and is not scored.';
-  foot.append(covered);
   left.append(foot);
 
-  const cta = node('button', 'ev-cta', 'View trades');
+  const cta = node('button', 'ev-cta', 'Trades');
   cta.type = 'button';
   cta.setAttribute('aria-label', `View trades for ${r.address}`);
   cta.onclick = (e) => { e.stopPropagation?.(); void openDetail(r.address, cta); };
@@ -229,6 +222,17 @@ function traderCard(r, anchor) {
   figs.append(node('span', 'tcard-label', 'Realized, round-trips only'));
   figs.append(node('strong', 'tcard-second', compact(r.matched_volume)));
   figs.append(node('span', 'tcard-label', 'Matched volume'));
+  // The record behind the badge, in the column that has room for words rather than
+  // crammed into a 46px bar where "Beyond chance" truncated to "Beyond".
+  const cov = coverage(r.out_of_scope_volume, r.total_volume);
+  const band = chanceBand(r.wins, r.round_trips);
+  figs.append(node('div', `tcard-verdict v-${band.verdict}`, band.label));
+  // Short enough to fit a 310px card without ellipsis; the full wording is in the title.
+  const rec = node('div', 'tcard-record',
+    `${r.round_trips} closed · ${cov.toFixed(0)}% covered`);
+  rec.title = `${r.round_trips} completed round-trips. ${cov.toFixed(1)}% of this address's `
+    + 'selling had an on-chain buy behind it; the rest has no cost basis and is not scored.';
+  figs.append(rec);
   body.append(figs);
   const spark = node('div', 'tcard-spark');
   spark.append(sparkline(r.spark ?? [], { width: 240, height: 88 }));
@@ -372,7 +376,7 @@ function renderDistribution() {
   const stat = (k, v, sub) => {
     const b = node('div', 'dstat');
     b.append(node('span', 'dstat-k', k));
-    const val = node('strong');
+    const val = node('strong', typeof v === 'string' ? 'dstat-plain' : undefined);
     if (typeof v === 'string') val.textContent = v; else val.append(v);
     b.append(val);
     if (sub) b.append(node('span', 'dstat-sub', sub));
@@ -389,35 +393,50 @@ function renderDistribution() {
 }
 
 /**
- * Scope before ranking: both universes, both counts, the window, and how the money is
- * denominated. Plus, on the RWA tab, why its success rate is not what it looks like.
+ * Scope before ranking, in ONE line.
+ *
+ * This was eleven lines of body text above the fold, which is eleven lines nobody reads
+ * and a card grid pushed off the screen. The reference gives its subtitle one line. So the
+ * numbers that bound the ranking stay visible — how many qualified, out of how many, over
+ * what window — and the method that explains them moves behind the disclosure beside the
+ * filters, where someone who wants it will look for it.
  */
 function renderCaveat() {
   const c = state.data.coverage;
   const d = state.data.distribution;
-  const p = el('caveat');
-  p.replaceChildren();
-  p.append(node('b', undefined,
-    `${c.addresses_qualifying.toLocaleString('en-US')} of `
-    + `${c.addresses_seen.toLocaleString('en-US')} addresses `));
-  p.append(document.createTextNode(
-    `closed a round-trip over ${c.window_label} across ${c.universe}. `
-    + 'The rest are out of scope, not estimated. '));
-  p.append(document.createTextNode(c.usd_note + ' '));
-  if (c.magnitude_note) {
-    // A high success rate on a small-magnitude universe reads as safety. It is not.
-    p.append(node('b', 'warn-note', c.magnitude_note));
-  }
-  el('criterion').textContent = `${CRITERION} ${c.scope_note}`;
-
   const sub = el('hero-sub');
   sub.replaceChildren();
+  sub.append(node('b', undefined,
+    `${c.addresses_qualifying.toLocaleString('en-US')} of `
+    + `${c.addresses_seen.toLocaleString('en-US')} addresses`));
   sub.append(document.createTextNode(
-    `${c.addresses_seen.toLocaleString('en-US')} traded over ${c.window_label}. `
-    + `Half of those who closed a round-trip made under `
-    + `${money(Math.abs(d.percentiles['50']))}; the top 1% took `
-    + `${(d.top1pct_share * 100).toFixed(0)}% of everything won. `
-    + 'Realized profit only, no execution here.'));
+    ` closed a round-trip over ${c.window_label}; half of them made under `
+    + `${money(Math.abs(d.percentiles['50']))}. `));
+  const more = node('a', 'sub-link', 'How this is measured');
+  more.setAttribute('href', '#measured');
+  more.onclick = (e) => {
+    e.preventDefault?.();
+    const box = /** @type {any} */ (el('measured'));
+    box.open = true;
+    box.setAttribute('open', 'true');
+    box.scrollIntoView?.({ block: 'center' });
+  };
+  sub.append(more);
+
+  // Everything that used to sit above the fold, behind the disclosure.
+  const full = el('criterion');
+  full.replaceChildren();
+  /** @param {string} text @param {string} [cls] */
+  const para = (text, cls) => full.append(node('p', cls, text));
+  para(`Ranked over ${c.universe}. ${c.note}`);
+  para(c.usd_note);
+  para(c.scope_note);
+  para(CRITERION);
+  if (c.magnitude_note) {
+    // A high success rate on a small-magnitude universe reads as safety. It is not.
+    para(c.magnitude_note, 'warn-note');
+  }
+  para(c.truncation_note);
 }
 
 function renderFootnote() {

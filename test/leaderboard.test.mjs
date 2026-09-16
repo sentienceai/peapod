@@ -64,6 +64,10 @@ test('the ranking says it is truncated rather than implying it is complete', () 
 });
 
 test('every signed figure carries a glyph AND a sign character AND colour', () => {
+  // The third channel is asserted in test/palette.test.mjs, which checks that no rule in
+  // the stylesheet can beat `.up`/`.down` on a nested element. This one checked the glyph
+  // was present and had the right character, and called that "colour" — it passed happily
+  // while `.dstat strong` rendered a whole row of signed figures neutral.
   const signed = [...get('podium').descendants(), ...get('rows').descendants()]
     .filter((n) => n.className === 'up' || n.className === 'down');
   assert.ok(signed.length > 10, `only ${signed.length} signed figures found`);

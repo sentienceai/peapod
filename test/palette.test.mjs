@@ -132,3 +132,47 @@ test('the stylesheet does not smuggle in colours the palette does not define', a
   assert.deepEqual(unexpected, [],
     `hardcoded colours in app.css: ${unexpected.join(', ')}`);
 });
+
+test('nothing can override the colour of a signed figure', async () => {
+  // THE BUG THIS EXISTS FOR. `.dstat strong { color: … }` is specificity (0,1,1) and beat
+  // `.up` at (0,1,0), so every signed figure in that row rendered neutral and its
+  // direction glyph inherited the same neutral. The sign test passed throughout, because
+  // it checked that the glyph was PRESENT and that its character was right — never that
+  // it carried a sign colour. Presence is not the claim; the claim is three channels.
+  const app = await readFile(new URL('../web/styles/app.css', import.meta.url), 'utf8');
+  const stripped = app.replace(/\/\*[\s\S]*?\*\//g, '');
+
+  /**
+   * @param {string} sel
+   * :where() contributes nothing, which is the tool for saying "style this, but never
+   * at the cost of a colour a class is asserting".
+   */
+  const specificity = (sel) => {
+    const outside = sel.replace(/:where\([^)]*\)/g, ' ');
+    const ids = (outside.match(/#[\w-]+/g) || []).length;
+    const classes = (outside.match(/[.[][\w-]+|:[a-z-]+(\([^)]*\))?/g) || []).length;
+    return ids * 100 + classes * 10;
+  };
+
+  /** @type {string[]} */
+  const offenders = [];
+  for (const m of stripped.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    const body = m[2];
+    if (!/(^|;)\s*color\s*:/.test(body)) continue;
+    for (const one of m[1].split(',').map((x) => x.trim())) {
+      if (!one || one.startsWith('@')) continue;
+      const last = one.split(/\s+|>/).filter(Boolean).pop() ?? '';
+      // A signed figure is a <strong> or <span> carrying .up/.down, holding a
+      // <span class="mark">. A rule whose final compound is one of those bare elements,
+      // at a specificity above a single class, wins over the sign colour.
+      if (/^(strong|span|b|i)$/.test(last) && specificity(one) >= 10) offenders.push(one);
+    }
+  }
+  assert.deepEqual(offenders, [],
+    `these set colour on a bare element and will beat .up/.down:\n  ${offenders.join('\n  ')}`);
+
+  // And the sign colours themselves are declared at exactly one class of specificity,
+  // so the rule above is the whole guard.
+  assert.match(stripped, /(^|\n)\.up \{ color: var\(--up\); \}/);
+  assert.match(stripped, /(^|\n)\.down \{ color: var\(--down\); \}/);
+});

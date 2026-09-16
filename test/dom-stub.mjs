@@ -28,7 +28,6 @@ class Node {
     this.dataset = {};
     this.className = '';
     this.hidden = false;
-    this.title = '';
     this.value = '';
     /** @type {{type: string, fn: (e: any) => void, capture: boolean}[]} */
     this.listeners = [];
@@ -107,6 +106,17 @@ class Node {
   removeAttribute(name) { delete this.attributes[name]; }
 
   get tagName() { return String(this.tag).toUpperCase(); }
+
+  /**
+   * title mirrors its attribute, the way a browser does.
+   *
+   * It was a plain field, so `el.title = '…'` set a property nothing could read back
+   * through getAttribute — a test asserting on the attribute saw undefined while the page
+   * was perfectly correct. Same shape as setAttribute('class') not reaching className.
+   */
+  get title() { return this.attributes.title ?? ''; }
+
+  set title(value) { this.attributes.title = String(value); }
 
   /**
    * A real classList, kept in sync with className both ways.

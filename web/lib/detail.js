@@ -68,7 +68,7 @@ function railBlock(title, rows) {
   b.append(node('h4', undefined, title));
   for (const r of rows) {
     const line = node('div', 'rail-row');
-    line.append(node('span', undefined, r.key));
+    line.append(node('span', 'label', r.key));
     const v = node('b');
     if (typeof r.value === 'string') v.textContent = r.value;
     else v.append(r.value);
@@ -97,7 +97,7 @@ function renderRail(d) {
   const fig = node('div', 'rail-figure');
   const strong = node('strong');
   strong.append(signed(s.realized));
-  fig.append(strong, node('span', undefined, 'Realized · round-trips only'));
+  fig.append(strong, node('span', 'label', 'Realized · round-trips only'));
   rail.append(fig);
 
   rail.append(railBlock('Activity', [
@@ -214,7 +214,7 @@ function renderChart(d) {
     tip.replaceChildren();
     const b = node('b');
     b.append(signed(hit.point[1]));
-    tip.append(b, node('span', undefined, when(hit.point[0])));
+    tip.append(b, node('span', 'label', when(hit.point[0])));
   });
   svg.addEventListener('mouseleave', () => { tip.hidden = true; clear?.(); });
 }
@@ -400,7 +400,7 @@ function renderNoRoundTrips(d) {
   // No realized figure, and no placeholder pretending to be one.
   const fig = node('div', 'rail-figure');
   fig.append(node('strong', 'muted-figure', 'No realized PnL'));
-  fig.append(node('span', undefined, 'no completed round-trips'));
+  fig.append(node('span', 'label', 'no completed round-trips'));
   rail.append(fig);
 
   rail.append(railBlock('What it did', [

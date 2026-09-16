@@ -66,12 +66,12 @@ test('the bottom bar holds evidence, never a score or a purchase', () => {
     assert.ok(!text.includes(banned), `"${banned}" appeared on a card`);
   }
   // Every card's verdict is one of the four the criterion defines, spelled out in words.
-  const labels = cards().map((/** @type {any} */ c) => c.byClass('ev-label')[0].textContent);
+  const labels = cards().map((/** @type {any} */ c) => c.byClass('tcard-verdict')[0].textContent);
   const allowed = [/^Beyond chance$/, /^Within chance$/, /^Below chance$/, /^Too few closes to tell \(\d+\)$/];
   for (const l of labels) {
     assert.ok(allowed.some((re) => re.test(l)), `unexpected verdict wording: ${l}`);
   }
-  assert.equal(cards()[0].byClass('ev-cta')[0].textContent, 'View trades');
+  assert.equal(cards()[0].byClass('ev-cta')[0].textContent, 'Trades');
 });
 
 test('the bar draws the band the data implies, not a fixed decoration', () => {
@@ -113,16 +113,21 @@ test('the scope tabs are offered and the caveat states scope before ranking', ()
 
   // Scope stays above the ranking. The method behind the bar moved into a disclosure
   // beside the filter that uses it, rather than a paragraph between filters and cards.
-  const caveat = get('caveat').textContent;
-  assert.match(caveat, /closed a round-trip/i);
-  assert.match(caveat, /out of scope, not estimated/);
-  // Both universes, both counts, the window, and how the dollars are made.
-  assert.match(caveat, /tokenized-equity pools/);
-  assert.match(caveat, /Pons pools/);
-  assert.match(caveat, /ETH-quoted legs convert at the trade's own timestamp/);
-  // It lives in the hero now, above the controls. What it must not become again is a
-  // paragraph between the filters and the cards, so it stays bounded.
-  assert.ok(caveat.length < 520, `the caveat is a wall again: ${caveat.length} chars`);
+  // ONE line above the fold, carrying the numbers that bound the ranking. Eleven lines
+  // of body text is eleven lines nobody reads and a card grid pushed off the screen.
+  const sub = get('hero-sub').textContent;
+  assert.match(sub, /closed a round-trip/i);
+  assert.match(sub, /of 103,920 addresses|of [\d,]+ addresses/);
+  assert.match(sub, /How this is measured/);
+  assert.ok(sub.length < 200, `the subtitle is a wall again: ${sub.length} chars`);
+
+  // And the method is still reachable, in full, behind the disclosure.
+  const full = get('criterion').textContent;
+  assert.match(full, /tokenized-equity pools/);
+  assert.match(full, /Pons pools/);
+  assert.match(full, /ETH-quoted legs convert at the trade's own timestamp/);
+  assert.match(full, /out of scope, not estimated/);
+  assert.match(full, /refolds the matching on that scope's trades/);
 
   const criterion = get('criterion').textContent;
   assert.match(criterion, /coin-flip null/);
@@ -269,14 +274,16 @@ test('the badge says how much of an address it can actually see', async () => {
   assert.equal(coverage(5, 0), 0, 'a zero-volume address must not divide by zero');
   assert.equal(coverage(150, 100), 0, 'coverage must not go negative');
 
+  // It lives beside the metrics now, not in the 46px bar where "Beyond chance" was
+  // truncating to "Beyond" — but it is still on the card, which is the point.
   for (const c of get('grid').byClass('tcard').slice(0, 8)) {
     const addr = c.attributes['aria-label'].replace('Open ', '');
     const row = board.rows.find((/** @type {any} */ r) => r.address === addr);
-    const shown = c.byClass('ev-n').map((/** @type {any} */ n) => n.textContent);
-    const want = `${coverage(row.out_of_scope_volume, row.total_volume).toFixed(0)}% covered`;
-    assert.ok(shown.includes(want),
-      `card shows ${JSON.stringify(shown)}, expected ${want}`);
-    assert.ok(shown.includes(`${row.round_trips} closed`));
+    const rec = c.byClass('tcard-record')[0];
+    assert.ok(rec, 'the card no longer says what the badge is scored over');
+    const cov = coverage(row.out_of_scope_volume, row.total_volume).toFixed(0);
+    assert.equal(rec.textContent, `${row.round_trips} closed · ${cov}% covered`);
+    assert.match(rec.attributes.title, /had an on-chain buy behind it/);
   }
 });
 
@@ -368,9 +375,10 @@ test('the hero leads with the field, not with the best number', async () => {
   const sub = get('hero-sub').textContent;
   assert.match(h1, /Every trader on the chain/);
   assert.ok(!/\$/.test(h1), 'the headline quotes a figure');
-  assert.match(sub, /Half of those who closed a round-trip made under/);
-  assert.match(sub, /top 1% took/);
-  assert.match(sub, /no execution here/i);
+  assert.match(sub, /closed a round-trip over the last/);
+  assert.match(sub, /half of them made under/);
+  // The distribution carries the rest; the subtitle carries scope.
+  assert.match(get('dist').textContent, /Top 1% took/);
 });
 
 test('an address detail carries its percentile and the field it is read against', async () => {
@@ -562,7 +570,7 @@ test('the components the data cannot support are still absent', async () => {
   // with leverage and liquidation, Account Value, Sharpe, Max Drawdown and Copiers. None
   // of those exist here, and rebuilding them as empty shells would be worse than the gap.
   const page = get('grid').textContent + get('statusbar').textContent
-    + get('caveat').textContent + get('footnote').textContent;
+    + get('hero-sub').textContent + get('footnote').textContent;
   for (const banned of ['Copy Score', 'Copytrade', 'Account Value', 'Sharpe',
     'Max Drawdown', 'Copiers', 'Liquidation', 'Leverage', '/100']) {
     assert.ok(!page.includes(banned), `"${banned}" appeared on the page`);
