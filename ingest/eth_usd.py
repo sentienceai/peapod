@@ -50,6 +50,25 @@ NATIVE = "0x0000000000000000000000000000000000000000"
 WIDTH = 20_000          # Edge refuses 30,000 whatever the filter; 20,000 is served.
 USDG_DECIMALS = 6
 ETH_DECIMALS = 18
+# The chosen reference pool, vendored beside the rest of the registry.
+#
+# WHY VENDORED RATHER THAN RECOMPUTED. Choosing the pool is an argmax over executable depth
+# across every ETH/USDG pool on the chain. It is expensive, it needs the band arithmetic,
+# and it is not guaranteed to return the same pool twice as depth moves. Running it on a
+# fifteen-minute schedule would let the reference flip mid-series, which puts a step change
+# into every ETH-quoted PnL on the site for no reason anyone could see. The selection is a
+# decision; --stage select is how it is revisited, deliberately.
+SELECTION = HERE.parent / "registry" / "eth-usd-reference.json"
+
+
+def selection() -> dict | None:
+    """The reference pool and its runners-up, from this run's own select or the vendored copy."""
+    if (OUT / "reference.json").exists() and (OUT / "candidates.json").exists():
+        return {"reference": json.loads((OUT / "reference.json").read_text()),
+                "candidates": json.loads((OUT / "candidates.json").read_text())}
+    if SELECTION.exists():
+        return json.loads(SELECTION.read_text())
+    return None
 
 
 
@@ -182,12 +201,18 @@ def stage_select(url: str, root: Path, lo: int, hi: int) -> None:
     print(f"\ndeepest: {top['pool_id']}  ${top['depth_usd']:,.0f} at +/-1%, "
           f"{share:.1%} of all ETH/USDG depth, {top['swaps']:,} swaps in the probe window")
     (OUT / "reference.json").write_text(json.dumps(top, indent=1))
+    # Vendored too, so a container that has never run this stage still knows which pool
+    # the price series is read from.
+    SELECTION.parent.mkdir(parents=True, exist_ok=True)
+    SELECTION.write_text(json.dumps(
+        {"reference": top, "candidates": json.loads((OUT / "candidates.json").read_text())},
+        indent=1))
 
 
 def stage_series(url: str, root: Path, lo: int, hi: int) -> None:
     """Every swap in the reference pool, as a price at a block."""
-    ref = json.loads((OUT / "reference.json").read_text())
-    cands = json.loads((OUT / "candidates.json").read_text())
+    chosen = selection()
+    ref, cands = chosen["reference"], chosen["candidates"]
     second = next(c for c in cands if c["pool_id"] != ref["pool_id"])
     session = requests.Session()
 
@@ -295,10 +320,23 @@ def main() -> int:
         import importlib  # noqa: PLC0415
         _LM = importlib.import_module("liquidity_math")
     url = env()["GOLDSKY_EDGE_URL"]
-    swaps = pl.concat([pl.read_parquet(p)
-                       for p in sorted((HERE / "out" / "pons_swaps").rglob("*.parquet"))])
+    # The window to price is the Pons tape's own extent, so this stage has nothing to do
+    # until the Pons ingest has fetched something. On a cold volume that was
+    # `cannot concat empty list` from a bare concat over an empty directory — a crash
+    # describing the code rather than the situation. Skipping is correct here: an unpriced
+    # ETH cohort cannot rank, and the empty Pons scopes are refused by the gates, so
+    # nothing is published on the strength of a missing price series.
+    parts = sorted((HERE / "out" / "pons_swaps").rglob("*.parquet"))
+    if not parts:
+        print("no Pons tape yet, so no window to price; skipping")
+        return 0
+    swaps = pl.concat([pl.read_parquet(p, columns=["block"]) for p in parts])
     lo, hi = int(swaps["block"].min()), int(swaps["block"].max())
     print(f"pons window: blocks {lo:,}..{hi:,}")
+    if args.stage != "select" and selection() is None:
+        print(f"no reference pool chosen and none vendored at {SELECTION}; "
+              "run --stage select; skipping")
+        return 0
     if args.stage == "select":
         stage_select(url, root, lo, hi)
     elif args.stage == "series":

@@ -157,3 +157,31 @@ def test_several_gaps_are_summed_not_just_counted():
 def test_no_gaps_is_the_normal_case():
     assert not go(gaps=[]).failed
     assert not go().failed
+
+
+def test_a_scope_that_was_never_built_is_rejected():
+    # The Pons universe is absent: no rows in any window, so the build skips those scopes
+    # and the tabs simply are not there. Every other gate reads healthy.
+    g = go(declared=["all", "rwa", "pons", "pons-eth"])
+    assert [r.name for r in g.failed] == ["every declared scope produced a ranking"]
+    assert "pons" in g.failed[0].detail
+
+
+def test_a_first_build_missing_a_scope_is_still_rejected():
+    # THE CASE THAT MATTERS. A cold volume has no previous build, so the gates that compare
+    # against one — window advances, qualifying in band, top in band — are all skipped.
+    # This is the only thing standing between a missing universe and a published site.
+    first = {"addresses": 0, "qualifying": 0, "build": None, "to_ts": None,
+             "top_realized": None, "scopes": 0}
+    g = go(before=first, address_count=53_222, declared=["all", "rwa", "pons"])
+    assert [r.name for r in g.failed] == ["every declared scope produced a ranking"]
+
+
+def test_every_scope_present_passes():
+    g = go(declared=["all", "rwa"])
+    assert not g.failed and not g.warned, g.report()
+
+
+def test_the_gate_is_inert_when_the_caller_declares_nothing():
+    # An older caller that does not pass the scope list must not start failing.
+    assert not go(declared=None).failed

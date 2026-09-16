@@ -89,6 +89,12 @@ def pool_universe(root: Path):
 
 
 def stage_ingest(root: Path, days: float):
+    raise SystemExit(
+        "superseded by `ingest/swaps_with_tx.py --universe pons`.\n"
+        "This stage fetched a fixed window with no cursor and numbered its parts from zero\n"
+        "on every run, which is safe to do once by hand and destructive on a schedule. The\n"
+        "shared ingest carries the cursor, the gap record, the window controller and the\n"
+        "incremental flush, and the cycle runs it. --stage report still works.")
     universe = pool_universe(root)
     ids = sorted(universe)
     print(f"pons pools with a denominable quote: {len(ids)} "
@@ -180,6 +186,11 @@ def stage_ingest(root: Path, days: float):
 
 
 def stage_resolve(root: Path, max_hours: float | None):
+    raise SystemExit(
+        "superseded by `ingest/resolve_senders.py`, which now reads both swap tapes into\n"
+        "one tx_from table. A transaction's sender does not depend on which pool it\n"
+        "touched, so resolving the two universes separately only meant one of them was\n"
+        "resolved by a script the cycle never ran. --stage report still works.")
     """Resolve tx.from for the blocks holding Pons swaps, newest first.
 
     Newest first so a partial run is a COMPLETE recent window rather than a scatter, which

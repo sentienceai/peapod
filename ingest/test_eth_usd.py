@@ -54,3 +54,67 @@ def test_a_realistic_sqrt_price_from_the_chain_prices_near_the_measured_range():
     sqrt_p = int(math.sqrt(2489.22 * 10 ** (6 - 18)) * (1 << 96))
     px = price_from(sqrt_p, eth0=True)
     assert 2400 < px < 2650, px
+
+
+# --- cold start ------------------------------------------------------------------
+#
+# This stage prices the Pons window, so it reads the Pons tape to find out what that window
+# is. On a cold volume there is no Pons tape, and a bare concat over the empty directory
+# raised `cannot concat empty list` — a message about the code rather than the situation,
+# eleven hours into a deploy with every earlier stage green. Skipping is right: the empty
+# Pons scopes are refused by the build gates, so nothing is published on a missing price.
+
+import json
+
+import pytest
+
+import eth_usd
+
+
+@pytest.fixture
+def cold(tmp_path, monkeypatch):
+    monkeypatch.setenv("GOLDSKY_EDGE_URL", "http://127.0.0.1:9/edge")
+    monkeypatch.setattr(eth_usd, "HERE", tmp_path)
+    monkeypatch.setattr(eth_usd, "OUT", tmp_path / "out" / "eth_usd")
+    monkeypatch.setattr(eth_usd, "SELECTION", tmp_path / "eth-usd-reference.json")
+    monkeypatch.setattr("sys.argv", ["eth_usd.py", "--stage", "series"])
+    return tmp_path
+
+
+def test_an_absent_pons_tape_is_a_skip_not_a_crash(cold, capsys):
+    assert eth_usd.main() == 0
+    assert "skipping" in capsys.readouterr().out
+
+
+def test_an_empty_pons_directory_is_a_skip_too(cold, capsys):
+    (cold / "out" / "pons_swaps").mkdir(parents=True)
+    assert eth_usd.main() == 0
+    assert "skipping" in capsys.readouterr().out
+
+
+def test_a_tape_with_no_chosen_reference_pool_is_a_skip(cold, capsys):
+    import polars as pl
+
+    d = cold / "out" / "pons_swaps"
+    d.mkdir(parents=True)
+    pl.DataFrame({"block": [10, 20]}).write_parquet(d / "part-00000.parquet")
+    assert eth_usd.main() == 0
+    out = capsys.readouterr().out
+    assert "pons window: blocks 10..20" in out
+    assert "no reference pool chosen" in out
+
+
+def test_the_vendored_reference_is_used_when_this_run_has_not_selected_one(cold):
+    (cold / "eth-usd-reference.json").write_text(
+        json.dumps({"reference": {"pool_id": "0xabc"}, "candidates": [{"pool_id": "0xabc"}]}))
+    assert eth_usd.selection()["reference"]["pool_id"] == "0xabc"
+
+
+def test_the_shipped_reference_is_vendored_and_readable():
+    # A container has never run --stage select and never will: the selection is an argmax
+    # over executable depth across every ETH/USDG pool, and rerunning it on a schedule
+    # would let the reference flip mid-series.
+    chosen = json.loads(eth_usd.SELECTION.read_text())
+    assert chosen["reference"]["pool_id"].startswith("0x")
+    assert any(c["pool_id"] != chosen["reference"]["pool_id"] for c in chosen["candidates"]), \
+        "the cross-check needs a second pool to compare against"

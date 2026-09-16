@@ -52,8 +52,20 @@ stage() {
 }
 
 if [ "${CYCLE_SKIP_INGEST:-0}" != "1" ]; then
+  # ORDER IS A DEPENDENCY CHAIN, NOT A PREFERENCE. Each stage consumes what the one above
+  # it wrote, and the cycle used to skip the second line entirely: Pons was ingested by a
+  # separate one-shot script that nothing ran, so on a cold volume eth/usd reached for a
+  # Pons tape that no stage had ever produced and died on an empty directory.
+  #
+  #   swaps:rwa ─┐
+  #   swaps:pons ┴─> identity ─> partitions ─> eth/usd ─> build
+  #
+  # identity resolves both tapes in one pass, so both must be fetched before it runs.
+  # eth/usd prices the Pons window, so it must run after the Pons tape exists.
+  #
   # Each of these resumes from its own checkpoint and is a no-op when there is nothing new.
-  stage "swaps: rwa"   $PY ingest/swaps_with_tx.py                    || exit 1
+  stage "swaps: rwa"   $PY ingest/swaps_with_tx.py --universe rwa   || exit 1
+  stage "swaps: pons"  $PY ingest/swaps_with_tx.py --universe pons  || exit 1
   stage "identity"     $PY ingest/resolve_senders.py --max-hours 0.2 || exit 1
   stage "partitions"   $PY ingest/partitions.py                    || exit 1
   stage "eth/usd"      $PY ingest/eth_usd.py --stage series        || exit 1

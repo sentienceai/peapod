@@ -53,7 +53,11 @@ from settings import endpoint, pacing  # noqa: E402
 
 RPC, ENDPOINT = endpoint()
 HERE = Path(__file__).resolve().parent
-SWAPS = HERE / "out" / "swaps_tx"
+# BOTH TAPES. A transaction's `from` is a property of the transaction, not of the pool it
+# touched, so one resolved table serves both universes and a transaction that swapped in
+# each is fetched once. Resolving them separately is what left the Pons side depending on
+# a script that never ran in the cycle.
+SWAPS = [HERE / "out" / "swaps_tx", HERE / "out" / "pons_swaps"]
 # Each source writes its own tree. Merging two providers into one directory would make
 # the cross-check impossible: agreement can only be asserted between sets kept apart.
 SOURCE = os.environ.get("PEAPOD_SOURCE", "public")
@@ -195,7 +199,7 @@ def main() -> int:
     args = ap.parse_args()
     claim_pidfile(PIDFILE)
 
-    parts = sorted(SWAPS.glob("part-*.parquet"))
+    parts = sorted(p for d in SWAPS for p in d.glob("part-*.parquet"))
     if not parts:
         raise SystemExit("no swap parts; run ingest/swaps_with_tx.py first")
     # Name the two columns this stage uses. The tape was written by two generations of

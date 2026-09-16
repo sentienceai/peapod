@@ -25,15 +25,40 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const python = process.env.PEAPOD_PY || '.venv/bin/python';
 
 /**
- * Stages the 15-minute cycle runs, in order, before the build.
- * @type {[string, string[]][]}
+ * Extra arguments that keep a stage short enough to test. Everything else about the
+ * command — which script, and the flags the cycle passes it — comes from cycle.sh.
+ * argparse takes the last value for a repeated flag, so these override rather than clash.
+ * @type {Record<string, string[]>}
  */
-const STAGES = [
-  ['swaps: rwa', ['ingest/swaps_with_tx.py', '--from', '64000000', '--to', '64000001']],
-  ['identity', ['ingest/resolve_senders.py', '--max-hours', '0.001']],
-  ['partitions', ['ingest/partitions.py', '--only', 'swaps_tx']],
-  ['eth/usd', ['ingest/eth_usd.py', '--stage', 'series']],
-];
+const FAST = {
+  'ingest/swaps_with_tx.py': ['--from', '64000000', '--to', '64000001'],
+  'ingest/resolve_senders.py': ['--max-hours', '0.001'],
+  'ingest/partitions.py': ['--only', 'swaps_tx'],
+};
+
+/**
+ * The stages the cycle runs, READ OUT OF cycle.sh rather than listed here.
+ *
+ * This list used to be written by hand, and it drifted from the script it was standing in
+ * for: the cycle had no Pons ingest at all, the hand-written list did not have one either,
+ * and the agreement between them read as coverage. Every stage the cycle gains is now
+ * covered by everything below without anyone remembering to add it.
+ * @param {string} src @returns {[string, string[]][]}
+ */
+function stagesOf(src) {
+  /** @type {[string, string[]][]} */
+  const stages = [];
+  for (const line of src.split('\n')) {
+    const m = /^\s*stage\s+"([^"]+)"\s+\$PY\s+([^|#]+)/.exec(line);
+    if (!m) continue;
+    const argv = m[2].trim().split(/\s+/);
+    stages.push([m[1], [...argv, ...(FAST[argv[0]] ?? [])]]);
+  }
+  return stages;
+}
+
+const CYCLE = await readFile(new URL('../scripts/cycle.sh', import.meta.url), 'utf8');
+const STAGES = stagesOf(CYCLE);
 
 /** @param {string[]} argv @param {Record<string,string>} env */
 function run(argv, env) {
@@ -118,4 +143,43 @@ test('credentials come from the environment, not only from a gitignored file', a
     assert.match(src, /from settings import env/, `${f} still defines its own env()`);
     assert.ok(!/def env\(\)/.test(src), `${f} still has a local .env-only reader`);
   }
+});
+
+test('the cycle ingests every universe the fold reads', async () => {
+  // THE BUG THIS PINS. The fold reads two swap tapes, RWA and Pons. The cycle fetched one.
+  // Pons was ingested by a one-shot script nothing ran, so on a cold volume the pricing
+  // stage reached for a tape that had never existed and died on an empty directory —
+  // eleven hours into a deploy, with every earlier stage reporting success.
+  const src = await readFile(new URL('../ingest/swaps_with_tx.py', import.meta.url), 'utf8');
+  const decl = /^TAPES = \{(.+?)\}$/m.exec(src);
+  assert.ok(decl, 'swaps_with_tx.py no longer declares TAPES');
+  const universes = [...decl[1].matchAll(/"(\w+)":/g)].map((m) => m[1]);
+  assert.ok(universes.length >= 2, `expected several universes, got ${universes}`);
+
+  const ingests = STAGES.filter(([, argv]) => argv[0] === 'ingest/swaps_with_tx.py');
+  const fetched = ingests.map(([, argv]) => argv[argv.indexOf('--universe') + 1]);
+  for (const u of universes) {
+    assert.ok(fetched.includes(u),
+      `the cycle never fetches the '${u}' tape, which the fold reads: ${JSON.stringify(fetched)}`);
+  }
+});
+
+test('stages run in dependency order', async () => {
+  // Each of these consumes what the one before it wrote. Read out of cycle.sh, so a
+  // reordering is caught here rather than by a container eleven hours later.
+  // Also the guard against a regex that matches nothing, which would make every test
+  // above pass over an empty list. Coverage is the test before this one, not this number.
+  assert.ok(STAGES.length >= 4, `parsed only ${STAGES.length} stages out of cycle.sh`);
+  const at = (/** @type {RegExp} */ re) => STAGES.findIndex(([, a]) => re.test(a.join(' ')));
+  const swaps = STAGES.map(([, a], i) => (a[0].endsWith('swaps_with_tx.py') ? i : -1))
+    .filter((i) => i >= 0);
+  const identity = at(/resolve_senders/);
+  const parts = at(/partitions/);
+  const price = at(/eth_usd/);
+
+  assert.ok(swaps.length > 0 && identity > Math.max(...swaps),
+    'identity resolves both tapes, so every swap stage must run before it');
+  assert.ok(parts > identity, 'partitions read what identity resolved');
+  assert.ok(price > Math.max(...swaps),
+    'eth/usd prices the Pons window, so the Pons tape must exist before it runs');
 });

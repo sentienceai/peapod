@@ -1,0 +1,373 @@
+{
+ "reference": {
+  "pool_id": "0xbac3aa3b91584a53a579b3c999a56756e954e59247e497bad1d25a4334bde551",
+  "eth0": true,
+  "fee": 8388608,
+  "swaps": 4956,
+  "price": 2511.421703819396,
+  "depth_usd": 3522562.0386787253,
+  "block": 62473633
+ },
+ "candidates": [
+  {
+   "pool_id": "0xbac3aa3b91584a53a579b3c999a56756e954e59247e497bad1d25a4334bde551",
+   "eth0": true,
+   "fee": 8388608,
+   "swaps": 4956,
+   "price": 2511.421703819396,
+   "depth_usd": 3522562.0386787253,
+   "block": 62473633
+  },
+  {
+   "pool_id": "0xc3a4e9ee0713fc883517db6683f2b5d57a3736198d4fd5cc7fbeb0ea62a6c1a6",
+   "eth0": true,
+   "fee": 1,
+   "swaps": 103,
+   "price": 2530.5972063112854,
+   "depth_usd": 2023081.4912062967,
+   "block": 62474111
+  },
+  {
+   "pool_id": "0x284ad8d82e1211731799368ebc099e94fdc1405b91576d49618b32478351ba21",
+   "eth0": true,
+   "fee": 0,
+   "swaps": 4294,
+   "price": 2511.9335802433047,
+   "depth_usd": 466543.51803860586,
+   "block": 62474172
+  },
+  {
+   "pool_id": "0xbd62317555585dc0545f46fb73a29d59c3b0c0eda97c8ad0a5323d9fbde0c1c0",
+   "eth0": true,
+   "fee": 0,
+   "swaps": 774,
+   "price": 2510.050876540727,
+   "depth_usd": 278849.2784148166,
+   "block": 62473350
+  },
+  {
+   "pool_id": "0x24107d152f14a76d292123265ae3f3c71f863fc2f4ef7ba49d64e78d28ea379e",
+   "eth0": true,
+   "fee": 100,
+   "swaps": 16440,
+   "price": 2512.258096,
+   "depth_usd": 164222.0088000324,
+   "block": 62474135
+  },
+  {
+   "pool_id": "0x54f7883914619af9105355bf83ed678bcf9f63560218ac61c9963b9503d0ba32",
+   "eth0": true,
+   "fee": 460,
+   "swaps": 5099,
+   "price": 2511.723211292637,
+   "depth_usd": 73829.09532220478,
+   "block": 62474181
+  },
+  {
+   "pool_id": "0x3b0cbf0603ecc67b5fc9bb4fbb6ac9e08d3b2f406b63d1662a36063a7fe5e866",
+   "eth0": true,
+   "fee": 87,
+   "swaps": 11180,
+   "price": 2512.105193,
+   "depth_usd": 51151.58434679953,
+   "block": 62474116
+  },
+  {
+   "pool_id": "0xefcec38281d4cccaf9c9d7da02aff071d3b94d54fa50bb14b8e6b8e74529a16b",
+   "eth0": true,
+   "fee": 83,
+   "swaps": 11221,
+   "price": 2512.298519032391,
+   "depth_usd": 38635.35707213001,
+   "block": 62474147
+  },
+  {
+   "pool_id": "0x4e81817db5cfa84a073f5a3c997626ace746c1e459f075905aedab87d574410c",
+   "eth0": true,
+   "fee": 0,
+   "swaps": 189,
+   "price": 1881.6901237528082,
+   "depth_usd": 26149.68683018256,
+   "block": 62472725
+  },
+  {
+   "pool_id": "0x387bf619da4d3fb62bb276482693dba1b9b3520f573cabdfe033384a24125982",
+   "eth0": true,
+   "fee": 500,
+   "swaps": 1222,
+   "price": 2511.5477968267955,
+   "depth_usd": 10541.614482553141,
+   "block": 62473820
+  },
+  {
+   "pool_id": "0x85aa9a7c2ef9deec7bcbc5e78c6b26d2598c2aaf3f810b267fa4f8f9b0854142",
+   "eth0": true,
+   "fee": 25,
+   "swaps": 1383,
+   "price": 2512.7292130243663,
+   "depth_usd": 10059.658646260146,
+   "block": 62473978
+  },
+  {
+   "pool_id": "0xd313d79d9d6a714e7bdf02fc42a2c27ede7e51928ffd605126fe9e1192630cf8",
+   "eth0": true,
+   "fee": 3000,
+   "swaps": 168,
+   "price": 2505.990639243413,
+   "depth_usd": 7931.884642113237,
+   "block": 62473204
+  },
+  {
+   "pool_id": "0xdbed57e1dc571d912097e4dd1808698c7d4f4cc9647a4be0b05f8ff57c92c317",
+   "eth0": true,
+   "fee": 8388608,
+   "swaps": 60,
+   "price": 2508.4736759937286,
+   "depth_usd": 7222.155508609918,
+   "block": 62469230
+  },
+  {
+   "pool_id": "0x8dae3fd4176dc44ff6d85b90b5e532a5423d632f935ac0005d29daf70adfd447",
+   "eth0": true,
+   "fee": 200,
+   "swaps": 2647,
+   "price": 2511.7449594809323,
+   "depth_usd": 4992.7473804274005,
+   "block": 62474118
+  },
+  {
+   "pool_id": "0x4f76e65b162606f0c846a979f198ec21b0350bfe17ac6ae3858df9aeebe7fbd3",
+   "eth0": true,
+   "fee": 392,
+   "swaps": 1267,
+   "price": 2511.847406908061,
+   "depth_usd": 4214.5561506598515,
+   "block": 62473360
+  },
+  {
+   "pool_id": "0x6e2f6195f492295c9c669a8140cfc4e68bc4df8ae1e87054c06e0229cf7ec848",
+   "eth0": true,
+   "fee": 0,
+   "swaps": 27,
+   "price": 2503.87837474162,
+   "depth_usd": 4011.1321843826436,
+   "block": 62445535
+  },
+  {
+   "pool_id": "0x4cd07eac25e652153618ff59c4a964d5b2c60bcf1b096874dea89109b90424e4",
+   "eth0": true,
+   "fee": 100,
+   "swaps": 34,
+   "price": 2499.8677101841217,
+   "depth_usd": 3385.594990096015,
+   "block": 62473181
+  },
+  {
+   "pool_id": "0x2180843805e49f2ad9ec44a88229e3b37ad825ca537cc3bdcae20485cada59e4",
+   "eth0": true,
+   "fee": 91,
+   "swaps": 3508,
+   "price": 2512.3657196210997,
+   "depth_usd": 896.5495623043073,
+   "block": 62473584
+  },
+  {
+   "pool_id": "0xd986decace9ec31ff37f5e0b28155fd5f83e604d8ea995163541cbd119c24614",
+   "eth0": true,
+   "fee": 0,
+   "swaps": 72,
+   "price": 2511.5752743829817,
+   "depth_usd": 877.0763945780542,
+   "block": 62473010
+  },
+  {
+   "pool_id": "0x74096e0c4de80238aff5b814dcb6acf15d5fe45a106071b87fcccaf32d60980f",
+   "eth0": true,
+   "fee": 8388608,
+   "swaps": 22,
+   "price": 2511.006041859952,
+   "depth_usd": 737.6191982122309,
+   "block": 62468543
+  },
+  {
+   "pool_id": "0xed517705e7047bcb81feb3769bc6c7d1875b26867300fdfcb1a53a34c2894b5a",
+   "eth0": true,
+   "fee": 8388608,
+   "swaps": 47,
+   "price": 2509.2320576334723,
+   "depth_usd": 355.24250064176067,
+   "block": 62465633
+  },
+  {
+   "pool_id": "0xef5672974ad552f1ce24f2873f3e4237e82d44780ef623b6a239db42b08a7d5c",
+   "eth0": true,
+   "fee": 10000,
+   "swaps": 37,
+   "price": 2486.94268160481,
+   "depth_usd": 348.79706265022594,
+   "block": 62333799
+  },
+  {
+   "pool_id": "0x495d34d14cff1f2f75feb454d90df0a6317a6f34eebaa2713bac31f9ab41645a",
+   "eth0": true,
+   "fee": 8388608,
+   "swaps": 63,
+   "price": 2511.2914791613625,
+   "depth_usd": 277.94457668156315,
+   "block": 62469163
+  },
+  {
+   "pool_id": "0x41adca2690e5e5f1a9cab779676ca61cb545229475019eba6c56d2ffdd558b60",
+   "eth0": true,
+   "fee": 8388608,
+   "swaps": 207,
+   "price": 2505.3644716910335,
+   "depth_usd": 165.55801059867804,
+   "block": 62462787
+  },
+  {
+   "pool_id": "0xa53aed8eb6f4c8a2c5d990c261868f45d2b2f10b13f1b14924ef5a6e614f2a28",
+   "eth0": true,
+   "fee": 8388608,
+   "swaps": 29,
+   "price": 2509.2487355907588,
+   "depth_usd": 118.9628408662622,
+   "block": 62466776
+  },
+  {
+   "pool_id": "0xf2d7b3738515e38d5c7434dc5ccd8aa35610b8b1eae8fa37d815c4a01223802f",
+   "eth0": true,
+   "fee": 8388608,
+   "swaps": 5,
+   "price": 2489.48323573842,
+   "depth_usd": 110.31297444485934,
+   "block": 62331627
+  },
+  {
+   "pool_id": "0x30dac7167c36242d1bacfd30561d444cf014529ee55978991d03e4ee178e725a",
+   "eth0": true,
+   "fee": 8388608,
+   "swaps": 10,
+   "price": 2504.650011283265,
+   "depth_usd": 79.59556447933343,
+   "block": 62451482
+  },
+  {
+   "pool_id": "0x0115a48c046e8776f95f9d52fddc85d8d88f7ddc73ea65015a465ae04977077d",
+   "eth0": true,
+   "fee": 8388608,
+   "swaps": 28,
+   "price": 2512.4479595779526,
+   "depth_usd": 66.59863474420624,
+   "block": 62466681
+  },
+  {
+   "pool_id": "0xd9cbf339298fa801e68dfd962c99e3366a5fac85bc64bd891c5aa892e4b3d37b",
+   "eth0": true,
+   "fee": 8388608,
+   "swaps": 4,
+   "price": 2493.1829075676155,
+   "depth_usd": 23.41536447014792,
+   "block": 62472665
+  },
+  {
+   "pool_id": "0x1bda2c4d215966ab8a07d50ed3f1851d6e40027bd91d435a97c744c1a0dd4b31",
+   "eth0": true,
+   "fee": 8388608,
+   "swaps": 1,
+   "price": 2482.863542270854,
+   "depth_usd": 22.156116848012708,
+   "block": 62175233
+  },
+  {
+   "pool_id": "0x8727d80334dad89a90596abffb5abfeb6040b58d87ce658387ca92fbbcf6d9d5",
+   "eth0": true,
+   "fee": 1100,
+   "swaps": 103,
+   "price": 2509.551415611378,
+   "depth_usd": 17.487418247380205,
+   "block": 62474015
+  },
+  {
+   "pool_id": "0xab75e137d851202c01cc43a8d766cdc4b4227e5b4ad25146933a39bfc4b52d1c",
+   "eth0": true,
+   "fee": 800,
+   "swaps": 99,
+   "price": 2509.4547377258195,
+   "depth_usd": 12.746828458732345,
+   "block": 62465838
+  },
+  {
+   "pool_id": "0xb1a46fb88357dcf6993fb24be742c3f176bcc7bc819b796850993225cb8ea037",
+   "eth0": true,
+   "fee": 8388608,
+   "swaps": 74,
+   "price": 2509.299070504135,
+   "depth_usd": 10.026842228030858,
+   "block": 62469302
+  },
+  {
+   "pool_id": "0x717fd7ee0f0725ea031dc19e60b040b5dd21fdcc94cb3e871bf0e27b020effa1",
+   "eth0": true,
+   "fee": 8388608,
+   "swaps": 2,
+   "price": 2480.953076555452,
+   "depth_usd": 8.518472969062088,
+   "block": 62456152
+  },
+  {
+   "pool_id": "0x7accaeb3d245292298b8b3eb413698e709780fb67318d0d723d597de9629dfc3",
+   "eth0": true,
+   "fee": 0,
+   "swaps": 2,
+   "price": 2494.172557421351,
+   "depth_usd": 4.990604509822087,
+   "block": 62344531
+  },
+  {
+   "pool_id": "0x8288e954fee4e7eadf995846c3dfe500e42b82cca2b6352233d62d9a37b8a416",
+   "eth0": true,
+   "fee": 870,
+   "swaps": 28,
+   "price": 2501.9262909543772,
+   "depth_usd": 0.9956841563178624,
+   "block": 62458081
+  },
+  {
+   "pool_id": "0xa41ab21b1cedd8ce55f51d1b2ac3b5740370ad7b4e64688da94dc54fbc45a072",
+   "eth0": true,
+   "fee": 110000,
+   "swaps": 1,
+   "price": 2775.76991744575,
+   "depth_usd": 0.39688415324085724,
+   "block": 62243542
+  },
+  {
+   "pool_id": "0x3c0fd043695cc5276a7495f1fc2424d7a9cd4e11bb62f39d266bef5f574845d6",
+   "eth0": true,
+   "fee": 2500,
+   "swaps": 4,
+   "price": 2497.4546564504763,
+   "depth_usd": 0.33981489943258686,
+   "block": 62119697
+  },
+  {
+   "pool_id": "0x3a31daea0dadc5888d32830966cedaf4e4f86025fb848a08764a7534d5e65474",
+   "eth0": true,
+   "fee": 375,
+   "swaps": 10,
+   "price": 2505.890233510173,
+   "depth_usd": 0.3389301206858948,
+   "block": 62187808
+  },
+  {
+   "pool_id": "0x1219e804816d95f93060f318ba8d1230621c4a6684f4e79abe2fb2ee6b034847",
+   "eth0": true,
+   "fee": 8388608,
+   "swaps": 1,
+   "price": 2577.1468750322224,
+   "depth_usd": 0.09271229378569287,
+   "block": 62299939
+  }
+ ]
+}

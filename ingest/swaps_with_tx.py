@@ -47,9 +47,72 @@ SWAP_TOPIC = "0x40e9cecb9f5f1f1c5b9c97dec2917b7ee92e57ba5563708daca94dd84ad7112f
 # ~19,081 blocks/hour on this chain, so this is a little over eight days.
 COLD_START_BLOCKS = 3_900_000
 
-OUT = Path(__file__).resolve().parent / "out" / "swaps_tx"
-CHECKPOINT = Path(__file__).resolve().parent / "out" / "swaps_tx.checkpoint.json"
-PIDFILE = Path(__file__).resolve().parent / "out" / "swaps_tx.pid"
+# TWO UNIVERSES, ONE INGEST. RWA and Pons are different pool sets over the same contract,
+# and the Pons side had its own script: a one-shot probe with no cursor, no gap record, and
+# parts numbered from zero on every run. On a fifteen-minute schedule that would refetch a
+# seven-day window every tick and rewrite part-00000 underneath whatever was reading it.
+# Nothing in the fetching is universe-specific, so the universe is an argument and the
+# tape, cursor and lock are named after it.
+UNIVERSE = "rwa"
+TAPES = {"rwa": "swaps_tx", "pons": "pons_swaps"}
+# Quote assets the export can denominate in. A Pons pool quoted in neither has no price to
+# net against and its swaps are dropped downstream, so fetching them costs topic slots for
+# rows nobody can use.
+QUOTES = ("ETH", "USDG")
+
+OUT = Path(__file__).resolve().parent / "out" / TAPES[UNIVERSE]
+CHECKPOINT = OUT.with_name(TAPES[UNIVERSE] + ".checkpoint.json")
+PIDFILE = OUT.with_name(TAPES[UNIVERSE] + ".pid")
+
+
+def use_universe(which: str) -> None:
+    """Point the tape, the cursor and the lock at one universe's files."""
+    global UNIVERSE, OUT, CHECKPOINT, PIDFILE
+    UNIVERSE = which
+    OUT = Path(__file__).resolve().parent / "out" / TAPES[which]
+    CHECKPOINT = OUT.with_name(TAPES[which] + ".checkpoint.json")
+    PIDFILE = OUT.with_name(TAPES[which] + ".pid")
+
+
+def _export_on_path() -> None:
+    """Put export/ ahead of the repository root on sys.path.
+
+    There is a `registry/` DIRECTORY of vendored parquet at the root and a `registry.py`
+    MODULE in export/. Whichever comes first on the path wins, and the directory wins by
+    default, importing as an empty namespace package whose every attribute is missing.
+    """
+    path = str(Path(__file__).resolve().parent.parent / "export")
+    if sys.path[:1] != [path]:
+        sys.path.insert(0, path)
+
+
+def select_pools(which: str) -> list[str]:
+    """The pool ids one universe trades in, from the vendored registry.
+
+    RWA is every pool pairing a tokenized equity against USDG. Pons is the basket's own
+    pairs, kept only where one side is a quote asset we can denominate in.
+    """
+    _export_on_path()
+    from registry import pools as registry_pools, tokens as registry_tokens  # noqa: PLC0415
+    tok = registry_tokens()
+    meta = registry_pools()
+    if which == "rwa":
+        rwa = set(tok.filter(pl.col("kind") == "rwa_spot")["address"].to_list())
+        quote = set(tok.filter(pl.col("symbol") == "USDG")["address"].to_list())
+        ids = sorted(meta.filter(
+            (pl.col("currency0").is_in(list(rwa)) & pl.col("currency1").is_in(list(quote)))
+            | (pl.col("currency1").is_in(list(rwa)) & pl.col("currency0").is_in(list(quote)))
+        )["pool_id"].to_list())
+    else:
+        from registry import basket  # noqa: PLC0415
+        pairs = [t["pair"] for t in basket()["tokens"] if t.get("pair")]
+        sym = dict(zip(tok["address"].to_list(), tok["symbol"].to_list()))
+        ids = sorted(r["pool_id"]
+                     for r in meta.filter(pl.col("pool_id").is_in(pairs)).iter_rows(named=True)
+                     if sym.get(r["currency0"]) in QUOTES or sym.get(r["currency1"]) in QUOTES)
+    if not ids:
+        raise SystemExit(f"no {which} pools in the registry; run export/registry.py --refresh")
+    return ids
 
 LOG_CAP = 10_000          # the endpoint's hard ceiling on one response
 TARGET_LOGS = 6_000       # aim below it, so density drift does not cost a retry
@@ -278,7 +341,7 @@ def record_gap(lo: int, hi: int, why: str) -> None:
     GAPS.parent.mkdir(parents=True, exist_ok=True)
     gaps = json.loads(GAPS.read_text()) if GAPS.exists() else []
     gaps.append({"from": lo, "to": hi, "blocks": hi - lo + 1, "why": why,
-                 "at": int(time.time())})
+                 "universe": UNIVERSE, "at": int(time.time())})
     GAPS.write_text(json.dumps(gaps, indent=1))
 
 
@@ -317,7 +380,11 @@ def clear_gaps(lo: int, hi: int) -> None:
     out, changed = [], False
     for g in gaps:
         a, b = g["from"], g["to"]
-        if hi < a or lo > b:                      # no overlap
+        # Block numbers are shared between the universes; holes are not. The Pons tape
+        # being whole over a range says nothing about the RWA tape over the same range, so
+        # a gap is only refillable by the universe that recorded it. Gaps written before
+        # the universe was recorded are RWA's: it was the only ingest running.
+        if g.get("universe", "rwa") != UNIVERSE or hi < a or lo > b:
             out.append(g)
             continue
         changed = True
@@ -337,6 +404,23 @@ def clear_gaps(lo: int, hi: int) -> None:
         print(f"  gap fully refilled by {lo:,}..{hi:,}; none outstanding", flush=True)
 
 
+def adopt_orphan_tape(state: dict) -> dict:
+    """Continue an existing tape that has no checkpoint beside it, rather than over it."""
+    if state["cursor"] is not None:
+        return state
+    existing = sorted(OUT.glob("part-*.parquet"))
+    if not existing:
+        return state
+    last = int(pl.concat([pl.read_parquet(p, columns=["block"]) for p in existing])
+               ["block"].max())
+    state["part"] = max(int(p.stem.split("-")[1]) for p in existing) + 1
+    state["cursor"] = last + 1
+    save_checkpoint(state)
+    print(f"adopting {len(existing)} existing part(s) with no checkpoint: numbering from "
+          f"part-{state['part']:05d}, resuming at {last + 1:,}")
+    return state
+
+
 def load_checkpoint() -> dict:
     if CHECKPOINT.exists():
         return json.loads(CHECKPOINT.read_text())
@@ -350,6 +434,8 @@ def save_checkpoint(state: dict) -> None:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
+    ap.add_argument("--universe", default="rwa", choices=sorted(TAPES),
+                    help="which pool set to fetch; each keeps its own tape and cursor")
     ap.add_argument("--from", dest="start", type=int, default=None)
     ap.add_argument("--to", dest="end", type=int, default=None)
     ap.add_argument("--pools-from", default=None,
@@ -362,10 +448,10 @@ def main() -> int:
                          "recorded gaps, then exit. For repairing a checkpoint that "
                          "advanced past ranges it never fetched.")
     args = ap.parse_args()
+    use_universe(args.universe)
     claim_pidfile(PIDFILE)
 
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "export"))
-    from registry import pools as registry_pools, tokens as registry_tokens  # noqa: PLC0415
 
     # WHICH POOLS, AND OVER WHAT RANGE — without another checkout.
     #
@@ -374,16 +460,7 @@ def main() -> int:
     # tick. The pools are the RWA universe, which the vendored registry defines; the range
     # is "from where we left off to the head of the chain", which is what an incremental
     # cycle actually wants and what the tape's fixed bounds were only ever standing in for.
-    tok = registry_tokens()
-    rwa = set(tok.filter(pl.col("kind") == "rwa_spot")["address"].to_list())
-    quote = set(tok.filter(pl.col("symbol").is_in(["USDG"]))["address"].to_list())
-    meta = registry_pools()
-    pool_ids = sorted(meta.filter(
-        (pl.col("currency0").is_in(list(rwa)) & pl.col("currency1").is_in(list(quote)))
-        | (pl.col("currency1").is_in(list(rwa)) & pl.col("currency0").is_in(list(quote)))
-    )["pool_id"].to_list())
-    if not pool_ids:
-        raise SystemExit("no RWA pools in the registry; run export/registry.py --refresh")
+    pool_ids = select_pools(args.universe)
 
     outcome, value = rpc("eth_blockNumber", [])
     if outcome != OK:
@@ -471,6 +548,12 @@ def main() -> int:
         return 0
 
     state = load_checkpoint()
+    # A TAPE ON DISK WITH NO CHECKPOINT BESIDE IT. The part counter would restart at zero
+    # and overwrite it part by part: a silent loss of everything already fetched. The Pons
+    # tape arrives exactly this way, written by the one-shot probe this ingest replaces,
+    # and any volume that loses a checkpoint file arrives that way too. Adopt it — continue
+    # the numbering, resume from its last block — rather than writing over it.
+    adopt_orphan_tape(state)
     # A cold start backfills a window rather than only moving forward: a container with an
     # empty volume that began at the head would take seven days to have a seven-day
     # leaderboard. COLD_START_BLOCKS is about eight days at this chain's rate.
@@ -480,7 +563,8 @@ def main() -> int:
     cursor = state["cursor"] if state["cursor"] is not None else start
     OUT.mkdir(parents=True, exist_ok=True)
 
-    print(f"pools {len(pool_ids)}  blocks {start:,}..{end:,}  resuming at {cursor:,}")
+    print(f"universe {args.universe}  tape {OUT.name}  pools {len(pool_ids)}  "
+          f"blocks {start:,}..{end:,}  resuming at {cursor:,}")
     width_cap = int(state.get("max_width") or MAX_WIDTH)
     width = min(20_000, width_cap)
     seen = Deduplicator(key_of=log_key)

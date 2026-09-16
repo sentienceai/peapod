@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 
+import polars as pl
 import pytest
 
 import swaps_with_tx as m
@@ -398,3 +399,82 @@ def test_no_stage_hardcodes_the_public_node_any_more():
         assert "rpc.mainnet.chain.robinhood.com" not in src, (
             f"{name} names the public node directly instead of asking settings.endpoint()")
         assert "from settings import endpoint" in src
+
+
+# --- two universes over one ingest ---------------------------------------------
+#
+# The Pons side used to be fetched by a separate one-shot script that the cycle never ran,
+# so a cold volume reached the pricing stage with no Pons tape in existence. These cover
+# the parts of sharing one ingest that can go wrong silently: the two tapes writing over
+# each other, and a gap in one being cleared by the other.
+
+def test_each_universe_writes_its_own_tape_cursor_and_lock():
+    seen = {}
+    for which in ("rwa", "pons"):
+        m.use_universe(which)
+        seen[which] = (m.OUT, m.CHECKPOINT, m.PIDFILE)
+    m.use_universe("rwa")
+    assert len(set(seen["rwa"]) | set(seen["pons"])) == 6, \
+        "the two universes must not share a tape, a cursor or a lock"
+    assert seen["pons"][0].name == "pons_swaps"
+    assert seen["rwa"][0].name == "swaps_tx"
+
+
+def test_the_two_pool_sets_are_disjoint_and_neither_is_empty():
+    rwa = set(m.select_pools("rwa"))
+    pons = set(m.select_pools("pons"))
+    assert rwa and pons
+    assert not (rwa & pons), "a pool in both universes would be counted twice"
+
+
+def test_a_gap_is_only_refillable_by_the_universe_that_recorded_it(tmp_path, capsys):
+    m.GAPS = tmp_path / "gaps.json"
+    m.use_universe("pons")
+    m.record_gap(1_000, 2_000, "too wide")
+    assert json.loads(m.GAPS.read_text())[0]["universe"] == "pons"
+
+    # The RWA ingest covering the same blocks says nothing about the Pons tape.
+    m.use_universe("rwa")
+    m.clear_gaps(500, 3_000)
+    assert len(json.loads(m.GAPS.read_text())) == 1, \
+        "one universe cleared another's gap; block numbers are shared, holes are not"
+
+    m.use_universe("pons")
+    m.clear_gaps(500, 3_000)
+    assert not m.GAPS.exists()
+
+
+def test_a_gap_recorded_before_universes_existed_belongs_to_rwa(tmp_path):
+    m.GAPS = tmp_path / "gaps.json"
+    m.GAPS.write_text(json.dumps([{"from": 10, "to": 20, "blocks": 11, "why": "old"}]))
+    m.use_universe("pons")
+    m.clear_gaps(0, 100)
+    assert json.loads(m.GAPS.read_text()), "Pons refilled a gap the RWA ingest recorded"
+    m.use_universe("rwa")
+    m.clear_gaps(0, 100)
+    assert not m.GAPS.exists()
+
+
+def test_a_tape_with_no_checkpoint_is_continued_not_overwritten(tmp_path, capsys):
+    m.use_universe("pons")
+    m.OUT = tmp_path / "pons_swaps"
+    m.CHECKPOINT = tmp_path / "pons_swaps.checkpoint.json"
+    m.OUT.mkdir()
+    pl.DataFrame({"block": [100, 200]}).write_parquet(m.OUT / "part-00000.parquet")
+    pl.DataFrame({"block": [300, 450]}).write_parquet(m.OUT / "part-00003.parquet")
+
+    state = m.adopt_orphan_tape({"cursor": None, "part": 0, "rows": 0, "calls": 0})
+    assert state["part"] == 4, "part 0 would have been written over the existing tape"
+    assert state["cursor"] == 451
+    assert m.CHECKPOINT.exists(), "the adoption must survive the process that made it"
+    m.use_universe("rwa")
+
+
+def test_adoption_leaves_a_live_checkpoint_alone(tmp_path):
+    m.use_universe("pons")
+    m.OUT = tmp_path / "t"
+    m.OUT.mkdir()
+    pl.DataFrame({"block": [9_000]}).write_parquet(m.OUT / "part-00000.parquet")
+    state = m.adopt_orphan_tape({"cursor": 42, "part": 7, "rows": 0, "calls": 0})
+    assert (state["cursor"], state["part"]) == (42, 7)
+    m.use_universe("rwa")

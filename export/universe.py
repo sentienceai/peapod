@@ -89,6 +89,15 @@ BASE_COLUMNS = ["pool_id", "block", "log_index", "tx_hash", "amount0", "amount1"
 RWA_COLUMNS = [*BASE_COLUMNS, "sqrt_price_x96"]
 
 
+# The shape combined() concatenates. An absent universe contributes no rows, not a
+# different set of columns: a vertical_relaxed concat over mismatched schemas is how a
+# column silently becomes null for half the tape.
+EMPTY_TRADES = pl.DataFrame(schema={
+    "tx": pl.String, "addr": pl.String, "book": pl.String, "label": pl.String,
+    "token": pl.String, "qty": pl.Float64, "usd": pl.Float64, "ts": pl.Int64,
+    "cat": pl.String, "quote": pl.String})
+
+
 def _read_swaps(paths, columns: list[str], what: str) -> pl.DataFrame:
     paths = list(paths)
     if not paths:
@@ -142,7 +151,7 @@ def rwa(root: Path, source: str = "edge") -> pl.DataFrame:
                     cat=pl.lit("rwa"), quote=pl.lit("USDG")))
 
 
-def pons(root: Path) -> pl.DataFrame:
+def pons(root: Path, source: str = "edge") -> pl.DataFrame:
     from registry import basket as pons_basket  # noqa: PLC0415
     ids = [t["pair"] for t in pons_basket()["tokens"] if t.get("pair")]
     pools = _pools()
@@ -161,12 +170,29 @@ def pons(root: Path) -> pl.DataFrame:
             "side": side, "quote": quote, "qdec": QUOTES[quote],
             "label": sym.get(base) or base[:10], "addr": base, "bdec": dec.get(base)}
 
-    swaps = _read_swaps(sorted((INGEST / "pons_swaps").glob("part-*.parquet")),
-                        BASE_COLUMNS, "Pons swap")
-    parts = sorted((INGEST / "tx_from_pons").glob("part-*.parquet"))
+    # An empty Pons tape returns an empty frame rather than stopping the build, so the
+    # refusal comes from the gates and names what is wrong instead of arriving as a stack
+    # trace from the fold. It is not waved through: every Pons scope then builds nothing in
+    # any window and the "every declared scope produced a ranking" gate refuses. That gate
+    # exists because of this branch — the empty scopes were not left empty, they vanished
+    # from the view list entirely, and every gate that compares against a previous build is
+    # skipped on a first build, which is exactly when a universe goes missing.
+    tape = sorted((INGEST / "pons_swaps").glob("part-*.parquet"))
+    if not tape:
+        print("no Pons tape on disk; the Pons scopes will be empty and the gates will "
+              "refuse the build")
+        return EMPTY_TRADES
+    swaps = _read_swaps(tape, BASE_COLUMNS, "Pons swap")
+    # The identity resolver covers both tapes into one table. tx_from_pons is the older
+    # split output and is still read where it exists, so a volume carrying one does not
+    # have to re-resolve transactions it already knows.
+    suffix = "" if source == "public" else f"_{source}"
+    parts = sorted((INGEST / f"tx_from{suffix}").glob("part-*.parquet")) + \
+        sorted((INGEST / "tx_from_pons").glob("part-*.parquet"))
     if not parts:
-        raise SystemExit("no resolved pons transactions")
-    senders = pl.concat([pl.read_parquet(p) for p in parts]).unique(subset=["tx_hash"])
+        raise SystemExit("no resolved transactions for the Pons tape")
+    senders = (pl.concat([pl.read_parquet(p, columns=["tx_hash", "tx_from"]) for p in parts])
+               .unique(subset=["tx_hash"]))
     df = swaps.join(senders, on="tx_hash", how="inner").filter(
         pl.col("pool_id").is_in(list(universe)))
     bn, bts = _block_times(root)
@@ -205,7 +231,8 @@ def netted(df: pl.DataFrame) -> pl.DataFrame:
 
 
 def combined(root: Path, source: str = "edge") -> pl.DataFrame:
-    return netted(pl.concat([rwa(root, source), pons(root)], how="vertical_relaxed"))
+    return netted(pl.concat([rwa(root, source), pons(root, source)],
+                            how="vertical_relaxed"))
 
 
 SCOPES = [

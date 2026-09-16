@@ -4,7 +4,7 @@ Realized profit and loss for every address that has traded on **Robinhood Chain*
 (Arbitrum Orbit L2, chain 4663), across both tokenized equities and the Pons memecoin
 pools, in one ranking. Searchable by address, whether or not the address ranks.
 
-Over the current seven-day window: **103,920 addresses traded, 30,011 of them closed a
+Over the current seven-day window: **103,920 addresses traded, 30,015 of them closed a
 round-trip.** 64.8% of those finished in profit, which sounds healthy until you see the
 sizes: the best made $188,639, the median made **$0.85**, and the top 1% took half of
 everything won.
@@ -113,11 +113,14 @@ Ingest enforces record identity rather than deduplicating afterwards: a duplicat
 dropped, a `removed: true` log is rejected outright, and two logs sharing `(block,
 log_index)` under different block hashes are both kept and recorded as a conflict.
 
-Ten gates run inside the commit transaction and roll it back if any fails — time moving
-backwards, addresses vanishing, an event counted twice, the qualifying count leaving a
-0.5×–2× band, a ranked row with no detail record, a flat price series. A build that
-completes and is wrong is the failure mode these exist for; a crash was never the hard
-case.
+Twelve gates run inside the commit transaction and roll it back if any fails — time
+moving backwards, addresses vanishing, an event counted twice, the qualifying count
+leaving a 0.5×–2× band, a ranked row with no detail record, a flat price series, a range
+the ingest could not read, and a declared scope that built nothing in any window. A build
+that completes and is wrong is the failure mode these exist for; a crash was never the
+hard case. The last of those is deliberately the one gate that still fires on a first
+build: a cold volume has no previous numbers to compare against, and a missing universe is
+exactly the kind of fault that arrives on a cold volume.
 
 ## Caveats
 
@@ -138,8 +141,10 @@ case.
 
 ## Architecture
 
-Five stages, sequenced by `scripts/cycle.sh` every fifteen minutes. **Ingest** pulls new
-Swap logs from the PoolManager by block range, resuming from a cursor. **Resolve** fetches
+Six stages, sequenced by `scripts/cycle.sh` every fifteen minutes. **Ingest** runs twice,
+once per universe: the same code pulls new Swap logs from the PoolManager by block range,
+resuming from a cursor, over the RWA pools and then the Pons pools, each with its own tape
+and cursor. **Resolve** fetches
 each block containing a swap and records the transaction senders — and the block
 timestamps, which the logs themselves do not carry on this chain. **Fold** appends both
 into UTC-day-partitioned parquet, which is what makes a seven-day query open eight

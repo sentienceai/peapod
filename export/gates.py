@@ -74,7 +74,7 @@ def snapshot(store) -> dict:
 
 def run(gates: Gates, *, before: dict, stats: dict, trades, views: list,
         missing_ranked: int, address_count: int, eth: dict | None,
-        gaps: list | None = None) -> Gates:
+        gaps: list | None = None, declared: list | None = None) -> Gates:
     first = not before.get("build")
 
     # 0. A range the ingest could not read. This is the only gate that describes the tape
@@ -126,6 +126,25 @@ def run(gates: Gates, *, before: dict, stats: dict, trades, views: list,
     gates.check("every declared view has rows", not empty,
                 f"{len(empty)} of {len(views)} views are empty: "
                 f"{[v['scope'] for v in empty][:4]}")
+
+    # 6b. A scope that was never built at all.
+    #
+    #     Gate 6 catches a view that was built and came out empty. A scope whose universe
+    #     is missing entirely does not get that far: it produces no rows in any window, the
+    #     build skips it, and the tab simply is not there. Every remaining tab then looks
+    #     perfectly healthy, and on a FIRST build — a cold volume, which is exactly when a
+    #     universe goes missing — there are no previous counts for the band gates to
+    #     compare against, so an RWA-only site would have published clean. That is how a
+    #     Pons ingest that no stage ran went unnoticed.
+    #
+    #     Per scope across all windows, not per (scope, window): a thin day with no ETH
+    #     trades in it is not a broken build.
+    if declared:
+        produced = {v["scope"] for v in views}
+        absent = [s for s in declared if s not in produced]
+        gates.check("every declared scope produced a ranking", not absent,
+                    f"{len(absent)} of {len(declared)} scopes built nothing in any "
+                    f"window: {absent[:5]}")
 
     # 7. Numbers are numbers. NaN and Infinity are not JSON and would break the page at
     #    parse time, which is a blank screen rather than a wrong figure.
