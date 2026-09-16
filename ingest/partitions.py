@@ -61,7 +61,12 @@ class BlockClock:
         self.measured_blocks = (measured["block"].to_numpy().astype(np.int64)
                                 if measured is not None and measured.height
                                 else np.array([], dtype=np.int64))
-        allc = pl.concat([f.select("block", "ts") for f in frames]).unique(
+        # Cast before concatenating. The vendored block_times carries UInt64 from
+        # upstream and the times this repository measures are Int64, so a clock that had
+        # recorded anything would not load — which is every container after its first
+        # identity stage.
+        allc = pl.concat([f.select(pl.col("block").cast(pl.Int64),
+                                   pl.col("ts").cast(pl.Int64)) for f in frames]).unique(
             subset=["block"], keep="first").sort("block")
         self.blocks = allc["block"].to_numpy().astype(np.int64)
         self.times = allc["ts"].to_numpy().astype(np.int64)

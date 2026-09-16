@@ -49,7 +49,9 @@ from partitions import record_block_times
 # apart, which ran 8/8 where anything faster was refused and then degraded to refusing
 # everything. A provider with 1:1 request billing has no such ceiling, so PEAPOD_RPC_BATCH
 # and PEAPOD_RPC_PACE should be raised with it.
-RPC = os.environ.get("PEAPOD_RPC_URL", "https://rpc.mainnet.chain.robinhood.com")
+from settings import endpoint, pacing  # noqa: E402
+
+RPC, ENDPOINT = endpoint()
 HERE = Path(__file__).resolve().parent
 SWAPS = HERE / "out" / "swaps_tx"
 # Each source writes its own tree. Merging two providers into one directory would make
@@ -62,8 +64,7 @@ PIDFILE = Path(__file__).resolve().parent / "out" / f"resolve_senders{_suffix}.p
 
 # Measured, not assumed: 25 sub-requests 3s apart ran 8/8: anything faster was refused and
 # then degraded to refusing everything for a while.
-BATCH = int(os.environ.get("PEAPOD_RPC_BATCH", "25"))
-PACE = float(os.environ.get("PEAPOD_RPC_PACE", "3.0"))
+BATCH, PACE = pacing(ENDPOINT)
 PART_ROWS = int(os.environ.get("PEAPOD_PART_ROWS", "5000"))
 # A long run must also flush on time, not only on volume: a quiet stretch of blocks can
 # hold tens of thousands of rows in memory for an hour, and a crash there loses all of it.
@@ -197,7 +198,11 @@ def main() -> int:
     parts = sorted(SWAPS.glob("part-*.parquet"))
     if not parts:
         raise SystemExit("no swap parts; run ingest/swaps_with_tx.py first")
-    swaps = pl.concat([pl.read_parquet(p) for p in parts])
+    # Name the two columns this stage uses. The tape was written by two generations of
+    # the ingest — older parts carry `ts`, newer ones `block_hash`, `removed` and
+    # `ts_unreliable` — so concatenating whole parts raises a width mismatch the first
+    # time a new part is written, which in a container is the first successful ingest.
+    swaps = pl.concat([pl.read_parquet(p, columns=["block", "tx_hash"]) for p in parts])
     wanted = set(swaps["tx_hash"].to_list())
 
     done_blocks: set[int] = set()
@@ -225,7 +230,8 @@ def main() -> int:
     todo = [b for b in blocks if b not in done_blocks]
     print(f"{len(wanted):,} swap transactions across {len(blocks):,} blocks; "
           f"{len(done_blocks):,} blocks already done, {len(todo):,} to go", flush=True)
-    print(f"at {BATCH} per call every {PACE}s that is "
+    print(f"endpoint: {ENDPOINT} at {BATCH} per call every {PACE}s", flush=True)
+    print(f"that is "
           f"{len(todo) / (BATCH / PACE) / 3600:.1f} hours for the rest", flush=True)
 
     state = load_checkpoint()

@@ -125,3 +125,16 @@ def test_the_margin_can_be_turned_off_when_times_are_exact(tmp_path):
     got = read_days(tmp_path, ts_at(2026, 9, 7, 0), ts_at(2026, 9, 7, 23, 59, 59),
                     margin_days=0)
     assert got.height == 0
+
+
+def test_measured_and_vendored_block_times_combine(tmp_path, monkeypatch):
+    # The vendored table carries UInt64 from upstream; times this repository measures are
+    # written as Int64. A clock that had recorded anything would not load, which is every
+    # container after its first identity stage.
+    measured = pl.DataFrame({"block": pl.Series([150], dtype=pl.Int64),
+                             "ts": pl.Series([1_000_500], dtype=pl.Int64)})
+    vendored = pl.DataFrame({"block": pl.Series([100, 200], dtype=pl.UInt64),
+                             "ts": pl.Series([1_000_000, 1_002_000], dtype=pl.UInt64)})
+    clock = BlockClock(measured, vendored)
+    assert clock.ts_of(np.array([150]))[0] == 1_000_500
+    assert clock.ts_of(np.array([100]))[0] == 1_000_000

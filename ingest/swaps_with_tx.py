@@ -39,29 +39,9 @@ from dedup import Deduplicator, log_key
 # apart, which ran 8/8 where anything faster was refused and then degraded to refusing
 # everything. A provider with 1:1 request billing has no such ceiling, so PEAPOD_RPC_BATCH
 # and PEAPOD_RPC_PACE should be raised with it.
-def _endpoint() -> str:
-    """Edge when we have it, the public node otherwise.
+from settings import endpoint  # noqa: E402
 
-    The cycle had credentials for Edge and was using the public node anyway, because this
-    defaulted to it. Edge takes the whole 7,593-pool filter in one call; the public node
-    caps a topic list at 1,000, so the same work costs nine calls there. Both are correct
-    now — this is about cost and latency, not correctness.
-    """
-    explicit = os.environ.get("PEAPOD_RPC_URL")
-    if explicit:
-        return explicit
-    try:
-        sys.path.insert(0, str(Path(__file__).resolve().parent))
-        from settings import env as _env  # noqa: PLC0415
-        edge = _env().get("GOLDSKY_EDGE_URL")
-        if edge:
-            return edge
-    except Exception:                                   # noqa: BLE001
-        pass
-    return "https://rpc.mainnet.chain.robinhood.com"
-
-
-RPC = _endpoint()
+RPC, ENDPOINT = endpoint()
 POOL_MANAGER = "0x8366a39cc670b4001a1121b8f6a443a643e40951"
 SWAP_TOPIC = "0x40e9cecb9f5f1f1c5b9c97dec2917b7ee92e57ba5563708daca94dd84ad7112f"
 # ~19,081 blocks/hour on this chain, so this is a little over eight days.

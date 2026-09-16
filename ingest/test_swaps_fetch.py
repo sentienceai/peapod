@@ -337,3 +337,64 @@ def test_the_resolver_flushes_on_a_signal_too():
     src = open(m.__file__.replace("swaps_with_tx", "resolve_senders"), encoding="utf8").read()
     assert "_ON_STOP.append(lambda _sig: flush())" in src
     assert "FLUSH_SECONDS = 30" in src, "a 5-minute window loses 5 minutes to a redeploy"
+
+
+# --- endpoint and pacing, resolved in one place ----------------------------------------
+
+def test_every_stage_prefers_edge_when_credentials_exist(monkeypatch):
+    # swaps_with_tx defaulted to the public node while holding Edge credentials. So did
+    # resolve_senders, and that one cost an identity stage 16 hours instead of 1.6.
+    import settings
+    monkeypatch.delenv("PEAPOD_RPC_URL", raising=False)
+    monkeypatch.setattr(settings, "env", lambda **_: {"GOLDSKY_EDGE_URL": "https://edge/x"})
+    url, which = settings.endpoint()
+    assert which == "edge" and url == "https://edge/x"
+
+
+def test_it_falls_back_to_the_public_node_without_credentials(monkeypatch):
+    import settings
+    monkeypatch.delenv("PEAPOD_RPC_URL", raising=False)
+    monkeypatch.setattr(settings, "env", lambda **_: {})
+    url, which = settings.endpoint()
+    assert which == "public" and url == settings.PUBLIC_RPC
+
+
+def test_an_explicit_url_still_wins(monkeypatch):
+    import settings
+    monkeypatch.setenv("PEAPOD_RPC_URL", "http://127.0.0.1:9/rpc")
+    url, which = settings.endpoint()
+    assert url == "http://127.0.0.1:9/rpc" and which == "public"
+
+
+def test_the_pacing_matches_the_endpoint_it_was_measured_against():
+    # Measured over 60-second trials on Edge: 200 every 2s gives 268,872 blocks/hour with
+    # nothing refused; the public node's 25 every 3s gives 26,741 on the same endpoint.
+    import settings
+    assert settings.pacing("edge") == (200, 2.0)
+    assert settings.pacing("public") == (25, 3.0)
+
+
+def test_the_edge_pacing_sits_on_the_documented_budget():
+    # 200 every 2s is 100 sub-requests a second, which is exactly 6,000 a minute. Faster
+    # is not faster: batch 200 at 0.5s had 90% of its blocks refused.
+    import settings
+    batch, pace = settings.pacing("edge")
+    assert batch / pace * 60 <= 6_000, "the pacing exceeds the per-minute budget"
+    assert batch / pace * 60 >= 5_000, "the pacing leaves the budget unused"
+
+
+def test_pacing_is_still_overridable(monkeypatch):
+    import settings
+    monkeypatch.setenv("PEAPOD_RPC_BATCH", "50")
+    monkeypatch.setenv("PEAPOD_RPC_PACE", "1.5")
+    assert settings.pacing("edge") == (50, 1.5)
+
+
+def test_no_stage_hardcodes_the_public_node_any_more():
+    import pathlib
+    ingest = pathlib.Path(m.__file__).parent
+    for name in ("swaps_with_tx.py", "resolve_senders.py"):
+        src = (ingest / name).read_text()
+        assert "rpc.mainnet.chain.robinhood.com" not in src, (
+            f"{name} names the public node directly instead of asking settings.endpoint()")
+        assert "from settings import endpoint" in src
