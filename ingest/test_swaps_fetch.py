@@ -130,3 +130,67 @@ def test_every_refusal_lands_in_exactly_one_bucket(monkeypatch, message, expecte
     install(monkeypatch, [error(message)])
     outcome, _ = m.rpc("eth_getLogs", [{}], retries=1)
     assert outcome == expected
+
+
+def test_a_too_wide_block_range_is_a_shrink_condition(monkeypatch):
+    # Measured against Edge: 30,000 blocks served, 30,001 refused, from three different
+    # base blocks. Independent of how many logs are in the range and of how many pools are
+    # asked for. This landed in FAILED, so a 36,000-block window stopped the run and then
+    # retried the identical window every fifteen minutes.
+    for message in ["getLogs request exceeded max allowed range",
+                    "block range 63989123 exceeds maximum of 30000",
+                    "requested block range is too large"]:
+        install(monkeypatch, [error(message, code=-32012)])
+        outcome, _ = m.rpc("eth_getLogs", [{}], retries=1)
+        assert outcome == m.TOO_WIDE, message
+
+
+def test_the_four_refusals_are_all_distinct(monkeypatch):
+    cases = {
+        "exceed max topics": m.TOO_MANY_TOPICS,
+        "getLogs request exceeded max allowed range": m.TOO_WIDE,
+        "query returned more than 10000 results": m.TOO_MANY_LOGS,
+        "execution reverted": m.FAILED,
+    }
+    for message, expected in cases.items():
+        install(monkeypatch, [error(message)])
+        outcome, _ = m.rpc("eth_getLogs", [{}], retries=1)
+        assert outcome == expected, f"{message} -> {outcome}"
+    assert len(set(cases.values())) == 4, "the buckets must stay distinct"
+
+
+def test_the_default_window_respects_the_measured_cap():
+    # A run that starts above the cap spends its first call learning what a measurement
+    # already told us.
+    assert m.MAX_WIDTH == 30_000, "the measured Edge limit"
+    assert m.MIN_WIDTH < m.MAX_WIDTH
+
+
+def test_a_refilled_gap_stops_blocking_the_build(monkeypatch, tmp_path):
+    # SUBTRACT, NOT MATCH. The gap that prompted this was 36,000 blocks, recorded before
+    # the 30,000 cap was known, so no compliant window could ever CONTAIN it — a
+    # containment test left it recorded for good and the gate blocked every later build
+    # over a hole that had already been refilled.
+    monkeypatch.setattr(m, "GAPS", tmp_path / "gaps.json")
+    m.record_gap(60_739_528, 60_775_527, "too wide")
+    m.clear_gaps(60_739_528, 60_759_527)          # first window
+    left = json.loads((tmp_path / "gaps.json").read_text())
+    assert len(left) == 1 and left[0]["from"] == 60_759_528 and left[0]["blocks"] == 16_000
+    m.clear_gaps(60_759_528, 60_789_526)          # second window covers the rest
+    assert not (tmp_path / "gaps.json").exists()
+
+
+def test_clearing_a_middle_slice_leaves_both_ends(monkeypatch, tmp_path):
+    monkeypatch.setattr(m, "GAPS", tmp_path / "gaps.json")
+    m.record_gap(1_000, 2_000, "why")
+    m.clear_gaps(1_400, 1_600)
+    left = json.loads((tmp_path / "gaps.json").read_text())
+    assert [(g["from"], g["to"]) for g in left] == [(1_000, 1_399), (1_601, 2_000)]
+
+
+def test_an_unrelated_range_leaves_a_gap_alone(monkeypatch, tmp_path):
+    monkeypatch.setattr(m, "GAPS", tmp_path / "gaps.json")
+    m.record_gap(1_000, 2_000, "why")
+    m.clear_gaps(5_000, 6_000)
+    left = json.loads((tmp_path / "gaps.json").read_text())
+    assert [(g["from"], g["to"]) for g in left] == [(1_000, 2_000)]

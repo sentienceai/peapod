@@ -73,7 +73,10 @@ PIDFILE = Path(__file__).resolve().parent / "out" / "swaps_tx.pid"
 
 LOG_CAP = 10_000          # the endpoint's hard ceiling on one response
 TARGET_LOGS = 6_000       # aim below it, so density drift does not cost a retry
-MIN_WIDTH, MAX_WIDTH = 200, 400_000
+# Measured against Edge, not chosen: 30,000 blocks is served and 30,001 is refused, from
+# three different base blocks. A run still narrows this further if its endpoint caps lower,
+# and remembers what it learned in the checkpoint.
+MIN_WIDTH, MAX_WIDTH = 200, 30_000
 # Endpoints cap how many values a topic position may hold: the public RPC at 1,000. Start
 # below the lowest known cap and halve on refusal.
 TOPIC_CHUNK = 900
@@ -120,7 +123,8 @@ def claim_pidfile(path: Path):
 # What a call came back as. The caller has to tell these apart: shrinking the block range
 # fixes one of them, and doing it for the others is how a permanent argument error became
 # thousands of silently skipped blocks.
-OK, TOO_MANY_LOGS, TOO_MANY_TOPICS, FAILED = "ok", "logs", "topics", "failed"
+OK, TOO_MANY_LOGS, TOO_MANY_TOPICS, TOO_WIDE, FAILED = (
+    "ok", "logs", "topics", "wide", "failed")
 
 
 def rpc(method: str, params: list, retries: int = 6):
@@ -161,12 +165,20 @@ def rpc(method: str, params: list, retries: int = 6):
             low = message.lower()
             # Too many RESULTS: a smaller block range fixes it.
             if "more than" in low or "exceed max results" in low or "too many results" in low \
-                    or "query returned more than" in low or "limit" in low:
+                    or "query returned more than" in low or "response size" in low:
                 return TOO_MANY_LOGS, message
             # Too many FILTER VALUES: a smaller block range never fixes it. Send fewer
             # pool ids per call instead.
             if "max topics" in low or "too many topics" in low or "exceed max topics" in low:
                 return TOO_MANY_TOPICS, message
+            # Too many BLOCKS. A cap on the span itself, independent of how many logs are
+            # in it or how many pools are asked for: Edge serves exactly 30,000 blocks and
+            # refuses 30,001, measured from three different base blocks. This is a shrink
+            # condition and was landing in FAILED, so a 36,000-block window stopped the
+            # run and then retried the identical window every fifteen minutes.
+            if "max allowed range" in low or "exceeds maximum of" in low \
+                    or "block range" in low:
+                return TOO_WIDE, message
             last = message
             time.sleep(delay)
             delay = min(delay * 2, 30)
@@ -274,6 +286,41 @@ def stop(state: dict, buffer: list, lo: int, hi: int, why: str) -> None:
     print(f"  recorded in {GAPS}; the cursor stays at {state.get('cursor') or lo:,} so the next run "
           "retries this range. The verification gate refuses to publish while a gap is "
           "outstanding.", flush=True)
+
+
+def clear_gaps(lo: int, hi: int) -> None:
+    """Subtract a fetched range from the recorded gaps.
+
+    SUBTRACT, NOT MATCH. The gap that prompted this was 36,000 blocks wide, recorded
+    before the endpoint's 30,000-block cap was known. No window that satisfies the cap can
+    ever CONTAIN it, so a containment test left it recorded for good and the gate blocked
+    every future build over a hole that had already been refilled. Each successful window
+    now removes its own overlap and leaves whatever is still outstanding.
+    """
+    if not GAPS.exists():
+        return
+    gaps = json.loads(GAPS.read_text())
+    out, changed = [], False
+    for g in gaps:
+        a, b = g["from"], g["to"]
+        if hi < a or lo > b:                      # no overlap
+            out.append(g)
+            continue
+        changed = True
+        if a < lo:                                # remainder before the fetched range
+            out.append({**g, "from": a, "to": lo - 1, "blocks": lo - a})
+        if b > hi:                                # remainder after it
+            out.append({**g, "from": hi + 1, "to": b, "blocks": b - hi})
+    if not changed:
+        return
+    if out:
+        GAPS.write_text(json.dumps(out, indent=1))
+        left = sum(g["blocks"] for g in out)
+        print(f"  gap partly refilled by {lo:,}..{hi:,}; {left:,} blocks still outstanding",
+              flush=True)
+    else:
+        GAPS.unlink()
+        print(f"  gap fully refilled by {lo:,}..{hi:,}; none outstanding", flush=True)
 
 
 def load_checkpoint() -> dict:
@@ -420,7 +467,8 @@ def main() -> int:
     OUT.mkdir(parents=True, exist_ok=True)
 
     print(f"pools {len(pool_ids)}  blocks {start:,}..{end:,}  resuming at {cursor:,}")
-    width = 20_000
+    width_cap = int(state.get("max_width") or MAX_WIDTH)
+    width = min(20_000, width_cap)
     seen = Deduplicator(key_of=log_key)
     buffer: list[dict] = []
     began = time.time()
@@ -440,6 +488,16 @@ def main() -> int:
             chunk = max(1, chunk // 2)
             print(f"  topic filter too large at {cursor:,}; {chunk} pool ids per call",
                   flush=True)
+            continue
+
+        if outcome == TOO_WIDE:
+            # Learn the endpoint's cap so no width known to fail is ever requested again,
+            # then climb back toward it from below rather than probing past it.
+            width_cap = min(width_cap, width - 1)
+            state["max_width"] = width_cap
+            width = max(MIN_WIDTH, min(width // 2, width_cap))
+            print(f"  block range too wide at {cursor:,}; capping windows at "
+                  f"{width_cap:,} blocks", flush=True)
             continue
 
         if outcome == TOO_MANY_LOGS:
@@ -465,6 +523,7 @@ def main() -> int:
             return 1
 
         logs = value
+        clear_gaps(cursor, hi)
         for log in logs:
             record = decode(log)
             if seen.accept(record):
@@ -476,7 +535,7 @@ def main() -> int:
         if got >= LOG_CAP * 0.95:
             width = max(MIN_WIDTH, width // 2)
         elif got < TARGET_LOGS // 3:
-            width = min(MAX_WIDTH, int(width * 1.8))
+            width = min(width_cap, int(width * 1.8))
         elif got > TARGET_LOGS:
             width = max(MIN_WIDTH, int(width * 0.7))
 
