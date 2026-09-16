@@ -4,11 +4,16 @@ THE QUESTION. The RWA round-trip leaderboard's top address made $65 over 23 hour
 a property of tokenized equities, or of this chain? Pons carries roughly 18x the daily flow,
 so the answer changes what v1 should cover.
 
-DENOMINATED IN THE QUOTE ASSET, NOT USD. Half the Pons pools quote in native ETH, and a
-USD figure would need an ETH price series at trade granularity that we do not have. Rather
-than invent one, PnL is reported in whatever each pool quotes in, and the ETH and USDG
-cohorts are reported separately. A single spot rate is applied at the very end for a rough
-cross-read only, and labelled as such.
+DENOMINATED IN USD, FROM THIS CHAIN'S OWN ETH PRICE. Half the Pons pools quote in native
+ETH and half in USDG, so without a price the two cohorts cannot share a table or a ranking.
+That price is now derived from the deepest ETH/USDG pool on this chain (ingest/eth_usd.py):
+72,236 observations over the window, median four seconds apart, agreeing with CoinGecko's
+hourly series to 0.04% at the median.
+
+CONVERTED AT THE TRADE, NOT AT THE END. Each ETH-quoted leg is priced at its own timestamp,
+so the USD figure is the profit as it was actually experienced. Repricing an ETH-denominated
+total at one closing rate would silently credit or charge every trader for the week's move
+in ETH, which is not a trading result and not theirs.
 
 WHY UNKNOWN DECIMALS DO NOT MATTER HERE. The token registry has no decimals for 60 of the
 90 Pons pools, because it was built for tokenized equities. It does not matter for PnL:
@@ -244,6 +249,19 @@ def stage_resolve(root: Path, max_hours: float | None):
     print(f"identity: {seen.summary()}", flush=True)
 
 
+def eth_usd_series():
+    """The chain's own ETH/USD series, as timestamps and prices.
+
+    Refuses rather than falling back to a constant. A missing price series must stop the
+    report, not quietly reprice half the pools at 1.0 and produce a table that looks fine.
+    """
+    path = HERE / "out" / "eth_usd" / "series.parquet"
+    if not path.exists():
+        raise SystemExit("no ETH/USD series; run ingest/eth_usd.py --stage series first")
+    s = pl.read_parquet(path).sort("ts")
+    return s["ts"].to_numpy().astype(np.int64), s["price"].to_numpy()
+
+
 def stage_report(root: Path):
     """Round-trip qualification and realized PnL, denominated in each pool's quote asset."""
     universe = pool_universe(root)
@@ -268,8 +286,15 @@ def stage_report(root: Path):
     base_delta = -np.where(side == 0, a1, a0)
     quote_delta = -np.where(side == 0, a0, a1) / (10.0 ** qdec)
 
+    # ETH legs are priced at their own timestamp so the dollar figure is the profit as it
+    # was experienced. A single closing rate would credit every trader with the week's
+    # move in ETH, which is not a trading result.
+    eth_ts, eth_px = eth_usd_series()
+    rate = np.where(np.array(quote) == "ETH", np.interp(ts, eth_ts, eth_px), 1.0)
+    usd_delta = quote_delta * rate
+
     net = (pl.DataFrame({"tx": df["tx_hash"], "addr": df["tx_from"], "pool": df["pool_id"],
-                         "quote": quote, "base": base_delta, "q": quote_delta, "ts": ts})
+                         "quote": quote, "base": base_delta, "q": usd_delta, "ts": ts})
            .group_by(["tx", "addr", "pool", "quote"])
            .agg(pl.col("base").sum(), pl.col("q").sum(), pl.col("ts").min())
            .filter(pl.col("base").abs() > 0).sort("ts"))
@@ -277,8 +302,8 @@ def stage_report(root: Path):
     print("=" * 74)
     print(f"PONS ROUND-TRIPS  ({span:.1f} hours resolved, {len(net):,} position changes)")
     print("=" * 74)
-    for qsym in ("ETH", "USDG"):
-        w = net.filter(pl.col("quote") == qsym)
+    for qsym in ("ETH", "USDG", "ALL"):
+        w = net if qsym == "ALL" else net.filter(pl.col("quote") == qsym)
         if len(w) == 0:
             continue
         books, realized, matched, tot = defaultdict(deque), defaultdict(float), defaultdict(float), defaultdict(float)
@@ -300,11 +325,22 @@ def stage_report(root: Path):
                         books[key].popleft()
         qual = [a for a in tot if matched[a] > 0]
         ranked = sorted(qual, key=lambda a: -realized[a])
-        print(f"\n  quoted in {qsym}: {len(tot):,} addresses, {len(qual):,} qualify "
-              f"({len(qual)/max(len(tot),1)*100:.1f}%)")
-        print(f"  {'#':>3} {'address':<16}{'realized ' + qsym:>20}{'matched vol':>18}")
+        label = "every pool" if qsym == "ALL" else f"pools quoting in {qsym}"
+        wins = sum(1 for a in qual if realized[a] > 0)
+        print(f"\n  {label}: {len(tot):,} addresses, {len(qual):,} qualify "
+              f"({len(qual)/max(len(tot),1)*100:.1f}%), {wins:,} of them in profit "
+              f"({wins/max(len(qual),1)*100:.1f}%)")
+        vals = np.array([realized[a] for a in qual]) if qual else np.zeros(1)
+        losers = vals[vals < 0]
+        print(f"  realized USD:  p100 ${vals.max():,.2f}  p99 ${np.percentile(vals,99):,.2f}  "
+              f"p50 ${np.percentile(vals,50):,.2f}  p1 ${np.percentile(vals,1):,.2f}  "
+              f"p0 ${vals.min():,.2f}")
+        if len(losers):
+            print(f"  losses:        {len(losers):,} addresses, total ${losers.sum():,.0f}, "
+                  f"median ${np.median(losers):,.2f}, worst ${losers.min():,.2f}")
+        print(f"  {'#':>3} {'address':<16}{'realized USD':>18}{'matched USD':>18}")
         for i, a in enumerate(ranked[:10], 1):
-            print(f"  {i:>3} {a[:14]:<16}{realized[a]:>20,.6f}{matched[a]:>18,.4f}")
+            print(f"  {i:>3} {a[:14]:<16}{realized[a]:>18,.2f}{matched[a]:>18,.2f}")
 
 
 def main() -> int:
