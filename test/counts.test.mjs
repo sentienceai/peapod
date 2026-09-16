@@ -28,7 +28,11 @@ const expected = JSON.parse(
 /** @param {string} path @returns {Promise<number>} */
 async function countTests(path) {
   const source = await readFile(new URL(path, root), 'utf8');
-  const pattern = path.endsWith('.py') ? /^\s+def test_/gm : /^test\(/gm;
+  // [ \t]* not \s+: \s matches a newline, so `^\s+def` was matching module-level
+  // functions only when a blank line happened to precede them. It counted 14 of 15 in a
+  // file where every test was present — nearly right, which is the worst kind of wrong
+  // for a tripwire whose whole job is spotting a missing test.
+  const pattern = path.endsWith('.py') ? /^[ \t]*def test_/gm : /^test\(/gm;
   return (source.match(pattern) || []).length;
 }
 

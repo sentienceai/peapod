@@ -12,6 +12,7 @@
   "test/wait-for-pid.test.mjs": 7,
   "export/test_bandwalk.py": 8,
   "export/test_build_output.py": 17,
+  "export/test_gates.py": 15,
   "export/test_windows.py": 8,
   "ingest/test_dedup.py": 11,
   "ingest/test_eth_usd.py": 6,

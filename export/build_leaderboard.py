@@ -478,11 +478,15 @@ def main() -> int:
     ap.add_argument("--source", default="edge")
     args = ap.parse_args()
 
+    import gates as gatemod  # noqa: PLC0415
     from store import Store, new_build_id  # noqa: PLC0415
     root = lp_terminal()
     web = HERE.parent / "web"
     store = Store(Path(os.environ.get("PEAPOD_DB", str(HERE.parent / "var" / "peapod.db"))))
     build_id = new_build_id()
+    # What the store holds now, captured before the transaction opens: inside it the
+    # values the gates compare against are already gone.
+    before = gatemod.snapshot(store)
     # One transaction for the whole cycle. WAL gives readers the previous build until this
     # commits, so a crash halfway rolls back rather than serving half a ranking.
     store.begin()
@@ -504,6 +508,7 @@ def main() -> int:
     windows = {"1d": 24, "7d": 168}
     index = {"provenance": meta["provenance"], "generated_from": args.source,
              "scopes": [], "windows": [], "views": []}
+    headline = {"qualifying": 0, "top": 0.0, "addresses": 0}
 
     for name, hours in windows.items():
         if hours > span_h + 0.5:
@@ -537,6 +542,9 @@ def main() -> int:
                 "provenance": meta["provenance"],
             }
             store.put_leaderboard(scope["id"], name, payload)
+            if scope["id"] == "all" and name == "7d":
+                headline = {"qualifying": qualifying, "top": float(arr.max()),
+                            "addresses": addresses}
             path = OUT / f"{scope['id']}-{name}.json"
             path.write_text(json.dumps(payload, separators=(",", ":"), allow_nan=False))
             index["views"].append({"scope": scope["id"], "window": name,
@@ -568,6 +576,37 @@ def main() -> int:
                         for n in windows if any(v["window"] == n for v in index["views"])]
     (OUT / "index.json").write_text(json.dumps(index, separators=(",", ":"), allow_nan=False))
     store.put_leaderboard("index", "index", index)
+
+    # ---- gates. A build that completes and is wrong is the dangerous case; a crash is
+    # ---- the easy one. Anything fatal rolls the transaction back, uncommitted.
+    eth_stats = None
+    eth_path = HERE.parent / "ingest" / "out" / "eth_usd" / "series.parquet"
+    if eth_path.exists():
+        e = pl.read_parquet(eth_path).sort("ts")
+        px = e["price"].to_numpy()
+        ets = e["ts"].to_numpy()
+        eth_stats = {"points": e.height,
+                     "spread_pct": float((px.max() - px.min()) / max(px.min(), 1e-9) * 100),
+                     "max_gap_s": int(np.diff(ets).max()) if e.height > 1 else 0}
+    ranked = {r["address"] for v in index["views"]
+              for r in json.loads((OUT / v["file"]).read_text())["rows"]}
+    stored = {row[0] for row in store.db.execute(
+        "SELECT addr FROM address WHERE build=?", (build_id,))}
+    stats = {"to_ts": hi, "qualifying": headline["qualifying"],
+             "top_realized": headline["top"], "addresses": headline["addresses"],
+             "scopes": len(index["views"])}
+    g = gatemod.run(gatemod.Gates(), before=before, stats=stats, trades=trades,
+                    views=index["views"], missing_ranked=len(ranked - stored),
+                    address_count=store.counts()["addresses"], eth=eth_stats)
+    print("\nverification gates")
+    print(g.report())
+    print(f"  {gatemod.summarise(g)}")
+    if g.failed:
+        store.rollback()
+        print(f"\nBUILD REJECTED: {len(g.failed)} gate(s) failed. Nothing was committed; "
+              f"the store still serves build {before['build']}.")
+        return 1
+    store.set_meta(gates=g.as_dict(), stats=stats)
     store.set_meta(build=build_id, built_at=int(time.time()), source=args.source,
                    provenance=meta["provenance"], windows=index["windows"],
                    scopes=index["scopes"])

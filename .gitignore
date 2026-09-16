@@ -13,3 +13,6 @@ ingest/out/
 # ingest/out/. The leaderboard JSONs alongside them are committed; these are
 # not, because 53k files makes every clone and status slow for no gain.
 web/data/address/
+
+# The store and the proxy cache: built artefacts, and on a deploy they live on the volume.
+var/
