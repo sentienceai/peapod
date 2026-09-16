@@ -31,7 +31,9 @@ for f in test/*.test.mjs; do
 done
 for f in export/test_*.py ingest/test_*.py; do
   [ -e "$f" ] || continue
-  n=$(grep -cE "^\s+def test_" "$f")
+  # Module-level functions AND methods: pytest collects both, and matching
+  # only the indented form counted two whole suites as zero.
+  n=$(grep -cE "^[[:space:]]*def test_" "$f")
   printf "%-42s %3d\n" "$f" "$n"
   emit "$f" "$n"
 done

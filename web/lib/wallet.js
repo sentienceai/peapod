@@ -77,6 +77,6 @@ export async function connect(provider) {
  */
 export async function hasDetail(address, fetcher) {
   const get = fetcher ?? ((/** @type {string} */ u) => fetch(u));
-  const res = await get(`/data/address/${address.slice(2, 4)}/${address}.json`);
+  const res = await get(`/api/address/${address}`);
   return Boolean(res?.ok);
 }

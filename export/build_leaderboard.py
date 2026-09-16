@@ -17,6 +17,8 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import os
+import time
 import json
 import math
 from collections import defaultdict, deque
@@ -322,8 +324,8 @@ def percentile_of(value: float, ranked) -> float:
     return bisect.bisect_left(ranked, value) / max(len(ranked), 1) * 100
 
 
-def write_address(addr: str, state, lo: int, hi: int, out: Path, provenance: dict,
-                  ranked=None, context=None) -> None:
+def write_address(addr: str, state, lo: int, hi: int, out: Path | None, provenance: dict,
+                  ranked=None, context=None):
     """One address's detail, whether or not it qualifies for the ranking.
 
     SEARCH MUST WORK FOR EVERY ADDRESS THAT TRADED, not just the ones shown. The ranking is
@@ -422,6 +424,10 @@ def write_address(addr: str, state, lo: int, hi: int, out: Path, provenance: dic
             return float(o)
         raise TypeError(f"not JSON serialisable: {type(o)}")
 
+    if out is None:
+        # Round-trip through json so the store sees exactly what a file would have held:
+        # numpy scalars and sets are not JSON, and `default=plain` is where that is handled.
+        return json.loads(json.dumps(payload, allow_nan=False, default=plain))
     shard = out / addr[2:4]
     shard.mkdir(parents=True, exist_ok=True)
     (shard / f"{addr}.json").write_text(
@@ -472,8 +478,14 @@ def main() -> int:
     ap.add_argument("--source", default="edge")
     args = ap.parse_args()
 
+    from store import Store, new_build_id  # noqa: PLC0415
     root = lp_terminal()
     web = HERE.parent / "web"
+    store = Store(Path(os.environ.get("PEAPOD_DB", str(HERE.parent / "var" / "peapod.db"))))
+    build_id = new_build_id()
+    # One transaction for the whole cycle. WAL gives readers the previous build until this
+    # commits, so a crash halfway rolls back rather than serving half a ranking.
+    store.begin()
     write_token_logos(
         pl.read_parquet(root / "out" / "raw" / "tokens" / "part-00000.parquet"), web)
 
@@ -524,6 +536,7 @@ def main() -> int:
                 "rows": rows,
                 "provenance": meta["provenance"],
             }
+            store.put_leaderboard(scope["id"], name, payload)
             path = OUT / f"{scope['id']}-{name}.json"
             path.write_text(json.dumps(payload, separators=(",", ":"), allow_nan=False))
             index["views"].append({"scope": scope["id"], "window": name,
@@ -539,24 +552,31 @@ def main() -> int:
             rows_all, qual_all = build(state, wlo, hi)
             ranked = sorted((state["realized"][a] for a in state["trips"]
                              if state["trips"][a] > 0))
-            detail_dir = OUT.parent / "address"
             everyone = sorted(state["total"])
             ctx = {"qualifying": qual_all, "traded": len(everyone),
                    "median": float(np.median(ranked)) if ranked else 0.0,
                    "at_a_loss_pct": float(np.mean(np.array(ranked) < 0) * 100) if ranked else 0.0}
-            for a in everyone:
-                write_address(a, state, wlo, hi, detail_dir, meta["provenance"],
-                              ranked=ranked, context=ctx)
-            print(f"        wrote {len(everyone):,} address files "
-                  f"({qual_all:,} qualifying, {len(everyone) - qual_all:,} with no "
-                  f"round-trip) -> web/data/address/")
+            written = store.put_addresses(
+                (write_address(a, state, wlo, hi, None, meta["provenance"],
+                               ranked=ranked, context=ctx) for a in everyone), build_id)
+            print(f"        stored {written:,} addresses "
+                  f"({qual_all:,} qualifying, {written - qual_all:,} with no round-trip)")
 
     index["scopes"] = [{"id": s["id"], "label": s["label"], "cat": s["cat"],
                         "quote": s["quote"]} for s in SCOPES]
     index["windows"] = [{"window": n, "label": {"1d": "24h", "7d": "7d"}[n]}
                         for n in windows if any(v["window"] == n for v in index["views"])]
     (OUT / "index.json").write_text(json.dumps(index, separators=(",", ":"), allow_nan=False))
-    print(f"\nwrote {OUT}/index.json")
+    store.put_leaderboard("index", "index", index)
+    store.set_meta(build=build_id, built_at=int(time.time()), source=args.source,
+                   provenance=meta["provenance"], windows=index["windows"],
+                   scopes=index["scopes"])
+    store.commit()
+    store.optimize()
+    c = store.counts()
+    print(f"\nstore {store.path}: build {build_id}, {c['addresses']:,} addresses "
+          f"({c['qualifying']:,} qualifying), {c['leaderboards']} leaderboards, "
+          f"{c['payload_bytes'] / 1e6:.0f} MB of gzipped payload")
     return 0
 
 

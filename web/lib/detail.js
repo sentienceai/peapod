@@ -327,8 +327,9 @@ function renderRanges(d) {
  */
 export async function openDetail(address, from) {
   wire();
-  const shard = address.slice(2, 4);
-  const res = await fetch(`/data/address/${shard}/${address}.json`);
+  // The API is the contract: the page does not know whether this came from a local
+  // database or a deployed one it is being proxied to.
+  const res = await fetch(`/api/address/${address}`);
   if (!res.ok) {
     renderAbsent(address);
     el('modal').hidden = false;

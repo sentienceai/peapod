@@ -9,6 +9,9 @@
  */
 
 import http from 'node:http';
+import { mkdir, readFile as readCache, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { gzipSync } from 'node:zlib';
 import { watch } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, resolve, sep } from 'node:path';
@@ -18,6 +21,85 @@ const root = fileURLToPath(new URL('./web/', import.meta.url));
 const host = process.env.HOST || '127.0.0.1';
 const port = Number(process.env.PORT || 3000);
 const dev = process.env.NODE_ENV !== 'production';
+
+/**
+ * Where the data comes from.
+ *
+ * PEAPOD_STORE as a URL points this server's /api at a deployed peapod instead of a local
+ * database, so someone who has just cloned the repository can run the site against real
+ * data with no dataset at all. That is the whole point: 256 MB of database is not
+ * something to hand a collaborator, and a stale copy is worse than none.
+ *
+ * Otherwise a local database is opened read-only. With neither, the server says so and
+ * names both options rather than serving an empty site that looks broken.
+ */
+const upstream = (process.env.PEAPOD_STORE || '').replace(/\/$/, '');
+const dbPath = process.env.PEAPOD_DB
+  || fileURLToPath(new URL('./var/peapod.db', import.meta.url));
+const cacheDir = fileURLToPath(new URL('./var/proxy-cache/', import.meta.url));
+
+/** @type {any} */
+let api = null;
+/** @type {any} */
+let apiRoute = null;
+if (!upstream) {
+  try {
+    const mod = await import('./web-api.mjs');
+    api = new mod.Api(dbPath);
+    apiRoute = mod.route;
+  } catch (err) {
+    console.error(`no store at ${dbPath}: ${/** @type {Error} */ (err).message}`);
+    console.error('build one with export/build_leaderboard.py, or point this server at a '
+      + 'deployed one:  PEAPOD_STORE=https://<host> npm run dev');
+    process.exit(1);
+  }
+} else {
+  console.log(`proxying /api to ${upstream} (read-only)`);
+}
+
+/**
+ * Proxy one API read upstream, cached on disk by build id.
+ *
+ * Forwards the path and query and nothing else: no headers, no credentials, no cookies.
+ * The cache key carries the upstream build so it invalidates when the deployment moves
+ * rather than going quietly stale, and it means iterating on a page does not hammer
+ * production or need a network at all after the first pass.
+ * @param {string} pathname @param {string} search
+ */
+async function proxy(pathname, search) {
+  const build = await currentBuild();
+  const key = createHash('sha256').update(`${build}|${pathname}${search}`).digest('hex');
+  const file = `${cacheDir}${key}.json`;
+  try {
+    const hit = await readCache(file);
+    return { status: 200, body: hit, type: 'application/json', gzip: true };
+  } catch { /* not cached yet */ }
+  const res = await fetch(`${upstream}${pathname}${search}`);
+  // fetch decompresses transparently, so re-compress before caching and serving. Without
+  // this a proxied response goes out four times the size the store holds, and the same
+  // route behaves differently depending on where the data came from — which is exactly
+  // what the API-as-contract is meant to prevent.
+  const body = gzipSync(Buffer.from(await res.arrayBuffer()), { level: 6 });
+  if (res.ok) {
+    await mkdir(cacheDir, { recursive: true }).catch(() => {});
+    await writeFile(file, body).catch(() => {});
+  }
+  return { status: res.status, body, type: 'application/json', gzip: true };
+}
+
+/** @type {{value: string, at: number}} */
+let buildCache = { value: 'unknown', at: 0 };
+async function currentBuild() {
+  if (Date.now() - buildCache.at < 60_000) return buildCache.value;
+  try {
+    const r = await fetch(`${upstream}/api/manifest`);
+    const m = await r.json();
+    buildCache = { value: String(m.build ?? 'unknown'), at: Date.now() };
+  } catch {
+    buildCache = { value: 'offline', at: Date.now() };
+  }
+  return buildCache.value;
+}
 
 const types = {
   '.html': 'text/html',
@@ -43,6 +125,22 @@ const server = http.createServer(async (req, res) => {
     }
     const url = new URL(req.url || '/', `http://${host}`);
     const path = decodeURIComponent(url.pathname);
+
+    if (path.startsWith('/api')) {
+      const out = upstream
+        ? await proxy(path, url.search)
+        : apiRoute(api, url);
+      const headers = /** @type {Record<string, string>} */ ({
+        'Content-Type': `${out.type}; charset=utf-8`,
+        'Content-Length': String(Buffer.byteLength(out.body)),
+        'Cache-Control': dev ? 'no-store' : 'public, max-age=60',
+        'X-Content-Type-Options': 'nosniff',
+      });
+      if (out.gzip) headers['Content-Encoding'] = 'gzip';
+      res.writeHead(out.status, headers);
+      res.end(req.method === 'HEAD' ? undefined : out.body);
+      return;
+    }
 
     if (dev && path === '/__reload') {
       res.writeHead(200, {

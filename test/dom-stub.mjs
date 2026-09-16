@@ -11,6 +11,8 @@
  */
 
 import { readFile } from 'node:fs/promises';
+import { gunzipSync } from 'node:zlib';
+import { fileURLToPath } from 'node:url';
 
 class Node {
   /** @param {string} tag */
@@ -294,7 +296,31 @@ export async function install(htmlUrl) {
 
   globalThis.document = /** @type {any} */ (document);
   globalThis.addEventListener = () => {};
+  // The pages read through /api, so the stub answers /api the way the server does —
+  // from the same store, not from a parallel set of fixture files. A stub that served
+  // JSON the server no longer produces would test a page that cannot run.
+  /** @type {any} */
+  let api = null;
+  const apiFor = async () => {
+    if (api) return api;
+    const mod = await import('../web-api.mjs');
+    api = { ...mod, inst: new mod.Api(
+      process.env.PEAPOD_DB
+      || fileURLToPath(new URL('../var/peapod.db', import.meta.url))) };
+    return api;
+  };
+
   globalThis.fetch = /** @type {any} */ (async (/** @type {string} */ path) => {
+    if (path.startsWith('/api')) {
+      const a = await apiFor();
+      const out = a.route(a.inst, new URL(`http://stub${path}`));
+      const text = out.gzip
+        ? gunzipSync(Buffer.from(out.body)).toString('utf8') : String(out.body);
+      return {
+        ok: out.status < 400, status: out.status,
+        json: async () => JSON.parse(text), text: async () => text,
+      };
+    }
     const file = new URL(`../web${path}`, import.meta.url);
     try {
       const body = await readFile(file, 'utf8');

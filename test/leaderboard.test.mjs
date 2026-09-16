@@ -13,6 +13,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 import { install } from './dom-stub.mjs';
+import { detail, sample, scalar } from './store.mjs';
 
 const { get, clipboard } = await install(new URL('../web/index.html', import.meta.url));
 await import('../web/index.js');
@@ -208,51 +209,58 @@ test('the out-of-scope note states the amount and refuses to estimate it', () =>
 });
 
 
-test('a detail file exists for every qualifying address, not just the ranked ones', async () => {
-  const { readdir } = await import('node:fs/promises');
-  const root = new URL('../web/data/address/', import.meta.url);
-  const shards = await readdir(root);
-  let files = 0;
-  for (const shard of shards) files += (await readdir(new URL(`${shard}/`, root))).length;
-  const c = view.coverage;
-  assert.ok(files >= c.addresses_qualifying,
-    `${files} detail files for ${c.addresses_qualifying} qualifying addresses — search `
-    + 'would 404 for anyone outside the shipped set');
-  // And for the addresses that traded without qualifying, too.
-  assert.ok(files >= c.addresses_seen * 0.99,
-    `${files} files for ${c.addresses_seen} addresses that traded`);
+test('every address that traded is reachable, not just the ranked ones', async () => {
+  // The ranking is a display choice; finding yourself outside it is the point of a search
+  // box. 73,905 addresses traded without ever closing a round-trip and each still has a
+  // record saying what it did do.
+  const traded = scalar('SELECT COUNT(*) FROM address');
+  const qualifying = scalar('SELECT COUNT(*) FROM address WHERE round_trips > 0');
+  assert.ok(traded > 100000, `only ${traded} addresses stored`);
+  assert.ok(qualifying > 25000 && qualifying < traded);
+
+  // Rows beyond the ranked cap resolve exactly like the ones on screen.
+  const deep = sample({ where: 'round_trips > 0 ORDER BY realized ASC', limit: 5 });
+  for (const d of deep) {
+    assert.equal(typeof d.summary.realized, 'number');
+    assert.ok(Array.isArray(d.round_trips));
+  }
+  const top = JSON.parse(
+    await readFile(new URL('../web/data/leaderboard/all-7d.json', import.meta.url), 'utf8'),
+  ).rows[0];
+  assert.ok(detail(top.address), 'the top-ranked address is not in the store');
 });
 
-test('addresses are sharded so no directory holds the whole set', async () => {
-  const { readdir } = await import('node:fs/promises');
-  const root = new URL('../web/data/address/', import.meta.url);
-  const shards = await readdir(root);
-  assert.ok(shards.length > 200, `only ${shards.length} shards`);
-  assert.ok(shards.every((s) => /^[0-9a-f]{2}$/.test(s)), 'a shard is not a 2-hex prefix');
+test('the store is one indexed database, not a directory of files', async () => {
+  // 103,920 files was 580 MB and 5x Cloudflare Pages' 20,000-file deployment cap, and the
+  // transfer index implies roughly a million addresses. This is sized for the million.
+  const { stat } = await import('node:fs/promises');
+  const { fileURLToPath } = await import('node:url');
+  const path = process.env.PEAPOD_DB
+    || fileURLToPath(new URL('../var/peapod.db', import.meta.url));
+  const info = await stat(path);
+  const rows = scalar('SELECT COUNT(*) FROM address');
+  const bytes = scalar('SELECT SUM(LENGTH(payload)) FROM address');
+  assert.ok(info.isFile());
+  // Payloads are stored gzipped and served with Content-Encoding: gzip untouched, so the
+  // server never decompresses and the wire carries a fifth of the JSON.
+  assert.ok(bytes / rows < 2600,
+    `stored payloads average ${(bytes / rows).toFixed(0)} bytes — compression regressed`);
+  assert.ok(info.size < 1.5e9, 'the store outgrew what a volume should hold');
 });
 
 test('an address that traded without a round-trip gets an explanation, not an error', async () => {
-  const { readFile, readdir } = await import('node:fs/promises');
-  const root = new URL('../web/data/address/', import.meta.url);
-  const shards = await readdir(root);
-  /** @type {any} */
-  let sample = null;
-  outer: for (const shard of shards.slice(0, 12)) {
-    for (const name of await readdir(new URL(`${shard}/`, root))) {
-      const d = JSON.parse(await readFile(new URL(`${shard}/${name}`, root), 'utf8'));
-      if (d.status === 'no_round_trips' && d.summary.total_volume > 0) { sample = d; break outer; }
-    }
-  }
-  assert.ok(sample, 'no non-qualifying address found to check');
-  assert.ok(sample.explain, 'a non-qualifying address has no explanation');
-  assert.match(sample.explain.headline, /No completed round-trips/);
-  assert.match(sample.explain.not_estimated, /No cost basis is guessed/);
-
   const { openDetail } = await import('../web/lib/detail.js');
-  await openDetail(sample.address);
-  const note = get('subtable').textContent;
-  assert.match(note, /No completed round-trips/);
-  assert.ok(!/no results/i.test(note), 'the empty-search wording leaked into a real address');
+  const none = sample({ where: 'round_trips = 0', limit: 1 })[0];
+  assert.ok(none, 'no non-qualifying address in the store');
+  assert.equal(none.status, 'no_round_trips');
+  assert.ok(none.explain.headline && none.explain.detail && none.explain.not_estimated,
+    'a non-qualifying address ships without the explanation of what it did do');
+
+  await openDetail(none.address);
+  const text = get('subtable').textContent;
+  assert.ok(text.includes(none.explain.headline));
+  assert.ok(!/NaN|undefined/.test(text));
+
   // It says what the address DID do rather than only what it lacks.
   const rail = get('rail').textContent;
   assert.match(rail, /Position changes/);
@@ -297,21 +305,23 @@ test('each tab renders rows from the shipped data', async () => {
 });
 
 test('the performance tab aggregates every round-trip, not the capped list', async () => {
-  const { readdir } = await import('node:fs/promises');
-  const root = new URL('../web/data/address/', import.meta.url);
-  /** @type {any} */
-  let heavy = null;
-  outer: for (const shard of (await readdir(root)).slice(0, 40)) {
-    for (const name of await readdir(new URL(`${shard}/`, root))) {
-      const d = JSON.parse(await readFile(new URL(`${shard}/${name}`, root), 'utf8'));
-      if (d.status === 'qualified' && d.summary.round_trips > 250) { heavy = d; break outer; }
-    }
-  }
-  assert.ok(heavy, 'no address with more round-trips than the shipped cap');
+  const { openDetail } = await import('../web/lib/detail.js');
+  const heavy = sample({ where: 'round_trips > 250 ORDER BY round_trips DESC', limit: 1 })[0];
+  assert.ok(heavy, 'no address with enough round-trips to test the cap');
   assert.ok(heavy.round_trips.length <= 200, 'the round-trip list is not capped');
-  const dailyTrips = heavy.daily.reduce((/** @type {number} */ a, /** @type {any} */ r) => a + r.round_trips, 0);
-  assert.equal(dailyTrips, heavy.summary.round_trips,
-    'daily totals were computed from the truncated list rather than every round-trip');
+
+  await openDetail(heavy.address);
+  const buttons = get('subtabs').byTag('button');
+  const labels = buttons.map((/** @type {any} */ b) => b.textContent);
+  buttons[labels.indexOf('Performance')].onclick?.(/** @type {any} */ ({}));
+
+  // Daily totals are folded over EVERY round-trip at build time. Summing the shipped
+  // (capped) list instead would quietly under-report anyone who traded a lot.
+  const fromDaily = heavy.daily.reduce((/** @type {number} */ a, /** @type {any} */ d) =>
+    a + d.round_trips, 0);
+  assert.equal(fromDaily, heavy.summary.round_trips,
+    'the daily breakdown was folded over the capped list');
+  assert.ok(heavy.summary.round_trips > heavy.round_trips.length);
 });
 
 test('the chart splits fill and stroke at zero rather than colouring by final value', async () => {
@@ -426,29 +436,23 @@ test('token logos reach the leaderboard column and every tab that names a token'
 });
 
 test('nearly every token the page names has a logo, and the rest fall back', async () => {
-  // 433 files cover both universes: the equity tickers by symbol, and the Pons tokens by
-  // contract address, because the equity registry never named those and a ticker-only map
-  // could not reach 204 of the files. A token with no file is not a bug — it draws its
-  // initials — but a collapse in coverage is, so the rate is pinned.
-  const { readdir } = await import('node:fs/promises');
+  // 433 files cover both universes: equity tickers by symbol and Pons tokens by contract
+  // address, because the equity registry never named those. A token with no file draws
+  // its initials — not a bug — but a collapse in coverage is, so the rate is pinned.
   const logos = JSON.parse(
     await readFile(new URL('../web/data/tokens.json', import.meta.url), 'utf8'),
   );
-  const root = new URL('../web/data/address/', import.meta.url);
   const used = new Set();
-  for (const shard of (await readdir(root)).slice(0, 16)) {
-    for (const name of (await readdir(new URL(`${shard}/`, root))).slice(0, 60)) {
-      const d = JSON.parse(await readFile(new URL(`${shard}/${name}`, root), 'utf8'));
-      for (const t of d.tokens ?? []) used.add(t.token);
-      for (const t of d.round_trips ?? []) used.add(t.token);
-    }
+  for (const d of sample({ where: 'round_trips > 0', limit: 400 })) {
+    for (const t of d.tokens ?? []) used.add(t.token);
+    for (const t of d.round_trips ?? []) used.add(t.token);
   }
   assert.ok(used.size > 40, `the sample found only ${used.size} tokens`);
   const covered = [...used].filter((t) => logos[t]).length / used.size;
   assert.ok(covered > 0.9,
     `logo coverage fell to ${(covered * 100).toFixed(0)}% of the tokens actually named`);
-  // And nothing the page names is a bare contract address: Pons symbols are read off the
-  // chain, because the registry was built for equities and names none of them.
+  // And nothing renders as a bare contract address: Pons symbols are read off the chain,
+  // because the registry was built for equities and names none of them.
   const raw = [...used].filter((t) => /^0x[0-9a-f]{6}/.test(t));
   assert.deepEqual(raw, [], `tokens rendering as raw addresses: ${raw.join(', ')}`);
 });

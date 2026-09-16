@@ -95,6 +95,7 @@ const QUOTES = [
 const PAGE = 24;
 const state = {
   /** @type {any} */ index: null,
+  /** @type {any} */ manifest: null,
   /** @type {any} */ data: null,
   cat: 'all',
   /** @type {string | null} */ quote: null,
@@ -425,6 +426,16 @@ function renderFootnote() {
   f.append(node('p', undefined,
     'Elapsed times are measured from the end of the tape, not from now, because the data '
     + 'is a fixed historical window.'));
+  // Name the build. A proxied dev session and a deployed one look identical otherwise,
+  // and a bug report has to be able to say which one it saw.
+  if (state.manifest?.build) {
+    const b = node('p', 'build-line');
+    b.append(document.createTextNode('Build '));
+    b.append(node('code', undefined, state.manifest.build));
+    b.append(document.createTextNode(
+      ` · ${Number(state.manifest.addresses).toLocaleString('en-US')} addresses stored`));
+    f.append(b);
+  }
   f.append(node('p', undefined,
     'There is no execution here and no trade is copied. Category and quote refold the '
     + 'matching on that scope\'s trades rather than filtering rows, because most of the '
@@ -440,7 +451,8 @@ function onSelect(id, fn) {
 /** Fetch the current scope's build and redraw everything that depends on it. */
 async function load() {
   const view = viewFor(scopeId(), state.window) ?? viewFor('all', state.window);
-  state.data = await fetch(`/data/leaderboard/${view.file}`).then((r) => r.json());
+  state.data = await fetch(`/api/leaderboard/${view.scope}/${view.window}`)
+    .then((r) => r.json());
   renderControls();
   renderCaveat();
   renderDistribution();
@@ -448,7 +460,8 @@ async function load() {
   render();
 }
 
-state.index = await fetch('/data/leaderboard/index.json').then((r) => r.json());
+state.index = await fetch('/api/leaderboard/index').then((r) => r.json());
+state.manifest = await fetch('/api/manifest').then((r) => r.json()).catch(() => ({}));
 setTokenLogos(await fetch('/data/tokens.json')
   .then((r) => (r.ok ? r.json() : {})).catch(() => ({})));
 await load();

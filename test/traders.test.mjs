@@ -378,16 +378,9 @@ test('the hero leads with the field, not with the best number', async () => {
 });
 
 test('an address detail carries its percentile and the field it is read against', async () => {
-  const { readdir } = await import('node:fs/promises');
-  const root = new URL('../web/data/address/', import.meta.url);
-  let found = null;
-  outer: for (const shard of (await readdir(root)).slice(0, 20)) {
-    for (const name of await readdir(new URL(`${shard}/`, root))) {
-      const d = JSON.parse(await readFile(new URL(`${shard}/${name}`, root), 'utf8'));
-      if (d.summary.round_trips > 5) { found = d; break outer; }
-    }
-  }
-  assert.ok(found, 'no qualifying address file found');
+  const { sample } = await import('./store.mjs');
+  const found = sample({ where: 'round_trips > 5', limit: 1 })[0];
+  assert.ok(found, 'no qualifying address in the store');
   // A dollar figure alone does not say whether it beat anyone: the median qualifier made
   // under a dollar, so $40 is not a small result here.
   assert.equal(typeof found.summary.percentile, 'number');
@@ -397,4 +390,85 @@ test('an address detail carries its percentile and the field it is read against'
   // Which universes this address traded is a fact about it, not a grid category.
   assert.ok(Array.isArray(found.universes) && found.universes.length > 0);
   for (const u of found.universes) assert.ok(['rwa', 'pons'].includes(u));
+});
+
+test('the API is the contract, and it is read-only', async () => {
+  const { Api, route: rawRoute } = await import('../web-api.mjs');
+  /** @param {any} a @param {URL} u */
+  const route = (a, u) => /** @type {any} */ (rawRoute(a, u)) ?? { status: 0 };
+  const { fileURLToPath } = await import('node:url');
+  const api = new Api(process.env.PEAPOD_DB
+    || fileURLToPath(new URL('../var/peapod.db', import.meta.url)));
+
+  // Every route a page uses, answered from the store.
+  assert.equal(route(api, new URL('http://x/api/manifest')).status, 200);
+  assert.equal(route(api, new URL('http://x/api/leaderboard/index')).status, 200);
+  assert.equal(route(api, new URL('http://x/api/leaderboard/all/7d')).status, 200);
+  const one = /** @type {any} */ (route(api, new URL(`http://x/api/address/${board.rows[0].address}`)));
+  assert.equal(one.status, 200);
+  assert.equal(one.gzip, true, 'payloads must go out compressed, as stored');
+
+  // Absent is a real answer: most addresses on this chain never traded.
+  assert.equal(route(api, new URL(`http://x/api/address/0x${'ab'.repeat(20)}`)).status, 404);
+  // And nothing that is not an address reaches a query.
+  // Anything that is not exactly 40 lowercase hex characters after 0x never reaches a
+  // query. A traversal attempt is normalised out of the path by URL before the API sees
+  // it, so what has to hold here is the shape check.
+  for (const bad of ['0xzz', 'select', '0x1234', "0x' OR 1=1--", '0xABCDEF']) {
+    assert.equal(route(api, new URL(`http://x/api/address/${encodeURIComponent(bad)}`))
+      .status, 404, bad);
+  }
+  // Scope and window are matched against a strict name pattern before they reach a
+  // query. A traversal attempt is normalised out of the path by URL itself and never
+  // reaches the API at all, so the check that matters is the pattern.
+  for (const bad of ['ALL', 'all;drop', 'all%20', '../etc']) {
+    assert.equal(route(api, new URL(`http://x/api/leaderboard/${bad}/7d`)).status, 404, bad);
+  }
+
+  // There is no write route at all, which is what makes the dev proxy safe to point at
+  // production: there is nothing to forward that could change anything.
+  const src = await readFile(new URL('../web-api.mjs', import.meta.url), 'utf8');
+  for (const verb of ['INSERT', 'UPDATE', 'DELETE', 'DROP', 'ATTACH']) {
+    assert.ok(!src.includes(verb), `the read API contains ${verb}`);
+  }
+  assert.match(src, /readOnly: true/);
+  assert.match(src, /query_only=1/);
+  api.close();
+});
+
+test('the manifest names the build, and the footer shows it', async () => {
+  const manifest = await fetch('/api/manifest').then((r) => r.json());
+  assert.match(manifest.build, /^\d{8}T\d{6}Z$/, `build id is ${manifest.build}`);
+  assert.ok(manifest.addresses > 100000);
+  assert.ok(manifest.qualifying > 0 && manifest.qualifying < manifest.addresses);
+  // A proxied dev session must be able to say which build it is looking at, or a bug
+  // report cannot name one.
+  assert.ok(get('footnote').textContent.includes(manifest.build),
+    'the footer does not name the build');
+});
+
+test('the dev server can run against a deployed store with no local data', async () => {
+  // The tarball problem: 256 MB of database is not something to hand a collaborator, and
+  // a stale copy is worse than none. PEAPOD_STORE points /api upstream and the site runs
+  // unchanged, because the API is the contract and the page never knew where bytes lived.
+  const src = await readFile(new URL('../server.mjs', import.meta.url), 'utf8');
+  assert.match(src, /PEAPOD_STORE/, 'the server has no remote-store mode');
+  assert.match(src, /proxying \/api to/);
+
+  // Read-only, and nothing of ours travels with the request: path and query, no headers,
+  // no credentials, no cookies.
+  const proxyFn = src.slice(src.indexOf('async function proxy('), src.indexOf('let buildCache'));
+  assert.ok(!/headers:/.test(proxyFn), 'the proxy forwards headers upstream');
+  assert.ok(!/GOLDSKY|API_KEY|Authorization/i.test(proxyFn));
+  assert.match(proxyFn, /createHash/, 'proxied reads are not cached');
+  // Keyed by upstream build, so the cache invalidates when the deployment moves rather
+  // than going quietly stale.
+  assert.match(proxyFn, /\$\{build\}\|/);
+  // And re-compressed, so a proxied route behaves like a local one rather than sending
+  // four times the bytes.
+  assert.match(proxyFn, /gzipSync/);
+
+  // With neither a store nor an upstream it says so and names both options, rather than
+  // serving an empty site that looks broken.
+  assert.match(src, /build one with export\/build_leaderboard\.py, or point this server/);
 });

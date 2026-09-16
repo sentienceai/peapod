@@ -61,7 +61,7 @@ function signedPct(n) {
 /** @param {string} a */
 const shortAddr = (a) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
-const index = await fetch('/data/leaderboard/index.json').then((r) => r.json());
+const index = await fetch('/api/leaderboard/index').then((r) => r.json());
 /**
  * This page is the combined ranking's simple view: one scope per category tab, the same
  * builds the traders page reads. A scope is a separate build because the matching is
@@ -299,7 +299,8 @@ function renderFootnote() {
 async function load() {
   const entry = viewFor(scopeId(), state.window) ?? viewFor('all', state.window)
     ?? index.views.at(-1);
-  state.data = await fetch(`/data/leaderboard/${entry.file}`).then((r) => r.json());
+  state.data = await fetch(`/api/leaderboard/${entry.scope}/${entry.window}`)
+    .then((r) => r.json());
   buildTabs();
   renderCaveat();
   renderHead();
