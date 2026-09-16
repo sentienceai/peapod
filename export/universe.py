@@ -75,10 +75,34 @@ def _symbols(root: Path) -> dict[str, str]:
     return symbols(base)
 
 
+# Read a fixed projection, not whatever columns a part happens to carry.
+#
+# The tape was written by two generations of the ingest: the older parts have `ts` and no
+# block hash, the newer ones carry `block_hash`, `removed` and `ts_unreliable` instead.
+# Concatenating them raised a width mismatch the first time a new part was written —
+# which, on the container, would have been the first successful ingest. Naming the columns
+# the fold actually uses makes the read independent of when a part was written.
+# The two tapes do not carry the same fields — the Pons ingest never recorded a sqrt
+# price, because PnL there is computed from the amounts alone. Each side names what it
+# needs and gets a clear error naming the tape if a column is genuinely missing.
+BASE_COLUMNS = ["pool_id", "block", "log_index", "tx_hash", "amount0", "amount1"]
+RWA_COLUMNS = [*BASE_COLUMNS, "sqrt_price_x96"]
+
+
+def _read_swaps(paths, columns: list[str], what: str) -> pl.DataFrame:
+    paths = list(paths)
+    if not paths:
+        raise SystemExit(f"no {what} tape on disk")
+    try:
+        return pl.concat([pl.read_parquet(p, columns=columns) for p in paths])
+    except pl.exceptions.ColumnNotFoundError as exc:
+        raise SystemExit(f"{what} tape is missing a column the fold needs: {exc}") from exc
+
+
 def rwa(root: Path, source: str = "edge") -> pl.DataFrame:
     suffix = "" if source == "public" else f"_{source}"
-    swaps = pl.concat([pl.read_parquet(p)
-                       for p in sorted((INGEST / "swaps_tx").glob("part-*.parquet"))])
+    swaps = _read_swaps(sorted((INGEST / "swaps_tx").glob("part-*.parquet")),
+                        RWA_COLUMNS, "RWA swap")
     parts = sorted((INGEST / f"tx_from{suffix}").glob("part-*.parquet"))
     if not parts:
         raise SystemExit(f"no resolved transactions for source '{source}'")
@@ -137,8 +161,8 @@ def pons(root: Path) -> pl.DataFrame:
             "side": side, "quote": quote, "qdec": QUOTES[quote],
             "label": sym.get(base) or base[:10], "addr": base, "bdec": dec.get(base)}
 
-    swaps = pl.concat([pl.read_parquet(p)
-                       for p in (INGEST / "pons_swaps").glob("part-*.parquet")])
+    swaps = _read_swaps(sorted((INGEST / "pons_swaps").glob("part-*.parquet")),
+                        BASE_COLUMNS, "Pons swap")
     parts = sorted((INGEST / "tx_from_pons").glob("part-*.parquet"))
     if not parts:
         raise SystemExit("no resolved pons transactions")

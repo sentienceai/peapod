@@ -602,9 +602,11 @@ def main() -> int:
     stats = {"to_ts": hi, "qualifying": headline["qualifying"],
              "top_realized": headline["top"], "addresses": headline["addresses"],
              "scopes": len(index["views"])}
+    gaps_path = HERE.parent / "ingest" / "out" / "gaps.json"
+    gaps = json.loads(gaps_path.read_text()) if gaps_path.exists() else []
     g = gatemod.run(gatemod.Gates(), before=before, stats=stats, trades=trades,
                     views=index["views"], missing_ranked=len(ranked - stored),
-                    address_count=store.counts()["addresses"], eth=eth_stats)
+                    address_count=store.counts()["addresses"], eth=eth_stats, gaps=gaps)
     print("\nverification gates")
     print(g.report())
     print(f"  {gatemod.summarise(g)}")

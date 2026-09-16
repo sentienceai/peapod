@@ -27,7 +27,7 @@ def clean_trades():
 def go(**over):
     kw = {"before": BEFORE, "stats": dict(STATS), "trades": clean_trades(),
           "views": list(VIEWS), "missing_ranked": 0, "address_count": 101_000,
-          "eth": dict(ETH)}
+          "eth": dict(ETH), "gaps": []}
     kw.update(over)
     return run(Gates(), **kw)
 
@@ -133,3 +133,27 @@ def test_the_band_is_wide_enough_for_an_ordinary_day(ratio):
     # gate that fires on normal days gets disabled.
     g = go(stats={**STATS, "qualifying": int(30_000 * ratio)})
     assert not g.failed, g.report()
+
+
+def test_an_unreadable_range_blocks_the_build():
+    # The ingest used to print "skipping ahead" and move on, so the only record of a hole
+    # was a log line nobody reads and a tape that looked complete. Everything downstream
+    # is arithmetic on rows that are not there, and all of it looks healthy.
+    g = go(gaps=[{"from": 60_482_370, "to": 60_482_569, "blocks": 200,
+                  "why": "unreadable: exceed max topics"}])
+    failed = [r.name for r in g.failed]
+    assert "no unreadable ranges in the tape" in failed
+    detail = next(r.detail for r in g.results if r.name == "no unreadable ranges in the tape")
+    assert "200 blocks" in detail and "60,482,370" in detail
+
+
+def test_several_gaps_are_summed_not_just_counted():
+    g = go(gaps=[{"from": 1, "to": 200, "blocks": 200, "why": "a"},
+                 {"from": 900, "to": 1299, "blocks": 400, "why": "b"}])
+    detail = next(r.detail for r in g.results if r.name == "no unreadable ranges in the tape")
+    assert "2 gap(s) covering 600 blocks" in detail
+
+
+def test_no_gaps_is_the_normal_case():
+    assert not go(gaps=[]).failed
+    assert not go().failed

@@ -39,7 +39,29 @@ from dedup import Deduplicator, log_key
 # apart, which ran 8/8 where anything faster was refused and then degraded to refusing
 # everything. A provider with 1:1 request billing has no such ceiling, so PEAPOD_RPC_BATCH
 # and PEAPOD_RPC_PACE should be raised with it.
-RPC = os.environ.get("PEAPOD_RPC_URL", "https://rpc.mainnet.chain.robinhood.com")
+def _endpoint() -> str:
+    """Edge when we have it, the public node otherwise.
+
+    The cycle had credentials for Edge and was using the public node anyway, because this
+    defaulted to it. Edge takes the whole 7,593-pool filter in one call; the public node
+    caps a topic list at 1,000, so the same work costs nine calls there. Both are correct
+    now — this is about cost and latency, not correctness.
+    """
+    explicit = os.environ.get("PEAPOD_RPC_URL")
+    if explicit:
+        return explicit
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from settings import env as _env  # noqa: PLC0415
+        edge = _env().get("GOLDSKY_EDGE_URL")
+        if edge:
+            return edge
+    except Exception:                                   # noqa: BLE001
+        pass
+    return "https://rpc.mainnet.chain.robinhood.com"
+
+
+RPC = _endpoint()
 POOL_MANAGER = "0x8366a39cc670b4001a1121b8f6a443a643e40951"
 SWAP_TOPIC = "0x40e9cecb9f5f1f1c5b9c97dec2917b7ee92e57ba5563708daca94dd84ad7112f"
 # ~19,081 blocks/hour on this chain, so this is a little over eight days.
@@ -52,6 +74,10 @@ PIDFILE = Path(__file__).resolve().parent / "out" / "swaps_tx.pid"
 LOG_CAP = 10_000          # the endpoint's hard ceiling on one response
 TARGET_LOGS = 6_000       # aim below it, so density drift does not cost a retry
 MIN_WIDTH, MAX_WIDTH = 200, 400_000
+# Endpoints cap how many values a topic position may hold: the public RPC at 1,000. Start
+# below the lowest known cap and halve on refusal.
+TOPIC_CHUNK = 900
+GAPS = Path(__file__).resolve().parent / "out" / "gaps.json"
 PACE = 0.35               # seconds between calls; the endpoint 429s on tight bursts
 PART_ROWS = 100_000
 
@@ -91,37 +117,62 @@ def claim_pidfile(path: Path):
 
 
 
+# What a call came back as. The caller has to tell these apart: shrinking the block range
+# fixes one of them, and doing it for the others is how a permanent argument error became
+# thousands of silently skipped blocks.
+OK, TOO_MANY_LOGS, TOO_MANY_TOPICS, FAILED = "ok", "logs", "topics", "failed"
+
+
 def rpc(method: str, params: list, retries: int = 6):
-    """One JSON-RPC call. Backs off on 429 and 5xx rather than treating them as fatal."""
+    """One JSON-RPC call, as (outcome, value).
+
+    IT USED TO RETURN None FOR EVERYTHING. A range that returned too many logs and a range
+    whose retries had run out were the same value, so the caller shrank the window for both
+    and, at the minimum width, skipped. The public RPC rejects a topic list longer than
+    1,000 with -32602 "exceed max topics" — a permanent argument error that no amount of
+    shrinking fixes — and the ingest read it as a sizing problem and skipped 200 blocks at
+    a time for nine hours.
+    """
     delay = 1.0
+    last = ""
     for _ in range(retries):
         try:
             r = SESSION.post(RPC, json={"jsonrpc": "2.0", "id": 1, "method": method,
                                         "params": params}, timeout=90)
-        except requests.RequestException:
+        except requests.RequestException as exc:
+            last = f"{type(exc).__name__}"
             time.sleep(delay)
             delay = min(delay * 2, 30)
             continue
         if r.status_code == 429 or r.status_code >= 500:
+            last = f"HTTP {r.status_code}"
             time.sleep(delay)
             delay = min(delay * 2, 30)
             continue
         try:
             body = r.json()
         except json.JSONDecodeError:
+            last = "non-JSON body"
             time.sleep(delay)
             delay = min(delay * 2, 30)
             continue
         if isinstance(body, dict) and "error" in body:
             message = str(body["error"].get("message", ""))
-            # A range that returns too many logs is a sizing problem, not a failure.
-            if "more than" in message or "limit" in message.lower() or "429" in message:
-                return None
+            low = message.lower()
+            # Too many RESULTS: a smaller block range fixes it.
+            if "more than" in low or "exceed max results" in low or "too many results" in low \
+                    or "query returned more than" in low or "limit" in low:
+                return TOO_MANY_LOGS, message
+            # Too many FILTER VALUES: a smaller block range never fixes it. Send fewer
+            # pool ids per call instead.
+            if "max topics" in low or "too many topics" in low or "exceed max topics" in low:
+                return TOO_MANY_TOPICS, message
+            last = message
             time.sleep(delay)
             delay = min(delay * 2, 30)
             continue
-        return body.get("result")
-    return None
+        return OK, body.get("result")
+    return FAILED, last or "retries exhausted"
 
 
 def signed(value: int) -> int:
@@ -166,10 +217,63 @@ def decode(log: dict) -> dict:
     }
 
 
-def fetch(lo: int, hi: int, pool_ids: list[str]):
-    params = {"fromBlock": hex(lo), "toBlock": hex(hi), "address": POOL_MANAGER,
-              "topics": [SWAP_TOPIC, pool_ids]}
-    return rpc("eth_getLogs", [params])
+def fetch(lo: int, hi: int, pool_ids: list[str], chunk: int):
+    """Every Swap in [lo, hi] for these pools, over as many calls as the endpoint needs.
+
+    The pool filter is split into chunks because endpoints cap how many values a topic
+    position may hold — the public RPC at 1,000, where this was sending 7,593. Chunking is
+    the second axis: when the block range cannot shrink any further, this one still can.
+
+    Returns (outcome, logs). A partial result is never returned as a success: if any chunk
+    refuses, the whole range refuses, because a union missing one chunk is a hole that
+    looks like data.
+    """
+    out: list[dict] = []
+    i = 0
+    while i < len(pool_ids):
+        sel = pool_ids[i:i + chunk]
+        params = {"fromBlock": hex(lo), "toBlock": hex(hi), "address": POOL_MANAGER,
+                  "topics": [SWAP_TOPIC, sel]}
+        outcome, value = rpc("eth_getLogs", [params])
+        if outcome != OK:
+            return outcome, value
+        out.extend(value or [])
+        i += chunk
+    return OK, out
+
+
+def record_gap(lo: int, hi: int, why: str) -> None:
+    """A range we could not read, written down where the build gates will find it.
+
+    The ingest used to print a line and move on, so the only record of a hole was a log
+    nobody reads and a tape that looked complete. A recorded gap fails the verification
+    gate, which means no build is published on top of it.
+    """
+    GAPS.parent.mkdir(parents=True, exist_ok=True)
+    gaps = json.loads(GAPS.read_text()) if GAPS.exists() else []
+    gaps.append({"from": lo, "to": hi, "blocks": hi - lo + 1, "why": why,
+                 "at": int(time.time())})
+    GAPS.write_text(json.dumps(gaps, indent=1))
+
+
+def stop(state: dict, buffer: list, lo: int, hi: int, why: str) -> None:
+    """Flush what is genuinely fetched, record the hole, and leave the cursor where it is.
+
+    The cursor not advancing is the point: the next run retries this range rather than
+    building on a tape with a silent hole in it.
+    """
+    if buffer:
+        pl.DataFrame(buffer).write_parquet(OUT / f"part-{state['part']:05d}.parquet")
+        state["part"] += 1
+        state["rows"] += len(buffer)
+        buffer.clear()
+    # The cursor is whatever the last SUCCESSFUL range left it at; stop() never moves it.
+    save_checkpoint(state)
+    record_gap(lo, hi, why)
+    print(f"\nSTOPPED at {lo:,}..{hi:,}: {why}", flush=True)
+    print(f"  recorded in {GAPS}; the cursor stays at {state.get('cursor') or lo:,} so the next run "
+          "retries this range. The verification gate refuses to publish while a gap is "
+          "outstanding.", flush=True)
 
 
 def load_checkpoint() -> dict:
@@ -189,6 +293,13 @@ def main() -> int:
     ap.add_argument("--to", dest="end", type=int, default=None)
     ap.add_argument("--pools-from", default=None,
                     help="parquet glob whose pool_id column fixes the universe")
+    ap.add_argument("--verify", type=int, default=0, metavar="N",
+                    help="sample N windows across the tape and compare each one's swap "
+                         "count against the chain. Reports holes; changes nothing.")
+    ap.add_argument("--rewind", action="store_true",
+                    help="set the cursor to the last block actually in the tape and clear "
+                         "recorded gaps, then exit. For repairing a checkpoint that "
+                         "advanced past ranges it never fetched.")
     args = ap.parse_args()
     claim_pidfile(PIDFILE)
 
@@ -213,7 +324,91 @@ def main() -> int:
     if not pool_ids:
         raise SystemExit("no RWA pools in the registry; run export/registry.py --refresh")
 
-    head = int(rpc("eth_blockNumber", []), 16)
+    outcome, value = rpc("eth_blockNumber", [])
+    if outcome != OK:
+        raise SystemExit(f"cannot read the chain head: {value}")
+    head = int(value, 16)
+    if args.verify:
+        # Answers "does this tape have holes in it" by asking the chain, rather than by
+        # reasoning about what the ingest might have done.
+        import random  # noqa: PLC0415
+        parts = sorted(OUT.glob("part-*.parquet"))
+        if not parts:
+            print("no tape on disk")
+            return 0
+        have = pl.concat([pl.read_parquet(p, columns=["block", "log_index", "pool_id"])
+                          for p in parts])
+        lo, hi = int(have["block"].min()), int(have["block"].max())
+# WHAT THIS CAN AND CANNOT TELL APART.
+        #
+        # A missing swap has two possible causes: a range the ingest skipped, or a pool
+        # that was not in the filter when that range was fetched. Comparing against the
+        # tape's own pool set removes the second cause only if the universe never changed
+        # over the tape's lifetime, and on this tape it did — pools were added as they
+        # started trading. So a reported hole means "the chain has swaps here that we do
+        # not", which is true and actionable, and does NOT prove which cause. Refetch the
+        # range rather than reasoning about it; refetching fixes both.
+        mine = sorted(set(have["pool_id"].to_list()))
+        print(f"tape covers {lo:,}..{hi:,} with {have.height:,} swaps across "
+              f"{len(mine):,} pools; the registry now names {len(pool_ids):,}", flush=True)
+        print(f"sampling {args.verify} windows of {MIN_WIDTH} blocks", flush=True)
+        rng = random.Random(7)
+        holes, checked, grew = [], 0, 0
+        for _ in range(args.verify):
+            a = rng.randrange(lo, max(lo + 1, hi - MIN_WIDTH))
+            b = a + MIN_WIDTH - 1
+            outcome, logs = fetch(a, b, mine, TOPIC_CHUNK)
+            if outcome != OK:
+                print(f"  {a:,}..{b:,}  could not check ({outcome})", flush=True)
+                continue
+            outcome2, wider = fetch(a, b, pool_ids, TOPIC_CHUNK)
+            checked += 1
+            ours = have.filter((pl.col("block") >= a) & (pl.col("block") <= b)).height
+            theirs = len({(int(x["blockNumber"], 16), int(x["logIndex"], 16)) for x in logs})
+            extra = (len({(int(x["blockNumber"], 16), int(x["logIndex"], 16)) for x in wider})
+                     - theirs) if outcome2 == OK else 0
+            grew += extra
+            if ours != theirs:
+                holes.append((a, b, ours, theirs))
+                print(f"  {a:,}..{b:,}  INCOMPLETE: tape has {ours}, chain has {theirs}",
+                      flush=True)
+            elif extra:
+                print(f"  {a:,}..{b:,}  ok ({ours}); +{extra} in pools added since",
+                      flush=True)
+        print(f"\n{checked} windows checked")
+        if holes:
+            missing = sum(t - o for _, _, o, t in holes)
+            print(f"  {len(holes)} window(s) INCOMPLETE: {missing:,} swaps the chain has "
+                  "and this tape does not, in pools the tape already covers.")
+            print("  Cause is not distinguishable after the fact — a skipped range and a "
+                  "pool added to the filter later look identical here. Refetch the "
+                  "affected span; that fixes both.")
+        else:
+            print("  complete: every pool the tape covers is whole over the sample")
+        if grew:
+            print(f"  +{grew:,} swaps in pools added to the universe since this tape was "
+                  "built. Not a hole — refetch to pick them up when convenient.")
+        return 1 if holes else 0
+
+    if args.rewind:
+        parts = sorted(OUT.glob("part-*.parquet"))
+        if not parts:
+            print("no tape on disk; nothing to rewind to")
+            return 0
+        last = int(pl.concat([pl.read_parquet(p, columns=["block"]) for p in parts])
+                   ["block"].max())
+        state = load_checkpoint()
+        was = state.get("cursor")
+        state["cursor"] = last + 1
+        state["complete"] = False
+        save_checkpoint(state)
+        if GAPS.exists():
+            GAPS.unlink()
+        print(f"cursor {was:,} -> {last + 1:,} (last block actually in the tape)")
+        print(f"rewound by {(was or 0) - last - 1:,} blocks; recorded gaps cleared, since "
+              "everything after this point will now be refetched")
+        return 0
+
     state = load_checkpoint()
     # A cold start backfills a window rather than only moving forward: a container with an
     # empty volume that began at the head would take seven days to have a seven-day
@@ -230,20 +425,46 @@ def main() -> int:
     buffer: list[dict] = []
     began = time.time()
 
+    chunk = TOPIC_CHUNK
     while cursor <= end:
         hi = min(cursor + width - 1, end)
-        logs = fetch(cursor, hi, pool_ids)
+        outcome, value = fetch(cursor, hi, pool_ids, chunk)
         state["calls"] += 1
-        if logs is None:
-            # Too many logs for this range, or a refusal we should treat as one.
-            if width <= MIN_WIDTH:
-                print(f"  cannot shrink below {MIN_WIDTH} at {cursor:,}; skipping ahead")
-                cursor = hi + 1
-                continue
-            width = max(MIN_WIDTH, width // 2)
-            time.sleep(PACE * 3)
+
+        if outcome == TOO_MANY_TOPICS:
+            # Fewer pool ids per call. The block range is irrelevant to this and shrinking
+            # it was the bug: at the minimum width the old code gave up and skipped.
+            if chunk <= 1:
+                stop(state, buffer, cursor, end, "endpoint refuses even one pool id")
+                return 1
+            chunk = max(1, chunk // 2)
+            print(f"  topic filter too large at {cursor:,}; {chunk} pool ids per call",
+                  flush=True)
             continue
 
+        if outcome == TOO_MANY_LOGS:
+            if width > MIN_WIDTH:
+                width = max(MIN_WIDTH, width // 2)
+                time.sleep(PACE * 3)
+                continue
+            # The block axis is exhausted, so narrow the other one. A single block with
+            # more than the cap for ONE pool is the only genuinely unfetchable case.
+            if chunk > 1:
+                chunk = max(1, chunk // 2)
+                print(f"  {MIN_WIDTH}-block window still over the cap at {cursor:,}; "
+                      f"{chunk} pool ids per call", flush=True)
+                continue
+            stop(state, buffer, cursor, hi,
+                 f"more than {LOG_CAP:,} logs for one pool in {width} block(s)")
+            return 1
+
+        if outcome == FAILED:
+            # NEVER SKIP. A range we could not read is a hole, and a hole that advances the
+            # cursor is indistinguishable from a range with no swaps in it.
+            stop(state, buffer, cursor, hi, f"unreadable: {value}")
+            return 1
+
+        logs = value
         for log in logs:
             record = decode(log)
             if seen.accept(record):

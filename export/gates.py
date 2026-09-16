@@ -73,8 +73,20 @@ def snapshot(store) -> dict:
 
 
 def run(gates: Gates, *, before: dict, stats: dict, trades, views: list,
-        missing_ranked: int, address_count: int, eth: dict | None) -> Gates:
+        missing_ranked: int, address_count: int, eth: dict | None,
+        gaps: list | None = None) -> Gates:
     first = not before.get("build")
+
+    # 0. A range the ingest could not read. This is the only gate that describes the tape
+    #    rather than the build: everything downstream is arithmetic on rows that are not
+    #    there, and it all looks perfectly healthy. The ingest used to print a line and
+    #    skip; now it records the range and stops, and this refuses to publish over it.
+    outstanding = gaps or []
+    blocks = sum(g.get("blocks", 0) for g in outstanding)
+    gates.check("no unreadable ranges in the tape", not outstanding,
+                f"{len(outstanding)} gap(s) covering {blocks:,} blocks"
+                + (f", first at {outstanding[0]['from']:,}: {outstanding[0]['why']}"
+                   if outstanding else ""))
 
     # 1. Time only moves forward. A cursor reset or a stale partition read shows up here
     #    before it shows up as a ranking of last week.
