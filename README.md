@@ -1,237 +1,172 @@
 # peapod
 
-Public data site for tokenized equity pools on Robinhood Chain (Arbitrum Orbit L2,
-chain 4663). Two tools: a **depth tracker** (real executable ±1% depth per pool, not TVL)
-and an **LP calculator** (fees minus impermanent loss versus holding, as a distribution).
+Realized profit and loss for every address that has traded on **Robinhood Chain**
+(Arbitrum Orbit L2, chain 4663), across both tokenized equities and the Pons memecoin
+pools, in one ranking. Searchable by address, whether or not the address ranks.
 
-Source research lives in `~/lp-terminal` (swap history, depth work, v4 accounting engine)
-and `~/canopy` (vanilla-JS frontend, theme layer, dependency-free Node server). Both are
-read-only upstreams; peapod copies and ports from them, never edits them.
+Over the current seven-day window: **103,920 addresses traded, 30,013 of them closed a
+round-trip.** 64.7% of those finished in profit, which sounds healthy until you see the
+sizes: the best made $188,639, the median made **$0.83**, and the top 1% took half of
+everything won.
 
-## Status
+## What it measures, and what it does not
 
-The v4 math engine is ported to BigInt with parity tests green, and executable ±1% depth
-is computed by walking the real tick liquidity map. The site itself is not built yet.
+**Realized PnL on completed round-trips only.** An address is scored when it bought a
+token on-chain and later sold it on-chain; the two are matched first-in-first-out and the
+difference is the result. That is the whole definition.
 
-**The headline number moved: 80.8% → 75.8%**, and two published claims are restated — the
-7-day-median count (eight of ten, not nine) and the flat-L "upper bound" (it is neither an
-upper nor a lower bound). See [Executable depth](#executable-depth).
+It follows that a great deal is **out of scope, not estimated**:
 
-## Constraints
+- **72.7% of volume has no matched round-trip behind it.** Tokens that were bridged in,
+  minted, airdropped or transferred from another wallet have no on-chain purchase, so
+  selling them produces no cost basis and no number. They are excluded, not guessed at.
+- **There is no unrealized PnL.** That would require a balance for every address at every
+  block, which needs a full ERC-20 transfer index this does not have (~210M events). Open
+  positions are invisible here.
+- **No account value, equity, leverage, or liquidation.** Those are perpetuals concepts
+  and this is a spot AMM. Where a figure does not exist it is absent from the interface
+  rather than shown empty.
 
-**No build step.** No bundler, no transpiler, no framework. `web/` is served as-is. The
-reason is not minimalism: the credibility of the calculator rests on the math engine being
-parity-validated against Uniswap v4-core, and with no build step the file the parity tests
-prove correct is byte-for-byte the file the browser loads. Do not introduce a transform
-between the two.
+Each address carries its own **coverage** figure — what share of its selling had an
+on-chain buy behind it — because a record scored over 96% of an address is a different
+claim from one scored over 49%. The top-ranked address is at 100%; the one below it, 73%.
 
-**Types without a build.** Types are JSDoc annotations in the `.js` sources, checked by
-`npm run lint` (`tsc --noEmit`, with `checkJs` set in `tsconfig.json`). It never emits and
-nothing it produces is served. TypeScript is a devDependency; the site itself has no
-runtime dependencies, and any third-party browser library is vendored as a pinned file.
+The win-rate badge answers one question with a published criterion: an address closed *n*
+round-trips and *k* at a profit; 95% of traders with no skill and the same *n* land inside
+`0.5 ± 1.96·√(0.25/n)`, so a rate outside that band is one chance produces less than one
+time in twenty. It measures the rate, not the profit, and only the selling it can see.
+That last limit was tested rather than assumed — see `export/selection_bias.py`.
 
-## Commands
+## Running it
+
+### Against the deployed store — no data, no credentials
 
 ```sh
-npm run dev   # serve web/ on :3000, no build, live reload
-npm test      # node --test — parity, kernel, findings, render
-npm run lint  # tsc --noEmit, JSDoc type check, emits nothing
-npm run check # both
+npm install
+PEAPOD_STORE=https://<deployed-host> npm run dev
 ```
 
-Data export is offline Python, run against a read-only lp-terminal checkout:
+The dev server proxies `/api` upstream and serves `web/` locally, so a fresh clone runs
+the whole site against real data. Seconds. This is the normal way to work on the
+interface. Responses are cached on disk by build id. See [STORE.md](STORE.md).
+
+### Against a local store
 
 ```sh
-PEAPOD_LP_TERMINAL=~/lp-terminal python export/executable_depth.py
-PEAPOD_LP_TERMINAL=~/lp-terminal PYTHONPATH=$PEAPOD_LP_TERMINAL/engine:export \
-  python export/test_executable_depth.py
+npm run dev
 ```
 
-It needs `polars` and `numpy`; lp-terminal's `.venv` already has them. peapod does not yet
-own a Python environment of its own — that is a loose end, not a decision.
+Needs `var/peapod.db` (about 256 MB). Seconds if you have one, and `npm run check` needs
+it too — the tests query the store rather than fixtures, so they only pass against a real
+build.
 
-## The data files
+### Rebuilding from the chain
 
-`export/build.py` writes four top-level files plus a per-pool directory:
+Needs `GOLDSKY_EDGE_URL` in the environment or `.env`, and about 1 GB of ingested tape in
+`ingest/out/`.
 
-| File | Size | What |
-|---|---|---|
-| `web/data/meta.json` | 4 KB | provenance, anchors, both depth bases, caveats |
-| `web/data/pools.json` | 24 KB | the universe, and which widths each pool can express |
-| `web/data/depth.json` | 171 KB | ±1% depth per pool, both bases, 7-day series |
-| `web/data/windows.json` | 741 KB | 5,650 calculator windows, columnar, no kernels |
-| `web/data/windows/<pool>.json` | 15 KB median | that pool's fee kernels |
+```sh
+scripts/cycle.sh                      # one incremental cycle
+CYCLE_SKIP_INGEST=1 scripts/cycle.sh  # rebuild from what is already on disk
+```
 
-Every file carries the same provenance block — deliberate duplication, because these get
-downloaded and quoted individually and a depth figure without its anchor will be misread.
+An incremental cycle is **about three minutes**; a rebuild from existing tape is **under a
+minute**. A cold start with an empty `ingest/out/` backfills roughly eight days of blocks
+and takes **several hours** and $9–20 of provider requests, once. No lp-terminal checkout
+is required — the pool registry and the v4 band arithmetic are vendored in `registry/` and
+`engine/`.
 
-**Why windows is split.** Held as one object per window it came to 12.3 MB, and 39% of that
-was fee kernels that only ever matter one pool at a time. Rounding and columnar encoding cut
-the rest; the kernels moved to per-pool files the calculator fetches when a pool is selected.
-This is a deviation from the one-file plan, forced by measurement.
+Deploying is [RAILWAY.md](RAILWAY.md).
 
-**The calculator precompute.** The IL term is size-independent — position value and the hold
-benchmark are both linear in L, and L is linear in notional — so it is computed once per
-window. Only fees depend on size, and only through `L/(L + active)`, so each window ships a
-bucketed kernel: `fees(N) = Σ G·L/(L+A)` with `L = liquidity_per_dollar · N`. That is the
-same functional form as the exact sum, not a curve fitted to it. Bucket width is chosen per
-window by measuring the error against the exact sum and narrowing until it is under 0.1%;
-each window ships its own certified bound. Two earlier designs were measured against real
-segments and discarded: fixed 2× buckets (1.1% worst error) and a sampled size grid with
-log-log interpolation (0.37% at 41 points per window, both worse and larger).
+## The data
 
-The fee model is `fee_attribution.py` — per-swap tick splitting, grossed up for v4 taking
-the fee before the price moves, price-taker. `export/test_windows.py` asserts peapod's
-faster splitter is segment-for-segment identical to lp-terminal's on randomised maps; only
-the lookup differs.
+**Source.** Swap logs from the v4 `PoolManager`, read over Goldsky Edge and the chain's
+public RPC. Two universes: 236 tokenized-equity pools quoting USDG, and 90 Pons pools
+quoting ETH or USDG.
 
-## The site
+**Identity is `tx.from`, never `Swap.sender`.** On Uniswap v4 the `sender` field on a Swap
+log is whichever router contract called the PoolManager, so ranking by it ranks routers.
+Resolving the real trader means fetching each block and reading the transaction's sender,
+which is why identity resolution dominates the cost of a cycle. Legs are also **not
+trades**: a three-hop route is one decision, so every transaction is netted to a single
+position change per token before anything is counted.
 
-Two pages, served straight from `web/` with no build step.
+**ETH is priced from this chain.** Half the Pons pools quote in native ETH, so without a
+price the two halves cannot share a ranking. The price comes from the deepest ETH/USDG
+pool on the chain — chosen by executable ±1% depth, not by trade count, because a thin
+pool's spot price is cheap to push. That pool holds 52.6% of all ETH/USDG depth and yields
+**72,236 observations over the window, a median four seconds apart**. Every ETH-quoted leg
+converts at its own timestamp; repricing a total at one closing rate would credit every
+trader with the week's move in ETH, which is not a trading result.
 
-**One material: ink on paper.** Six values, one accent, and the accent has exactly one
-referent — the pool the page is about. It appears twice: a pointer under the hero band and
-a marker on that pool's row. Nowhere else. Colour does not carry sign; the ▲▼ arrows do,
-alone. An earlier version had oxblood for below-median and teal for above, which was a
-second channel repeating what the arrows already said, and spending the page's only accent
-on forty table cells is not rare use.
+**Verification.** Three independent derivations of the same data:
 
-**One family, four sizes, two weights.** Archivo at 11 / 13 / 16 / 36px, weights 400 and
-600, tabular lining figures throughout. An earlier version used the width axis at five
-settings and called it an instrument; it was five typefaces in a trench coat.
+- The identity mapping was resolved twice, from the public RPC and from Goldsky Edge, and
+  compared row for row. **440,211 overlapping transactions, zero disagreements.** (An
+  earlier check over 94,368 rows was also exact; the overlap has since grown.)
+- The swap tape was resampled against a second provider on `(block, log_index)` identities
+  rather than counts — **20 of 20 windows matched**. `ingest/verify_tape.py`.
+- The on-chain ETH/USD series agrees with CoinGecko's hourly series to **0.04% at the
+  median**, 0.11% at p95.
 
-**Space is the tool.** Sections are 96–128px apart, table rows 16px. Zebra striping, sticky
-headers, hover fills, the entrance animation and the coloured strip rule were all removed —
-space and alignment do the same work more quietly. One left edge runs from the wordmark to
-the footer; every numeric column is right-aligned on tabular figures.
+Ingest enforces record identity rather than deduplicating afterwards: a duplicate is
+dropped, a `removed: true` log is rejected outright, and two logs sharing `(block,
+log_index)` under different block hashes are both kept and recorded as a conflict.
 
-**The band is an instrument scale, not a chart.** Width is the magnitude, so nothing else
-encodes it: one block in full ink for the dominant pool, one grey for everything else, a
-drawn scale beneath, and a small accent pointer. Under it, the sentence that makes it a
-finding: *47 of 66 pools are narrower than one pixel at this width; the smallest holds
-$0.02.* That count comes from the reader's own band width and is recomputed on resize.
+Ten gates run inside the commit transaction and roll it back if any fails — time moving
+backwards, addresses vanishing, an event counted twice, the qualifying count leaving a
+0.5×–2× band, a ranked row with no detail record, a flat price series. A build that
+completes and is wrong is the failure mode these exist for; a crash was never the hard
+case.
 
-**Plain language, once.** Depth is defined in normal words — "how much you could buy or
-sell in one trade before moving the price by 1%" — and then used plainly. No term is
-explained twice, and "executable ±1% depth", "tick-map walk" and "basis" are gone from
-everything a first-time reader meets.
+## Caveats
 
-### What the tests hold in place
+- **The window is seven days.** Not all-time. Earlier windows produce very different
+  numbers: at 23 hours the best result on the equity side was $65; at seven days it is
+  $1,634. Any figure here is a statement about this window.
+- **Robinhood Chain ran under a gas subsidy that ends 2026-09-29, after the tape behind
+  every figure here.** None of this volume was recorded under real costs, so all of it is
+  provisional. This is on every page, not only here.
+- **Coverage percentages are shares of this universe**, not of the chain. An address that
+  qualifies has closed at least one round-trip *in these pools in this window*; an address
+  that does not still gets a page explaining what it did do.
+- **RWA looks safer than Pons and is not.** 84.4% of qualifying RWA addresses are in
+  profit against 53.4% on Pons, but the best RWA result is $1,634 against $188,639. The
+  higher success rate reflects how little is at stake. The interface says so on that tab.
+- **Elapsed times are measured from the end of the tape**, not from now, because the data
+  is a fixed historical window.
 
-There is no browser in this environment, so `test/render.test.mjs` runs both pages against
-a small DOM stub and asserts what they built from the real data. It proves content, not
-appearance — nothing here lays out or paints. Each of these was checked by making the
-reversion and watching the suite fail:
+## Architecture
 
-| Reversion | Caught by |
+Five stages, sequenced by `scripts/cycle.sh` every fifteen minutes. **Ingest** pulls new
+Swap logs from the PoolManager by block range, resuming from a cursor. **Resolve** fetches
+each block containing a swap and records the transaction senders — and the block
+timestamps, which the logs themselves do not carry on this chain. **Fold** appends both
+into UTC-day-partitioned parquet, which is what makes a seven-day query open eight
+directories instead of the whole tape. **Build** loads the window, nets each transaction
+to one position change per token, walks it in time order matching FIFO, and writes every
+ranking scope and every address payload into a single SQLite database in one transaction —
+so readers see the previous build until the new one commits, and a failed gate rolls it
+back. **Serve** is a dependency-free Node server exposing a small read-only API over that
+database, with gzipped payloads handed to the browser exactly as stored.
+
+No build step: `web/` is served as it sits on disk, types are JSDoc checked by
+`tsc --noEmit`, and the only runtime dependency is Node 22.
+
+```
+npm run check     # tsc --noEmit, then the full suite
+npm test          # 135 tests
+```
+
+## Layout
+
+| | |
 |---|---|
-| headline typed into `index.html` | `the headline is not written into the markup` |
-| sub-pixel line made generic | `the hero states the sub-pixel finding` |
-| subsidy caveat out of the strip | `the provenance strip carries both anchors` |
-| sign arrows removed | `signed figures carry an arrow` |
-| log axis undrawn, or transform undisclosed | `the log-scaled depth ruler draws its axis` |
-| accent spread beyond one pool | `the accent points at the pool the page is about` |
-| distribution replaced by a median | `the calculator renders a distribution` |
-
-## Executable depth
-
-`export/executable_depth.py` replaces the flat-L depth figure with a walk of the real tick
-liquidity map: the ±1% band is split at every initialized tick the price would cross, each
-segment valued with the liquidity genuinely active there. Positions whose ranges end inside
-the band stop contributing where they end. That is what "executable" means, and it is why
-the site can say depth rather than TVL.
-
-The reconstruction is verified, not assumed. Active liquidity at the current tick is the
-sum of `liquidityNet` over all ticks at or below it, and every Swap event carries the
-pool's real active liquidity, so the map is checked against the chain at the anchor swap
-for every pool. **All 66 pools reconstruct exactly.** Any that did not would be excluded
-and counted, never silently valued.
-
-| Basis | Top-1 share | Chain-wide depth |
-|---|---|---|
-| flat-L at tape end (published) | 80.8% | $9.78M |
-| flat-L at anchor | 75.2% | $10.17M |
-| **executable at anchor** | **75.8%** | **$8.77M** |
-
-Both bases are computed at the same anchor so the comparison isolates the method, and the
-published figure is reproduced exactly at the original tape end as a control.
-
-**The anchor.** lp-terminal's ModifyLiquidity ingest finished at block 62,264,735; its swap
-ingest ran five hours later, to 62,441,080. Liquidity moved in between, so at the swap
-tape's end the tick map is stale — 19 of the top 25 pools fail to reconstruct there. Depth
-is therefore taken at each pool's last swap at or before the ModifyLiquidity head. That
-costs five hours of freshness and buys a number that can be checked against the chain. Both
-timestamps ship with the data.
-
-**The replay is checked at every swap, not just at the anchor.** Building the fee segments
-walks the tick map through all 2.4 million swaps in the universe, and every Swap event
-carries the pool's real post-swap active liquidity. The reconstruction matched the chain at
-**every single swap** — zero mismatches.
-
-**"Nine of ten below their 7-day median" is restated: it is eight of ten, and SPY #1 is at
-109%.** lp-terminal took the median liquidity and the median sqrt price over the window and
-valued that pair once. peapod samples executable depth every four hours across the seven
-days and takes the median of those depths. Executable depth is a function of the whole book,
-so a median of the inputs is not the median of the output — they are different statistics,
-and peapod publishes the second. On it, eight of the top ten sit below their own median and
-the largest pool sits *above* it, at 109%.
-
-Both this and the flat-L correction ship in every data file under `provenance.restatements`,
-generated from the computed rows rather than typed in. `test_build_output.py` recomputes both
-counts from `depth.json` and fails if the shipped prose disagrees, so neither can quietly
-revert.
-
-**The flat-L figure was never an upper bound.** lp-terminal describes it as one, and for
-most pools it is: SPY #1 is at 87% of it, GOOGL at 71%. But liquidity can also switch *on*
-inside the band, and then real depth is larger — SPCX 104%, TSLA 112%. Across the 58 pools
-with a real book the ratio runs p5=69%, p50=100%, p95=116%. It is a point estimate that errs
-in both directions, not a ceiling.
-
-## The math engine
-
-`web/engine/liquidity-math.js` is a 1:1 BigInt port of lp-terminal's
-`engine/liquidity_math.py`, itself a 1:1 port of v4-core @ v4.0.0 — `TickMath`,
-`SqrtPriceMath`, and the three-branch split of `Pool.modifyLiquidity`.
-
-Every value is an exact integer. There is no `Number` arithmetic in that file, and there
-must not be. v4 rounds *against* the LP when liquidity is added and *toward* the pool when
-it is removed; a float port drifts by a wei per call and compounds across a backtest.
-
-### What the tests prove
-
-17 tests over three ground-truth fixtures, all generated from canonical v4-core:
-
-| Fixture | Cases | Pins |
-|---|---|---|
-| `positions.json` | 20 | `modifyLiquidityDelta` on real Robinhood Chain positions |
-| `tick-sweep.json` | 477 | `getSqrtPriceAtTick` across the full tick domain |
-| `delta-sweep.json` | 280 | `getAmount0Delta` / `getAmount1Delta` over a price × liquidity grid |
-| `boundary-sweep.json` | 216 | the three-branch split at every range boundary |
-
-`positions.json` is byte-identical to the fixture lp-terminal's
-`contracts/test/LiquidityParity.t.sol` asserts against v4-core, so green here plus green
-`forge test` there means JS == Python == v4-core on the same 20 real positions.
-
-### Why the sweeps exist
-
-The suite was mutation-tested: eleven deliberate defects were introduced one at a time to
-find what the tests would miss. `positions.json` alone caught only six of them. It cannot
-pin `getSqrtPriceAtTick` — its positions are mostly full-range, so the bounds are MIN/MAX
-tick, and `sqrtPriceX96` comes straight from the event rather than from a tick. A corrupted
-per-bit multiplier that changes the sqrt price at 6,898 of 18,295 ticks passed all 20
-fixtures. Nor does it contain a case where the price sits strictly inside a tick that
-equals a range bound, so a `<` → `<=` slip in the branch survived it too.
-
-The three sweeps close those holes. The battery now catches every mutation except a 1-ulp
-change to a tick multiplier, which was verified to be unobservable — identical output at
-all 136,504 sampled ticks, because the `>> 32` truncation absorbs it. That is not a defect
-the tests miss; it is not a defect.
-
-Regenerating fixtures: see `tools/parity/README.md`.
-
-## Caveat that travels with every number on this site
-
-Robinhood Chain ran under a gas subsidy that ends **2026-09-29**. The current tape ends
-2026-09-14, so every volume and activity figure predates the real cost regime. Results are
-provisional and the study re-runs in October. The tape date and this caveat must be visible
-on the site, not buried in a method page.
+| `ingest/` | chain reads: swaps, identity, block times, ETH/USD, day partitions |
+| `export/` | the fold, the scopes, the gates, the store writer |
+| `engine/` | v4 concentrated-liquidity math, vendored from lp-terminal |
+| `registry/` | pools, tokens, the Pons basket — 1.3 MB, so nothing needs seeding |
+| `web/` | the site, served as-is |
+| `archive/web/` | the earlier depth tracker and LP calculator, still tested |
+| [`STORE.md`](STORE.md) | the query store, the API, and developing without the data |
+| [`RAILWAY.md`](RAILWAY.md) | deploying |
