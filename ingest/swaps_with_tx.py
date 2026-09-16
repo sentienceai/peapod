@@ -101,6 +101,11 @@ TOPIC_CHUNK = 900
 GAPS = Path(__file__).resolve().parent / "out" / "gaps.json"
 PACE = 0.35               # seconds between calls; the endpoint 429s on tight bursts
 PART_ROWS = 100_000
+# AND ON A TIMER. Flushing only every 100,000 rows meant a run that fetched fewer than
+# that wrote nothing and saved no checkpoint: eight minutes across 250,000 blocks is about
+# 50,000 rows at this chain's density, so three deploys in a row lost their entire run and
+# restarted from the same cursor. A platform that redeploys is not an unusual event.
+FLUSH_SECONDS = 30
 
 SESSION = requests.Session()
 
@@ -108,6 +113,12 @@ SESSION = requests.Session()
 # --- run lock -----------------------------------------------------------------
 # Published so a waiter can check `kill -0 PID` instead of pattern-matching command
 # lines. A pgrep -f waiter matches its own shell, and its wrapper, and never exits.
+
+# Work to do before the process goes away, whatever kills it. A redeploy sends SIGTERM,
+# and losing the buffer to it is the difference between a cycle that makes progress and
+# one that starts over forever.
+_ON_STOP: list = []
+
 
 def claim_pidfile(path: Path):
     """Write this process's pid, and clear it on exit however the run ends."""
@@ -129,6 +140,11 @@ def claim_pidfile(path: Path):
     for sig in (signal.SIGTERM, signal.SIGINT):
         previous = signal.getsignal(sig)
         def handler(signum, frame, _prev=previous):
+            for job in _ON_STOP:
+                try:
+                    job(signum)
+                except Exception:                       # noqa: BLE001, PERF203
+                    pass
             release()
             if callable(_prev):
                 _prev(signum, frame)
@@ -493,6 +509,30 @@ def main() -> int:
 
     chunk = TOPIC_CHUNK
     clean = 0
+    last_flush = time.time()
+
+    def flush(reason: str = "") -> None:
+        nonlocal buffer, last_flush
+        if buffer:
+            part = OUT / f"part-{state['part']:05d}.parquet"
+            tmp = part.with_suffix(".parquet.tmp")
+            pl.DataFrame(buffer).write_parquet(tmp)
+            tmp.rename(part)          # a reader never sees a half-written part
+            state["part"] += 1
+            state["rows"] += len(buffer)
+            buffer = []
+        state["cursor"] = cursor
+        state["max_width"] = width_cap
+        save_checkpoint(state)
+        last_flush = time.time()
+        if reason:
+            print(f"  flushed at {cursor:,} ({reason}); {state['rows']:,} rows on disk",
+                  flush=True)
+
+    # SIGTERM is how a redeploy arrives. Write down what has been fetched and where we got
+    # to, so the next container resumes instead of refetching the same blocks.
+    _ON_STOP.append(lambda _sig: flush("stopping"))
+
     while cursor <= end:
         width = max(MIN_WIDTH, min(width, width_cap))
         hi = min(cursor + width - 1, end)
@@ -576,14 +616,8 @@ def main() -> int:
         elif got > TARGET_LOGS:
             width = max(MIN_WIDTH, int(width * 0.7))
 
-        if len(buffer) >= PART_ROWS:
-            part = OUT / f"part-{state['part']:05d}.parquet"
-            pl.DataFrame(buffer).write_parquet(part)
-            state["part"] += 1
-            state["rows"] += len(buffer)
-            buffer = []
-            state["cursor"] = cursor
-            save_checkpoint(state)
+        if len(buffer) >= PART_ROWS or time.time() - last_flush >= FLUSH_SECONDS:
+            flush()
             done = (cursor - start) / max(end - start, 1) * 100
             rate = state["rows"] / max(time.time() - began, 1)
             print(f"  {done:5.1f}%  block {cursor:,}  rows {state['rows']:,}  "

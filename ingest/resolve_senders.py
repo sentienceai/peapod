@@ -67,7 +67,9 @@ PACE = float(os.environ.get("PEAPOD_RPC_PACE", "3.0"))
 PART_ROWS = int(os.environ.get("PEAPOD_PART_ROWS", "5000"))
 # A long run must also flush on time, not only on volume: a quiet stretch of blocks can
 # hold tens of thousands of rows in memory for an hour, and a crash there loses all of it.
-FLUSH_SECONDS = 300
+# Was 300. A redeploy arriving 4 minutes into a window discarded 4 minutes of resolved
+# blocks, and the identity resolver is the slowest stage in the cycle.
+FLUSH_SECONDS = 30
 
 SESSION = requests.Session()
 
@@ -229,6 +231,10 @@ def main() -> int:
     state = load_checkpoint()
     buffer: list[dict] = []
     clock_buffer: list[tuple[int, int]] = []
+    # A redeploy sends SIGTERM. Write down what has been resolved so the next container
+    # resumes from it rather than re-fetching the same blocks.
+    from swaps_with_tx import _ON_STOP  # noqa: PLC0415
+    _ON_STOP.append(lambda _sig: flush())
     unresolved: list[int] = []
     seen = Deduplicator(key_of=tx_key, track_conflicts=False)
     began = time.time()

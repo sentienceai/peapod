@@ -281,3 +281,59 @@ def test_every_refusal_path_resets_the_clean_streak():
     source = open(m.__file__, encoding="utf8").read()
     body = source[source.index("while cursor <= end:"):source.index("clear_gaps(cursor, hi)")]
     assert body.count("clean = 0") >= 4, "a refusal path leaves the streak running"
+
+
+# --- work must survive a redeploy ------------------------------------------------------
+
+def test_the_ingest_flushes_on_a_timer_not_only_on_a_row_count():
+    # PART_ROWS alone meant a run that fetched fewer than 100,000 rows wrote nothing and
+    # saved no checkpoint. Eight minutes across 250,000 blocks is about 50,000 rows at
+    # this chain's density, so three redeploys in a row lost their entire run and
+    # restarted from the same cursor.
+    assert m.FLUSH_SECONDS <= 60, f"a {m.FLUSH_SECONDS}s window loses that much on a kill"
+    source = open(m.__file__, encoding="utf8").read()
+    assert "len(buffer) >= PART_ROWS or time.time() - last_flush >= FLUSH_SECONDS" in source
+
+
+def test_a_signal_runs_the_registered_stop_work(monkeypatch, tmp_path):
+    # A redeploy arrives as SIGTERM. The handler used to release the pidfile and exit,
+    # discarding everything buffered.
+    called = []
+    m._ON_STOP.clear()
+    m._ON_STOP.append(lambda sig: called.append(sig))
+    path = tmp_path / "pid"
+    m.claim_pidfile(path)
+
+    import signal
+    handler = signal.getsignal(signal.SIGTERM)
+    assert callable(handler)
+    try:
+        handler(signal.SIGTERM, None)
+    except SystemExit:
+        pass
+    assert called == [signal.SIGTERM], "the stop work did not run"
+    assert not path.exists(), "the pidfile was not released"
+    m._ON_STOP.clear()
+
+
+def test_the_ingest_registers_a_flush_for_that_signal():
+    source = open(m.__file__, encoding="utf8").read()
+    assert '_ON_STOP.append(lambda _sig: flush("stopping"))' in source
+    # And the flush records the cursor, or the next run refetches what was just written.
+    body = source[source.index("def flush(reason"):source.index("_ON_STOP.append")]
+    assert 'state["cursor"] = cursor' in body
+    assert "save_checkpoint(state)" in body
+
+
+def test_a_part_is_written_through_a_temporary_name():
+    # A kill during write must not leave a half-written parquet that the reader treats as
+    # data. Same discipline the day partitions use.
+    source = open(m.__file__, encoding="utf8").read()
+    body = source[source.index("def flush(reason"):source.index("_ON_STOP.append")]
+    assert ".parquet.tmp" in body and "tmp.rename(part)" in body
+
+
+def test_the_resolver_flushes_on_a_signal_too():
+    src = open(m.__file__.replace("swaps_with_tx", "resolve_senders"), encoding="utf8").read()
+    assert "_ON_STOP.append(lambda _sig: flush())" in src
+    assert "FLUSH_SECONDS = 30" in src, "a 5-minute window loses 5 minutes to a redeploy"

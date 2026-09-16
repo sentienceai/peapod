@@ -20,9 +20,18 @@ ln -sfn "$DATA/var" /app/var
 if [ ! -e /app/var/peapod.db ]; then
   echo "no build yet at $DATA/var/peapod.db — serving an empty state until the first cycle"
 fi
-if [ ! -d "$DATA/ingest-out/days" ]; then
-  echo "no tape at $DATA/ingest-out — the first cycles will ingest from the chain."
-  echo "  To seed it instead, see RAILWAY.md."
+# Report what is ACTUALLY on the volume. This tested for ingest-out/days, which only the
+# partition stage creates — so a volume holding a perfectly good part-written swap tape
+# reported "no tape", and three deploys of lost work looked like a volume that was not
+# persisting.
+swaps=$(ls "$DATA/ingest-out/swaps_tx"/part-*.parquet 2>/dev/null | wc -l | tr -d ' ')
+ident=$(ls "$DATA/ingest-out/tx_from_edge"/part-*.parquet 2>/dev/null | wc -l | tr -d ' ')
+days=$(ls -d "$DATA/ingest-out/days"/* 2>/dev/null | wc -l | tr -d ' ')
+cursor=$(sed -n 's/.*"cursor": *\([0-9]*\).*/\1/p' \
+  "$DATA/ingest-out/swaps_tx.checkpoint.json" 2>/dev/null | head -1)
+echo "volume: ${swaps:-0} swap parts, ${ident:-0} identity parts, ${days:-0} day partitions${cursor:+, cursor $cursor}"
+if [ "${swaps:-0}" = "0" ]; then
+  echo "  no swap tape yet — the first cycles will ingest from the chain. See RAILWAY.md."
 fi
 
 exec "$@"

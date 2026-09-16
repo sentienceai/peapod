@@ -193,3 +193,15 @@ test('production on loopback says so instead of looking healthy', async () => {
   const docker = await readFile(new URL('../Dockerfile', import.meta.url), 'utf8');
   assert.match(docker, /HOST=0\.0\.0\.0/);
 });
+
+test('the entrypoint reports what is on the volume, not one later stage', async () => {
+  // It tested for ingest-out/days, which only the partition stage creates — so a volume
+  // holding a perfectly good part-written swap tape reported "no tape", and three deploys
+  // of lost work looked like a volume that was not persisting.
+  const src = await readFile(new URL('../scripts/entrypoint.sh', import.meta.url), 'utf8');
+  assert.ok(!/if \[ ! -d "\$DATA\/ingest-out\/days" \]/.test(src),
+    'the volume check still keys off a directory the swap ingest never creates');
+  assert.match(src, /swap parts/);
+  assert.match(src, /identity parts/);
+  assert.match(src, /cursor/);
+});
