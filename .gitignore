@@ -16,3 +16,11 @@ web/data/address/
 
 # The store and the proxy cache: built artefacts, and on a deploy they live on the volume.
 var/
+
+# Built by export/build_leaderboard.py on every cycle, and duplicated into the store the
+# API actually serves. Tracking them meant ~7 MB of new blobs every 15 minutes.
+web/data/leaderboard/
+web/data/tokens.json
+
+# Ad-hoc archives. peapod-webdata.tar.gz was swept in by `git add -A` and cost 32 MB.
+*.tar.gz

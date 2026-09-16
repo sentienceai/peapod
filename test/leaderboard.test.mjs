@@ -13,21 +13,19 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 import { install } from './dom-stub.mjs';
-import { detail, sample, scalar } from './store.mjs';
+import { detail, index as storeIndex, sample, scalar, view } from './store.mjs';
 
 const { get, clipboard } = await install(new URL('../web/index.html', import.meta.url));
 await import('../web/index.js');
 
-const index = JSON.parse(
-  await readFile(new URL('../web/data/leaderboard/index.json', import.meta.url), 'utf8'),
-);
+const index = storeIndex();
 /** The default view this page boots into: the combined ranking over the longest window. */
-const view = index.views.find((/** @type {any} */ v) => v.scope === 'all'
+const defaultView = index.views.find((/** @type {any} */ v) => v.scope === 'all'
   && v.window === index.windows.at(-1).window);
 
 test('the coverage caveat states scope before any ranking', () => {
   const text = get('caveat').textContent;
-  const c = view.coverage;
+  const c = defaultView.coverage;
   assert.match(text, /round-trips only/i);
   assert.match(text, /out of scope, not estimated/);
 
@@ -56,7 +54,7 @@ test('the ranking says it is truncated rather than implying it is complete', () 
   // The table shows a capped top-N. Presenting that as the full ranking would overstate
   // both an address's rank and the size of the field it beat.
   const text = get('caveat').textContent;
-  const c = view.coverage;
+  const c = defaultView.coverage;
   assert.ok(c.rows_shown < c.addresses_qualifying,
     'this assertion is moot if the cap ever exceeds the qualifying set');
   assert.ok(text.includes(`Showing the top ${c.rows_shown.toLocaleString('en-US')}`),
@@ -141,9 +139,7 @@ test('rows and podium cards open the detail view', async () => {
 
 test('the detail view renders without perps-state fields', async () => {
   const { openDetail } = await import('../web/lib/detail.js');
-  const first = JSON.parse(
-    await readFile(new URL('../web/data/leaderboard/rwa-usdg-all.json', import.meta.url), 'utf8'),
-  ).rows[0];
+  const first = view('all', '7d').rows[0];
   await openDetail(first.address);
 
   const rail = get('rail').textContent.toLowerCase();
@@ -224,9 +220,7 @@ test('every address that traded is reachable, not just the ranked ones', async (
     assert.equal(typeof d.summary.realized, 'number');
     assert.ok(Array.isArray(d.round_trips));
   }
-  const top = JSON.parse(
-    await readFile(new URL('../web/data/leaderboard/all-7d.json', import.meta.url), 'utf8'),
-  ).rows[0];
+  const top = view('all', '7d').rows[0];
   assert.ok(detail(top.address), 'the top-ranked address is not in the store');
 });
 
@@ -280,9 +274,7 @@ test('an address absent from the tape is told so, and told what that means', asy
 
 test('the tab bar carries only tabs we can fill', async () => {
   const { openDetail } = await import('../web/lib/detail.js');
-  const top = JSON.parse(
-    await readFile(new URL('../web/data/leaderboard/rwa-usdg-all.json', import.meta.url), 'utf8'),
-  ).rows[0];
+  const top = view('all', '7d').rows[0];
   await openDetail(top.address);
 
   const labels = get('subtabs').byTag('button').map((b) => b.textContent);
@@ -419,9 +411,7 @@ test('token logos reach the leaderboard column and every tab that names a token'
     .test(n.attributes.src)), 'a logo src is not a token-logos path');
 
   const { openDetail } = await import('../web/lib/detail.js');
-  const top = JSON.parse(
-    await readFile(new URL('../web/data/leaderboard/rwa-usdg-all.json', import.meta.url), 'utf8'),
-  ).rows[0];
+  const top = view('all', '7d').rows[0];
   await openDetail(top.address);
   const buttons = get('subtabs').byTag('button');
   const labels = buttons.map((/** @type {any} */ b) => b.textContent);
@@ -556,9 +546,7 @@ test('the confirmation is brief, and Enter on it does not open the modal', async
 
 test('the detail rail carries the copy glyph next to the address', async () => {
   const { openDetail } = await import('../web/lib/detail.js');
-  const top = JSON.parse(
-    await readFile(new URL('../web/data/leaderboard/rwa-usdg-all.json', import.meta.url), 'utf8'),
-  ).rows[0];
+  const top = view('all', '7d').rows[0];
   await openDetail(top.address);
 
   const buttons = copiesIn(get('rail'));

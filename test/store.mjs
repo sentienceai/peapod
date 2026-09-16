@@ -42,3 +42,22 @@ export function scalar(sql, args = []) {
 }
 
 export { all };
+
+/**
+ * A leaderboard payload, from the store rather than from a file.
+ *
+ * Tests read these off disk until the store landed, and two of them were still reading
+ * rwa-usdg-all.json — a scope the build stopped producing when Pons went in. It was
+ * passing against a fossil. Reading through the store means a test can only assert
+ * against something a build actually made.
+ * @param {string} scope @param {string} window
+ */
+export function view(scope, window) {
+  const row = db.prepare('SELECT payload FROM leaderboard WHERE scope=? AND window=?')
+    .get(scope, window);
+  if (!row) throw new Error(`no leaderboard for ${scope}/${window} in the store`);
+  return unpack(/** @type {any} */ (row.payload));
+}
+
+/** The scope and window index, as the API serves it. */
+export const index = () => view('index', 'index');

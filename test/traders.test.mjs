@@ -15,14 +15,13 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 import { install } from './dom-stub.mjs';
+import { index, sample, view } from './store.mjs';
 import { chanceBand } from '../web/lib/evidence.js';
 
 const { get } = await install(new URL('../web/traders.html', import.meta.url));
 await import('../web/traders.js');
 
-const board = JSON.parse(
-  await readFile(new URL('../web/data/leaderboard/all-7d.json', import.meta.url), 'utf8'),
-);
+const board = view('all', '7d');
 
 const cards = () => get('grid').byClass('tcard');
 
@@ -309,11 +308,9 @@ test('a scope refolds the matching rather than filtering rows', async () => {
   // 68 of the top 100 trade BOTH universes. If a scope filtered rows, the Pons table
   // would still show those addresses carrying the profit they made on RWA. Each scope is
   // its own build, so the same address has DIFFERENT numbers under different scopes.
-  const read = async (/** @type {string} */ f) => JSON.parse(
-    await readFile(new URL(`../web/data/leaderboard/${f}`, import.meta.url), 'utf8'));
-  const all = await read('all-7d.json');
-  const rwa = await read('rwa-7d.json');
-  const pons = await read('pons-7d.json');
+  const all = view('all', '7d');
+  const rwa = view('rwa', '7d');
+  const pons = view('pons', '7d');
 
   const byAddr = (/** @type {any} */ b) => new Map(
     b.rows.map((/** @type {any} */ r) => [r.address, r]));
@@ -327,17 +324,15 @@ test('a scope refolds the matching rather than filtering rows', async () => {
       `${a} kept all its round-trips under the RWA scope`);
   }
   // RWA pools all quote USDG, so an rwa-eth scope would be empty and is not built.
-  const index = await read('index.json');
-  assert.equal(index.views.filter((/** @type {any} */ v) => v.scope === 'rwa-eth').length, 0);
+  const idx = index();
+  assert.equal(idx.views.filter((/** @type {any} */ v) => v.scope === 'rwa-eth').length, 0);
   assert.ok(pons.coverage.universe.includes('Pons'));
   assert.ok(rwa.coverage.universe.includes('tokenized-equity'));
 });
 
 test('the RWA tab says its success rate is small magnitudes, not better trading', async () => {
-  const rwa = JSON.parse(
-    await readFile(new URL('../web/data/leaderboard/rwa-7d.json', import.meta.url), 'utf8'));
-  const all = JSON.parse(
-    await readFile(new URL('../web/data/leaderboard/all-7d.json', import.meta.url), 'utf8'));
+  const rwa = view('rwa', '7d');
+  const all = view('all', '7d');
   // The thing that needs saying: RWA is in profit far more often, on a ceiling two orders
   // of magnitude lower. Without the note it reads as the safer place to trade.
   assert.ok(rwa.distribution.in_profit_pct > all.distribution.in_profit_pct + 10);
@@ -378,7 +373,6 @@ test('the hero leads with the field, not with the best number', async () => {
 });
 
 test('an address detail carries its percentile and the field it is read against', async () => {
-  const { sample } = await import('./store.mjs');
   const found = sample({ where: 'round_trips > 5', limit: 1 })[0];
   assert.ok(found, 'no qualifying address in the store');
   // A dollar figure alone does not say whether it beat anyone: the median qualifier made
