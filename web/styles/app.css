@@ -22,7 +22,9 @@ body {
 a { color: inherit; text-decoration: none; }
 :focus-visible { outline: 1px solid var(--focus); outline-offset: 2px; }
 
-.shell { max-width: var(--page); margin: 0 auto; padding: 0 var(--s-5); }
+/* Measured gutter on the reference at a 1327px viewport: 8.5px left, 10px right.
+   It runs close to full bleed; ours was 24px and lost most of a card column. */
+.shell { max-width: var(--page); margin: 0 auto; padding: 0 10px; }
 
 .skip { position: absolute; left: -9999px; }
 .skip:focus { left: var(--s-4); top: var(--s-2); background: var(--raised); padding: var(--s-2); z-index: 10; }
@@ -75,9 +77,9 @@ a { color: inherit; text-decoration: none; }
 }
 .tabset { display: flex; align-items: center; gap: var(--s-1); }
 .tabset button {
-  font: inherit; font-size: var(--t-body);
+  font: inherit; font-size: var(--t-num);
   background: transparent; color: var(--text-muted);
-  border: 0; border-radius: 6px; padding: var(--s-2) var(--s-3); cursor: pointer;
+  border: 0; border-radius: 6px; padding: var(--s-2) 14px; cursor: pointer;
 }
 .tabset button:hover { color: var(--text-body); }
 .tabset button[aria-selected='true'] { background: var(--raised); color: var(--text); }
@@ -368,17 +370,17 @@ table.mini td:first-child { text-align: left; }
    1300px viewport before any content. It is now about 150. */
 .hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 340px);
   gap: var(--s-5); align-items: center; padding: 37px 0 0; }
-.hero h1 { font-size: clamp(21px, 2.2vw, 28px); font-weight: var(--w-semi);
+.hero h1 { font-size: clamp(20px, 2vw, 26px); font-weight: var(--w-semi);
   line-height: 1.15; letter-spacing: -0.02em; color: var(--text); margin: 0; }
 .hero h1 em { font-style: normal; color: var(--accent-soft); }
 .hero-sub { margin: var(--s-2) 0 0; color: var(--text-body);
-  font-size: var(--t-body); line-height: 1.45; }
+  font-size: var(--t-num); line-height: 1.45; }
 .hero .caveat { margin: 6px 0 0; max-width: 84ch; font-size: var(--t-small);
   line-height: 1.45; }
 
 /* The deck is the page's only decoration: three real cards from the ranking, overlapped
    the way the reference stacks them. Short enough that it cannot drive the hero's height. */
-.hero-deck { position: relative; height: 104px; }
+.hero-deck { position: relative; height: 165px; }
 .deckcard { position: absolute; width: 56%; padding: var(--s-2); border-radius: 8px;
   background: var(--surface); border: 1px solid var(--line);
   display: flex; flex-direction: column; gap: 2px; }
@@ -387,17 +389,17 @@ table.mini td:first-child { text-align: left; }
 .deckcard:nth-child(3) { left: 44%; top: 16px; transform: rotate(4deg); opacity: 0.5; }
 .deck-addr { font-size: var(--t-micro); color: var(--text-muted); }
 .deck-fig { font-size: var(--t-body); }
-.deckcard .spark { width: 100%; height: 28px; }
+.deckcard .spark { width: 100%; height: 44px; }
 
 @media (max-width: 980px) { .hero { grid-template-columns: 1fr; } .hero-deck { display: none; } }
 
 .pill--sort select { min-width: 140px; }
 
-.hero + .controls { margin-top: 39px; }
-.controls + .pills { margin-top: var(--s-3); }
+.hero + .controls { margin-top: 57px; }
+.controls + .pills { margin-top: var(--s-2); }
 .cardgrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--s-3); margin-top: 31px; }
-.pills + .table-wrap { margin-top: 31px; }
+  gap: 22px; margin-top: 13px; }
+.pills + .table-wrap { margin-top: 13px; }
 .cardgrid + .more, .table-wrap + .more { margin-top: 0; }
 #footnote { margin-top: 57px; }
 
@@ -415,16 +417,17 @@ table.mini td:first-child { text-align: left; }
 @media (max-width: 1180px) { .cardgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 640px) { .cardgrid { grid-template-columns: 1fr; } }
 
-.tcard { display: flex; flex-direction: column; background: var(--surface);
-  border: 1px solid var(--line); border-radius: 10px; overflow: hidden; cursor: pointer; }
+.tcard { display: flex; flex-direction: column; min-height: 232px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+  overflow: hidden; cursor: pointer; }
 .tcard:hover { border-color: color-mix(in srgb, var(--accent-soft) 24%, var(--line)); }
 .tcard:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
-.tcard-head { display: flex; align-items: flex-start; gap: var(--s-2);
-  padding: var(--s-3); }
+.tcard-head { display: flex; align-items: flex-start; gap: var(--s-3);
+  padding: 13px var(--s-3) 0; min-height: 61px; }
 .tcard-who { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: var(--s-1); }
 .tcard-addr { display: flex; align-items: center; }
-.tcard-addr b { font-weight: var(--w-medium); font-size: var(--t-body); color: var(--text); }
+.tcard-addr b { font-weight: var(--w-medium); font-size: var(--t-num); color: var(--text); }
 .tcard-toks { display: flex; gap: var(--s-1); flex-wrap: wrap; }
 .tcard-ago { font-size: var(--t-micro); color: var(--text-muted); white-space: nowrap; }
 
@@ -435,18 +438,21 @@ table.mini td:first-child { text-align: left; }
 .tcard-second { color: var(--text-body); margin-top: var(--s-2); }
 .tcard-label { font-size: var(--t-micro); color: var(--text-muted); }
 .tcard-spark { min-width: 0; }
-.tcard-spark .spark { width: 100%; height: 88px; display: block; }
+.tcard-spark .spark { width: 100%; height: 100px; display: block; }
 
 /* The bottom bar. Tinted by the verdict, the way the reference tints by score, but the
    tint is reporting a test result rather than a rating. */
 .tcard-bar { display: flex; align-items: center; gap: var(--s-3);
-  padding: var(--s-2) var(--s-3); border-top: 1px solid var(--line);
+  padding: 0 var(--s-3); height: 46px; border-top: 1px solid var(--line);
   background: var(--raised); margin-top: auto; }
-.tcard-bar.v-above { background: var(--up-fill); }
-.tcard-bar.v-below { background: var(--down-fill); }
+/* The reference's bottom bar sits 3.3x the card's luminance — it advances. The forest
+   swatch against the slate card is only 1.23x, so at full strength it reads as no panel
+   at all. Lifted toward the positive green, which keeps both swatches as the source. */
+.tcard-bar.v-above { background: color-mix(in srgb, var(--up-fill) 72%, var(--up) 28%); }
+.tcard-bar.v-below { background: color-mix(in srgb, var(--down-fill) 76%, var(--down) 24%); }
 .ev { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .ev-head { display: flex; align-items: baseline; gap: var(--s-1); }
-.ev-head b { font-size: var(--t-num); font-weight: var(--w-semi); color: var(--text); }
+.ev-head b { font-size: 16px; font-weight: var(--w-semi); color: var(--text); }
 .ev-of, .ev-n { font-size: var(--t-micro); color: var(--text-muted); }
 .ev-track { position: relative; height: 6px; border-radius: 3px;
   background: rgba(255, 255, 255, 0.06); overflow: hidden; }
@@ -458,8 +464,9 @@ table.mini td:first-child { text-align: left; }
 .v-below .ev-mark { background: var(--down); }
 .ev-foot { display: flex; align-items: baseline; gap: var(--s-2); }
 .ev-label { font-size: var(--t-micro); color: var(--text-body); }
-.v-above .ev-label { color: var(--up); }
-.v-below .ev-label { color: var(--down); }
+/* On a green panel the verdict is carried by the panel; the label goes light. */
+.v-above .ev-label, .v-below .ev-label { color: var(--text); }
+.v-above .ev-n, .v-below .ev-n, .v-above .ev-of, .v-below .ev-of { color: var(--text-body); }
 .v-text-above { color: var(--up); }
 .v-text-below { color: var(--down); }
 .v-text-within, .v-text-none { color: var(--text-muted); }
@@ -492,3 +499,6 @@ table.mini td:first-child { text-align: left; }
   background: var(--raised); color: var(--text-body); font: inherit;
   font-size: var(--t-small); cursor: pointer; }
 .wallet-pick:hover { color: var(--text); }
+
+/* The card avatar is 36px on the reference, not the 28px used in table rows. */
+.tcard .avatar { width: 36px; height: 36px; border-radius: 8px; font-size: var(--t-small); }
