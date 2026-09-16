@@ -21,7 +21,7 @@ import { openDetail } from './lib/detail.js';
 import { sparkline } from './lib/spark.js';
 import { setTokenLogos, tokenCell } from './lib/token.js';
 import { copyButton } from './lib/copy.js';
-import { chanceBand, CRITERION } from './lib/evidence.js';
+import { chanceBand, coverage, CRITERION } from './lib/evidence.js';
 import { mountWallet } from './lib/wallet-ui.js';
 
 /** @param {string} id */
@@ -166,6 +166,12 @@ function evidenceBar(r) {
   const foot = node('div', 'ev-foot');
   foot.append(node('span', 'ev-label', b.label));
   foot.append(node('span', 'ev-n', `${r.round_trips} closed`));
+  // A badge over 12% of someone's flow is not the claim a badge over 95% is.
+  const cov = coverage(r.out_of_scope_volume, r.total_volume);
+  const covered = node('span', 'ev-n', `${cov.toFixed(0)}% covered`);
+  covered.title = `${cov.toFixed(1)}% of this address's selling had an on-chain buy behind `
+    + 'it. The rest has no cost basis and is not scored.';
+  foot.append(covered);
   left.append(foot);
 
   const cta = node('button', 'ev-cta', 'View trades');

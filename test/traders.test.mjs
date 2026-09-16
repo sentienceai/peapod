@@ -130,7 +130,11 @@ test('presets and filters change the set, and the caveat states the criterion', 
 
   const criterion = get('criterion').textContent;
   assert.match(criterion, /coin-flip null/);
-  assert.match(criterion, /It measures the rate, not the profit\./);
+  assert.match(criterion, /the rate, not the profit/);
+  // The test only sees selling with an on-chain buy behind it. The criterion has to say
+  // so, and has to say the subset was checked for selection rather than assumed clean.
+  assert.match(criterion, /only the selling that has an on-chain buy/);
+  assert.match(criterion, /Checked for selection/);
 });
 
 test('the page says there is no execution rather than implying there is', () => {
@@ -257,4 +261,27 @@ test('tab is trapped inside the dialog', async () => {
   assert.equal(doc.activeElement, items[items.length - 1], 'shift-tab escaped at the start');
 
   get('modal-close').dispatchEvent({ type: 'click' });
+});
+
+test('the badge says how much of an address it can actually see', async () => {
+  const { coverage } = await import('../web/lib/evidence.js');
+  // 72% of selling chain-wide has no on-chain buy, so a badge over 12% of one address's
+  // flow and a badge over 95% of it are different claims and must not look alike.
+  assert.equal(coverage(0, 100), 100);
+  assert.equal(coverage(100, 100), 0);
+  assert.equal(coverage(25, 100), 75);
+  assert.equal(coverage(5, 0), 0, 'a zero-volume address must not divide by zero');
+  assert.equal(coverage(150, 100), 0, 'coverage must not go negative');
+
+  const tabs = get('presets').byTag('button');
+  tabs[0].onclick?.(/** @type {any} */ ({}));
+  for (const c of get('grid').byClass('tcard').slice(0, 8)) {
+    const addr = c.attributes['aria-label'].replace('Open ', '');
+    const row = board.rows.find((/** @type {any} */ r) => r.address === addr);
+    const shown = c.byClass('ev-n').map((/** @type {any} */ n) => n.textContent);
+    const want = `${coverage(row.out_of_scope_volume, row.total_volume).toFixed(0)}% covered`;
+    assert.ok(shown.includes(want),
+      `card shows ${JSON.stringify(shown)}, expected ${want}`);
+    assert.ok(shown.includes(`${row.round_trips} closed`));
+  }
 });

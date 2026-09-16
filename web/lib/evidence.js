@@ -59,4 +59,21 @@ export function chanceBand(wins, trips) {
 export const CRITERION = 'Win rate on matched round-trips against a coin-flip null: '
   + '95% of traders with no skill and the same number of closes land inside the shaded '
   + 'band. Outside it is beyond what chance produces one time in twenty. It measures the '
-  + 'rate, not the profit.';
+  + 'rate, not the profit, and only the selling that has an on-chain buy behind it — the '
+  + 'coverage figure on each card says how much of that address\'s selling that is. '
+  + 'Checked for selection: an address\'s matched sells execute 0.085% worse than its own '
+  + 'unmatched sells against the day\'s average price, not better, so the scored subset is '
+  + 'not the flattering half.';
+
+/**
+ * How much of an address's selling the test can see.
+ *
+ * A badge over 12% of someone's flow and a badge over 95% of it are not the same claim,
+ * and nothing else on the card distinguishes them.
+ * @param {number} outOfScope @param {number} total
+ * @returns {number} percent of flow with an on-chain buy behind it
+ */
+export function coverage(outOfScope, total) {
+  if (!(total > 0)) return 0;
+  return Math.max(0, Math.min(100, (1 - outOfScope / total) * 100));
+}
