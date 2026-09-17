@@ -51,6 +51,12 @@
   /* signed. Measured off the product's own gainers and losers. */
   --up: #cdf460;            /* MEASURED — 16.71 on the ground */
   --down: #ec6688;          /* MEASURED —  6.82 on the ground */
+  /* THE ONE COLOUR THAT IS NOT IN THE SPEC. The system is deliberately binary — lime or
+     dark, no neutral secondary — and that binary has nowhere to put "measured, but you
+     should know how much of this is not". The out-of-scope meter is that, and on a site
+     whose whole argument is its coverage caveat it is not a detail. Amber is the only
+     addition, it appears on one meter, and the words beside it carry the same message so
+     it is never the only channel. */
   --warn: #ffd166;
 
   /* brand. The lime is a SURFACE here and a foreground nowhere except the sign, which is
@@ -71,6 +77,11 @@
      heavier than a winning one, which would read as emphasis rather than as sign. */
   --up-fill: #22300a;       /* lime at 22% over black */
   --down-fill: #471f29;     /* rose at 30% over black */
+
+  /* The dialog scrim. A token rather than a literal, so the stylesheet holds no colour
+     the palette has not named — it was the one exception the check allowed, and an
+     exception is a place where the next one goes unnoticed. */
+  --scrim: #000000e6;
 
   --focus: #ccff00;         /* the spec's own recommendation: 2px lime, 2px offset */
 

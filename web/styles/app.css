@@ -54,11 +54,11 @@ a { color: inherit; text-decoration: none; }
   font-size: var(--t-body); letter-spacing: var(--ls-body); font-weight: var(--w-semi);
   color: var(--text); letter-spacing: 0.06em; text-transform: uppercase;
 }
-.brand i { width: 9px; height: 9px; background: var(--accent-soft); display: block; }
+.brand i { width: 9px; height: 9px; background: var(--brand); display: block; }
 .topnav { display: flex; gap: var(--s-4); font-size: var(--t-small); color: var(--text-muted); }
 .topnav a { padding: var(--s-1) 0; border-bottom: 2px solid transparent; }
 .topnav a:hover { color: var(--text-body); }
-.topnav [aria-current='page'] { color: var(--text); border-bottom-color: var(--accent-soft); }
+.topnav [aria-current='page'] { color: var(--text); border-bottom-color: var(--text); }
 
 /* ------------------------------------------------------------- page head */
 
@@ -163,10 +163,6 @@ a { color: inherit; text-decoration: none; }
 .pcard-top { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); }
 .pcard-addr { display: flex; align-items: center; gap: var(--s-1); color: var(--text); font-size: var(--t-num); letter-spacing: var(--ls-num); font-weight: var(--w-medium); }
 .avatar { width: 28px; height: 28px; border-radius: var(--r-card); background: var(--raised); border: 1px solid var(--line); display: grid; place-items: center; color: var(--text-muted); font-size: var(--t-micro); letter-spacing: var(--ls-micro); }
-.rankbadge { font-size: var(--t-num); letter-spacing: var(--ls-num); font-weight: var(--w-semi); color: var(--text-muted); }
-/* The accent's first referent: rank one. */
-.pcard--first .rankbadge { background: var(--accent); color: var(--accent-ink);
-  border-radius: 5px; padding: 2px 7px; }
 /* Rank one's card is lifted by a brighter edge, in the neutral channel: the lime here
    would be a second positive figure on a card that already has one. */
 .pcard--first { border-color: color-mix(in srgb, var(--rank-1) 28%, var(--line)); }
@@ -279,13 +275,15 @@ table.board tbody tr.is-first td:first-child { color: var(--rank-1); }
  */
 
 .modal-backdrop {
-  position: fixed; inset: 0; background: #000000cc; z-index: 20;
+  position: fixed; inset: 0; background: var(--scrim); z-index: 20;
   display: grid; place-items: start center; padding: var(--s-4) var(--s-3); overflow: auto;
 }
 .modal-backdrop[hidden] { display: none !important; }
 .modal {
   width: min(1180px, 100%);
-  background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-card);
+  /* Lifted off the ground rather than flush with it. A black dialog over a black page
+     separated by one hairline is a dialog you have to look for. */
+  background: var(--raised); border: 1px solid var(--line-soft); border-radius: var(--r-card);
   overflow: hidden;
 }
 .modal-head {
@@ -301,9 +299,10 @@ table.board tbody tr.is-first td:first-child { color: var(--rank-1); }
    is what receives focus when the dialog opens. */
 .modal-close { margin-left: auto; width: 28px; height: 28px; display: inline-flex;
   align-items: center; justify-content: center; background: var(--raised);
-  border: 1px solid var(--line); border-radius: var(--r-card); color: var(--text-body);
-  font-size: 16px; line-height: 1; cursor: pointer; padding: 0; }
-.modal-close:hover { color: var(--text); border-color: var(--accent-soft); }
+  border: 1px solid var(--line); border-radius: var(--r-pill); color: var(--text-body);
+  font-size: var(--t-body); line-height: 1; cursor: pointer; padding: 0;
+  transition: border-color var(--motion) var(--ease), color var(--motion) var(--ease); }
+.modal-close:hover { color: var(--text); border-color: var(--text); }
 .modal-close:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
 .modal-body { display: grid; grid-template-columns: 268px minmax(0, 1fr); gap: 0; }
@@ -311,9 +310,17 @@ table.board tbody tr.is-first td:first-child { color: var(--rank-1); }
 .rail-id { display: flex; align-items: center; gap: var(--s-2); }
 .rail-id .avatar { width: 36px; height: 36px; font-size: var(--t-small); letter-spacing: var(--ls-small); }
 :where(.rail-id) b { display: block; color: var(--text); font-size: var(--t-num); letter-spacing: var(--ls-num); font-weight: var(--w-medium); }
-.rail-id small { color: var(--text-muted); font-size: var(--t-micro); letter-spacing: var(--ls-micro); }
+/* The full address, which is 42 characters and has never fitted the rail's 268px on one
+   line — it was running out under the divider. It wraps rather than truncates: the short
+   form is already on the line above, so the only reason to print this one is that all of
+   it is readable. */
+.rail-id small { color: var(--text-muted); font-size: var(--t-micro); letter-spacing: var(--ls-micro);
+  display: block; overflow-wrap: anywhere; line-height: 1.45; }
 
-.rail-figure strong { display: block; font-size: 26px; font-weight: var(--w-semi); letter-spacing: -0.02em; }
+/* The modal opens on its number. This is the largest figure in the view, so it takes the
+   spec's heading step rather than a hand-picked 26px. */
+.rail-figure strong { display: block; font-size: var(--t-head); letter-spacing: var(--ls-head);
+  line-height: var(--lh-head); font-weight: var(--w-regular); }
 .rail-figure .label { display: block; margin-top: 2px; font-size: var(--t-micro); letter-spacing: var(--ls-micro); color: var(--text-muted); }
 
 .rail-block { border-top: 1px solid var(--line); padding-top: var(--s-3); }
@@ -323,9 +330,11 @@ table.board tbody tr.is-first td:first-child { color: var(--rank-1); }
 :where(.rail-row) b { font-weight: var(--w-regular); color: var(--text-body); }
 
 .label-item { border: 1px solid var(--line); border-radius: var(--r-card); padding: var(--s-2); margin-bottom: var(--s-1); }
-.label-item[data-earned='true'] { border-color: color-mix(in srgb, var(--accent-soft) 28%, var(--line)); }
+/* An earned label is a state, not a gain. Brightness carries it: the earned ones sit at
+   full strength with a brighter edge, the rest were already dimmed. */
+.label-item[data-earned='true'] { border-color: color-mix(in srgb, var(--text) 28%, var(--line)); }
 :where(.label-item) b { display: block; font-size: var(--t-small); letter-spacing: var(--ls-small); color: var(--text-body); font-weight: var(--w-medium); }
-:where(.label-item[data-earned='true']) b { color: var(--accent-soft); }
+:where(.label-item[data-earned='true']) b { color: var(--text); }
 .label-item small { display: block; margin-top: 3px; font-size: var(--t-micro); letter-spacing: var(--ls-micro); color: var(--text-muted); line-height: 1.4; }
 .label-item[data-earned='false'] { opacity: 0.45; }
 
@@ -334,7 +343,7 @@ table.board tbody tr.is-first td:first-child { color: var(--rank-1); }
 
 .pane { padding: var(--s-4); display: flex; flex-direction: column; gap: var(--s-3); }
 .metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-3); }
-.metric { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: var(--s-3); }
+.metric { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); padding: var(--s-3); }
 .metric h5 { margin: 0 0 var(--s-2); font-size: var(--t-small); letter-spacing: var(--ls-small); font-weight: var(--w-regular); color: var(--text-muted); }
 .metric .big { font-size: var(--t-lead); letter-spacing: var(--ls-lead); font-weight: var(--w-semi); }
 .metric .foot { margin-top: var(--s-1); font-size: var(--t-small); letter-spacing: var(--ls-small); color: var(--text-muted); }
@@ -351,15 +360,17 @@ table.board tbody tr.is-first td:first-child { color: var(--rank-1); }
 .bar i { display: block; height: 100%; background: var(--text); }
 .bar i.warn { background: var(--warn); }
 
-.chartcard { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: var(--s-3); }
+.chartcard { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); padding: var(--s-3); }
 .chartcard-head { display: flex; align-items: baseline; gap: var(--s-3); margin-bottom: var(--s-2); }
 .chartcard-head h5 { margin: 0; font-size: var(--t-small); letter-spacing: var(--ls-small); font-weight: var(--w-regular); color: var(--text-muted); }
 .chartcard-head strong { font-size: var(--t-lead); letter-spacing: var(--ls-lead); font-weight: var(--w-semi); }
 .chart-stage { position: relative; }
 .chart { width: 100%; height: 220px; display: block; }
+/* The tooltip sits on a card that is now the same value as the dialog behind it, so its
+   edge is what separates it: the divider grey rather than the card-border grey. */
 .tip {
-  position: absolute; pointer-events: none; background: var(--raised);
-  border: 1px solid var(--line); border-radius: var(--r-card); padding: var(--s-1) var(--s-2);
+  position: absolute; pointer-events: none; background: var(--bg);
+  border: 1px solid var(--line-soft); border-radius: var(--r-card); padding: var(--s-1) var(--s-2);
   font-size: var(--t-small); letter-spacing: var(--ls-small); white-space: nowrap; transform: translate(-50%, -120%);
 }
 .tip[hidden] { display: none !important; }
@@ -368,10 +379,11 @@ table.board tbody tr.is-first td:first-child { color: var(--rank-1); }
 
 .subtabs { display: flex; gap: var(--s-3); border-bottom: 1px solid var(--line); }
 .subtabs button { font: inherit; font-size: var(--t-small); letter-spacing: var(--ls-small); background: none; border: 0; border-bottom: 2px solid transparent; color: var(--text-muted); padding: var(--s-1) 0; cursor: pointer; }
-.subtabs button[aria-selected='true'] { color: var(--text); border-bottom-color: var(--accent-soft); }
+.subtabs button[aria-selected='true'] { color: var(--text); border-bottom-color: var(--text);
+  transition: color var(--motion) var(--ease); }
 
 table.mini { width: 100%; border-collapse: collapse; font-size: var(--t-small); letter-spacing: var(--ls-small); }
-table.mini th { text-align: right; font-size: var(--t-micro); letter-spacing: var(--ls-micro); font-weight: var(--w-medium); color: var(--text-muted); padding: var(--s-1) var(--s-2) var(--s-1) 0; border-bottom: 1px solid var(--line); }
+table.mini th { text-align: right; font-size: var(--t-micro); letter-spacing: var(--ls-micro); font-weight: var(--w-medium); color: var(--text-muted); padding: var(--s-1) var(--s-2) var(--s-1) 0; border-bottom: 1px solid var(--line-soft); }
 table.mini th:first-child { text-align: left; }
 table.mini td { text-align: right; padding: var(--s-1) var(--s-2) var(--s-1) 0; border-bottom: 1px solid var(--line-soft); white-space: nowrap; }
 table.mini td:first-child { text-align: left; }
@@ -621,7 +633,7 @@ table.mini td:first-child { text-align: left; }
 .wallet-btn { padding: 6px 12px; border-radius: var(--r-card); border: 1px solid var(--line);
   background: var(--raised); color: var(--text-body); font: inherit;
   font-size: var(--t-small); letter-spacing: var(--ls-small); cursor: pointer; white-space: nowrap; }
-.wallet-btn:hover { color: var(--text); border-color: var(--accent-soft); }
+.wallet-btn:hover { color: var(--text); border-color: var(--text); }
 .wallet-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .wallet-btn[disabled] { opacity: 0.6; cursor: default; }
 .wallet-addr { font-size: var(--t-small); letter-spacing: var(--ls-small); color: var(--text-body); }
@@ -664,7 +676,7 @@ table.mini td:first-child { text-align: left; }
 .keycap { flex: none; font: inherit; font-size: 10px; line-height: 1;
   padding: 3px 5px; border-radius: var(--r-card); color: var(--text-muted);
   background: var(--raised); border: 1px solid var(--line); white-space: nowrap; }
-.search:focus-within .keycap { color: var(--text-body); border-color: var(--accent-soft); }
+.search:focus-within .keycap { color: var(--text-body); border-color: var(--text); }
 
 /* Podium medals. Rank is an ordinal; three in one colour makes the order something
    you read rather than see. The numeral is inside the badge, so colour is never the
@@ -720,9 +732,10 @@ table.mini td:first-child { text-align: left; }
 
 /* One line of subtitle, as the reference has, with the method behind a disclosure.
    Eleven lines of body text above the fold is eleven lines nobody reads. */
-.sub-link { color: var(--accent-soft); text-decoration: none;
-  border-bottom: 1px solid color-mix(in srgb, var(--accent-soft) 40%, transparent); }
-.sub-link:hover { color: var(--text); border-bottom-color: var(--accent-soft); }
+/* Marked rather than coloured, which is what a link on this palette has to be. */
+.sub-link { color: var(--text); text-decoration: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--text) 45%, transparent); }
+.sub-link:hover { border-bottom-color: var(--text); }
 .pill--note > div { position: absolute; right: 0; top: calc(100% + 6px); z-index: 5;
   width: min(62ch, 86vw); margin: 0; padding: var(--s-3);
   background: var(--raised); border: 1px solid var(--line); border-radius: var(--r-card);

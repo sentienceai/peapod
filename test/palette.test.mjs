@@ -135,10 +135,10 @@ test('the stylesheet does not smuggle in colours the palette does not define', a
   // use them, and a hex in a comment is documentation, not a colour on the page.
   const code = app.replace(/\/\*[\s\S]*?\*\//g, '');
   const literals = [...code.matchAll(/#[0-9a-fA-F]{3,8}\b/g)].map((m) => m[0]);
-  // One exception, and it is a shade of black used as a scrim, not a palette colour.
-  const unexpected = literals.filter((h) => h.toLowerCase() !== '#000000cc');
-  assert.deepEqual(unexpected, [],
-    `hardcoded colours in app.css: ${unexpected.join(', ')}`);
+  // No exceptions any more. The scrim was the one, and an allowed exception is a place
+  // where the next one goes unnoticed — it is --scrim in tokens.css now.
+  assert.deepEqual(literals, [],
+    `hardcoded colours in app.css: ${literals.join(', ')}`);
 });
 
 test('nothing can override the colour of a signed figure', async () => {
