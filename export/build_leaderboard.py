@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import os
+import re
 import time
 import json
 import math
@@ -33,6 +34,35 @@ OUT = HERE.parent / "web" / "data" / "leaderboard"
 Q96 = 1 << 96
 DUST = 1e-12
 SPARK_POINTS = 24
+DAY = 86400
+ASSET_SERIES_CAP = 200
+ASSET_TRADES = 50
+# What /api/asset/:symbol can spell, kept in step with web-api.mjs by hand.
+#
+# WIDE ON PURPOSE. This was [A-Za-z0-9.]{1,16}, which dropped three Pons tokens named in
+# emoji and Chinese — and the leaderboard lists those tokens in its own rows, so the asset
+# list disagreed with the board about which tokens exist. A symbol is data from the chain,
+# not an identifier we get to choose, and the one thing a URL actually needs is that it can
+# be percent-encoded and round-trip: that rules out path separators and control characters,
+# and nothing else.
+#
+# What is refused, and why:
+#   / and \   a path separator would make the symbol a path
+#   . and ..  the two names every filesystem reserves for somewhere else
+#   control   including newline and tab: invisible, and unloggable without escaping
+#   empty     nothing to address
+#   > 32      a cap, because a symbol is a ticker and this one is already generous
+ASSET_SYMBOL_MAX = 32
+_UNADDRESSABLE = re.compile(r"[/\\\x00-\x1f\x7f]")
+
+
+def addressable(symbol: str | None) -> bool:
+    """Whether /api/asset/:symbol can carry this symbol there and back."""
+    if not symbol or symbol in {".", ".."}:
+        return False
+    if len(symbol) > ASSET_SYMBOL_MAX:
+        return False
+    return not _UNADDRESSABLE.search(symbol)
 
 
 def load(root: Path, source: str) -> pl.DataFrame:
@@ -307,6 +337,32 @@ def longest_streak(trips: list[dict]) -> int:
     return best
 
 
+def max_drawdown(series: list) -> dict:
+    """The deepest fall of the realized curve, over EVERY close.
+
+    Computed here, before `downsample`, because a 500-point sample of a 2,800-close curve
+    can step straight over the trough: the figure taken from the shipped series is a lower
+    bound, not the drawdown. The curve starts at zero, so an address that only ever lost is
+    in drawdown from its first close rather than showing none.
+
+    This is not account drawdown. Nothing here knows what the address holds, so an open
+    position that halved contributes nothing; it is the fall of the closed-round-trip
+    total, and the interface labels it as that.
+    """
+    peak = 0.0
+    peak_ts = None
+    best = {"depth": 0.0, "peak": 0.0, "trough": 0.0, "from_ts": None, "to_ts": None,
+            "closes": len(series)}
+    for ts, value in series:
+        if value > peak:
+            peak, peak_ts = value, int(ts)
+        fall = peak - value
+        if fall > best["depth"]:
+            best = {"depth": fall, "peak": peak, "trough": value, "from_ts": peak_ts,
+                    "to_ts": int(ts), "closes": len(series)}
+    return best
+
+
 def downsample(series: list, cap: int = 500) -> list:
     """Thin a series to `cap` points, always keeping the first and last.
 
@@ -319,6 +375,88 @@ def downsample(series: list, cap: int = 500) -> list:
     step = len(series) / cap
     out = [series[int(i * step)] for i in range(cap - 1)]
     out.append(series[-1])
+    return out
+
+
+def assets(trades: pl.DataFrame, to_ts: int) -> list[dict]:
+    """Per-asset aggregates, folded from the same window the ranking is.
+
+    THE SAME WINDOW, NOT A SECOND PASS OVER THE TAPE. These rows and the leaderboard rows
+    are read side by side on the site, and two aggregations over two windows would disagree
+    about volume by whatever arrived in between and look like a bug in one of them.
+
+    PRICE IS AN EXECUTION, NOT A QUOTE. It is the most recent trade's own abs(usd)/abs(qty),
+    so it is a price somebody actually paid. Rows under DUST are skipped for anything
+    price-bearing: a quantity that small divides into a price of thousands or of nothing,
+    and one of them would become this asset's headline number. Those rows still count
+    towards volume and the trade count, because they did happen.
+
+    change24h IS None WHEN THE WINDOW HOLDS NO TRADE THAT OLD. Not zero: zero is "it did
+    not move", which is a measurement, and this is the absence of one. It stays None
+    through the store and out of the API, and the page has to decide what to show for it.
+
+    There are no holders and no holder count. That needs an ERC-20 transfer index this
+    build does not have, and a zero in its place would read as a measured zero.
+
+    Returns one payload per asset, richest first, each {asset, series, trades}: the summary
+    row is nested rather than spread because the summary's `trades` is a count and the
+    detail's is a list, and one key cannot honestly mean both.
+    """
+    day_ago = to_ts - DAY
+    out, skipped = [], []
+    for part in trades.sort("ts").partition_by("label", maintain_order=True):
+        symbol = part["label"][0]
+        if not addressable(symbol):
+            skipped.append(symbol)
+            continue
+        usd = np.abs(part["usd"].to_numpy())
+        ts = part["ts"].to_numpy()
+        priced = part.filter((pl.col("qty").abs() > DUST) & pl.col("usd").is_finite())
+        pts = priced["ts"].to_numpy()
+        pqty = np.abs(priced["qty"].to_numpy())
+        pusd = np.abs(priced["usd"].to_numpy())
+        prices = pusd / pqty
+        price = float(prices[-1]) if len(prices) else None
+        # The last trade at or before the boundary, by position: the window is sorted, so
+        # this is a lookup rather than a second filter.
+        back = int(np.searchsorted(pts, day_ago, side="right")) - 1
+        change = ((price - float(prices[back])) / float(prices[back]) * 100
+                  if price is not None and back >= 0 and prices[back] > 0 else None)
+        series = []
+        if len(pts):
+            # One point per hour, and the point is the last trade in that hour rather than
+            # a mean of it: a mean is a price nothing traded at.
+            hour = pts // 3600
+            for i in np.flatnonzero(np.append(hour[1:] != hour[:-1], True)):
+                series.append([int(pts[i]), float(prices[i])])
+        addrs = priced["addr"].to_list()
+        signed = priced["qty"].to_numpy()
+        recent = [{"ts": int(pts[i]), "address": addrs[i],
+                   "side": "buy" if signed[i] > 0 else "sell",
+                   "qty": float(pqty[i]), "price": float(prices[i]),
+                   "value": float(pusd[i])}
+                  for i in range(len(pts) - 1, max(len(pts) - ASSET_TRADES, 0) - 1, -1)]
+        out.append({
+            "asset": {
+                "symbol": symbol,
+                # The two universes under the names the site uses for them. 'rwa' and
+                # 'pons' are what the tape calls them and mean nothing to a reader.
+                "kind": "stock" if part["cat"][-1] == "rwa" else "meme",
+                "price": price,
+                "change24h": change,
+                "volume24h": float(usd[ts > day_ago].sum()),
+                "volume": float(usd.sum()),
+                "traders": part["addr"].n_unique(),
+                "trades": part.height,
+            },
+            "series": downsample(series, ASSET_SERIES_CAP),
+            "trades": recent,
+        })
+    out.sort(key=lambda a: -a["asset"]["volume"])
+    if skipped:
+        # Said out loud. Dropping them in silence is how a universe quietly shrinks.
+        print(f"assets: {len(skipped)} symbol(s) the API route cannot address, "
+              f"skipped: {skipped}")
     return out
 
 
@@ -407,6 +545,9 @@ def write_address(addr: str, state, lo: int, hi: int, out: Path | None, provenan
             # Which asset this address's volume is priced in. Not a direction and not a
             # rating — ETH-quoted flow is converted at the trade's own timestamp, so a
             # reader is entitled to know how much of a figure went through that step.
+            # The deepest fall of the realized curve, over every close rather than over
+            # the sampled series the chart draws. Not account drawdown: see max_drawdown.
+            "realized_drawdown": max_drawdown(state["series"][addr]),
             "quote_mix": [{"quote": q, "volume": v,
                            "pct": v / total_vol * 100 if total_vol else 0}
                           for q, v in sorted(state["by_quote"].get(addr, {}).items(),
@@ -621,6 +762,11 @@ def main() -> int:
                            ranked=ranked, context=ctx) for a in everyone), build_id)
         print(f"        stored {written:,} addresses from the {name} window "
               f"({qual_all:,} qualifying, {written - qual_all:,} with no round-trip)")
+        # Assets come off the same frame as the detail records, for the same reason: the
+        # widest window that built is the one every other payload is written from, so an
+        # asset page and the address pages that link to it cannot disagree about the window.
+        shipped_assets = store.put_assets(assets(w_all, hi), build_id)
+        print(f"        stored {shipped_assets:,} assets from the {name} window")
 
     index["scopes"] = [{"id": s["id"], "label": s["label"], "cat": s["cat"],
                         "quote": s["quote"]} for s in SCOPES]
@@ -670,6 +816,7 @@ def main() -> int:
     c = store.counts()
     print(f"\nstore {store.path}: build {build_id}, {c['addresses']:,} addresses "
           f"({c['qualifying']:,} qualifying), {c['leaderboards']} leaderboards, "
+          f"{c['assets']:,} assets, "
           f"{c['payload_bytes'] / 1e6:.0f} MB of gzipped payload")
     return 0
 

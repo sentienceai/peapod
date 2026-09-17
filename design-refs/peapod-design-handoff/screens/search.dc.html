@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+  <style>
+    .pp { --surface: #FFFFFF; --surface-2: #FAFBF9; --sunken: #F7F8F6; --hover: #F5F7F3; --muted-bg: #F2F4F0; --muted-bg-2: #EEF1EC; --grid: #F0F2EE; --line-soft: #EEF0EC; --line: #E6E9E3; --up-line: #E1F2E6; --line-strong: #D6DAD2; --line-strong-2: #C9CEC5; --faint: #B7BCB2; --subtle: #8A9082; --placeholder: #6B7166; --muted: #5F6559; --fg: #11140F; --fg-strong: #000000; --up: #067A2F; --down: #C8360F; --warn: #8A6100; --meme: #6D4FE0; --up-bg: #EAF8EE; --up-bg-2: #F3FBF5; --up-track: #C9E9D2; --down-bg: #FDECE7; --meme-bg: #F1EDFF; --inv-bg: #11140F; --inv-fg: #FFFFFF; --inv-hover: #2A2E25; color-scheme: light; color: var(--fg); transition: background-color 250ms ease, color 250ms ease; }
+    .pp.theme-dark { --surface: #111310; --surface-2: #161914; --sunken: #0B0C0A; --hover: #1A1D17; --muted-bg: #1C1F19; --muted-bg-2: #20241D; --grid: #161914; --line-soft: #1E221B; --line: #272B23; --up-line: #1C3323; --line-strong: #394033; --line-strong-2: #4A5143; --faint: #596052; --subtle: #858C7E; --placeholder: #7D8476; --muted: #A3AA9B; --fg: #EEF1EA; --fg-strong: #FFFFFF; --up: #4BD17A; --down: #FF7A57; --warn: #F2C14E; --meme: #B4A2FF; --up-bg: #12281A; --up-bg-2: #0F1D13; --up-track: #1F3A27; --down-bg: #2E1710; --meme-bg: #231D3A; --inv-bg: #EEF1EA; --inv-fg: #0B0C0A; --inv-hover: #FFFFFF; color-scheme: dark; }
+    .pp.theme-dark .dark { box-shadow: inset 0 0 0 1px #22261E; }
+    .theme-toggle:hover { border-color: var(--line-strong) !important; }
+    body { margin: 0; font-family: "Schibsted Grotesk", "Helvetica Neue", sans-serif; -webkit-font-smoothing: antialiased; }
+    button { font-family: inherit; cursor: pointer; }
+    input { font-family: inherit; }
+    input::placeholder { color: var(--placeholder); }
+    .sp-row:hover { background: var(--hover) !important; }
+    .sp-chip:hover { color: var(--fg); }
+  </style>
+</helmet>
+<div class="{{themeClass}}" style="width: 860px; height: 600px; box-sizing: border-box; background: transparent;">
+  <div role="dialog" aria-modal="true" aria-label="Search" style="height: 600px; box-sizing: border-box; border-radius: 16px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); box-shadow: 0 40px 100px -20px rgba(11,12,10,0.5); overflow: hidden; display: flex; flex-direction: column;">
+
+    <div style="height: 64px; flex-shrink: 0; box-sizing: border-box; padding: 0 16px 0 20px; border-bottom: 1px solid var(--line-soft); display: flex; align-items: center; gap: 12px;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" style="stroke: var(--muted);" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+      <input type="search" autoFocus="{{ true }}" aria-label="Search assets or addresses" value="{{q}}" onChange="{{onQuery}}" onKeyDown="{{onKey}}" placeholder="Search assets, addresses or trader names" style="flex-grow: 1; min-width: 0; border: 0; outline: none; background: transparent; color: var(--fg); font-size: 18px;">
+      <button onClick="{{close}}" aria-label="Close search" style="height: 28px; padding: 0 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface-2); color: var(--muted); font-family: 'JetBrains Mono', monospace; font-size: 11px;">ESC</button>
+    </div>
+
+    <div style="height: 46px; flex-shrink: 0; box-sizing: border-box; padding: 0 20px; border-bottom: 1px solid var(--line-soft); display: flex; align-items: stretch; gap: 22px;">
+      <sc-for list="{{tabs}}" as="t" hint-placeholder-count="2">
+        <button onClick="{{t.pick}}" style="{{t.style}}">
+          {{t.label}}
+          <span style="font-size: 11px; color: var(--subtle);">{{t.count}}</span>
+        </button>
+      </sc-for>
+    </div>
+
+    <div style="height: 50px; flex-shrink: 0; box-sizing: border-box; padding: 0 14px; display: flex; align-items: center; gap: 4px;">
+      <sc-for list="{{subs}}" as="s" hint-placeholder-count="4">
+        <button class="sp-chip" onClick="{{s.pick}}" style="{{s.style}}">{{s.label}}</button>
+      </sc-for>
+      <div style="flex-grow: 1;"></div>
+      <span style="padding-right: 6px; font-size: 12px; color: var(--muted);">{{countLabel}}</span>
+    </div>
+
+    <div style="{{headStyle}}">
+      <sc-for list="{{heads}}" as="h" hint-placeholder-count="4">
+        <div style="{{h.style}}">
+          {{h.label}}
+          <sc-if value="{{h.sortable}}" hint-placeholder-val="{{ false }}">
+            <svg width="8" height="12" viewBox="0 0 10 14" aria-hidden="true"><path d="M1.5 5L5 1.5 8.5 5" fill="none" style="stroke: var(--faint);" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path><path d="M1.5 9L5 12.5 8.5 9" fill="none" style="stroke: var(--faint);" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+          </sc-if>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="flex-grow: 1; min-height: 0; overflow: auto;">
+      <sc-if value="{{isTraders}}" hint-placeholder-val="{{ true }}">
+        <sc-for list="{{traderRows}}" as="r" hint-placeholder-count="9">
+          <button class="sp-row" onClick="{{r.open}}" style="{{r.style}}">
+            <span style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+              <span style="{{r.avatarStyle}}">{{r.initials}}</span>
+              <span style="font-size: 14px; font-weight: 600; white-space: nowrap;">{{r.name}}</span>
+              <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--muted); white-space: nowrap;">[{{r.short}}]</span>
+              <sc-if value="{{r.hasTag}}" hint-placeholder-val="{{ false }}">
+                <span style="height: 20px; padding: 0 6px; border-radius: 5px; background: var(--up-bg); color: var(--up); font-size: 11px; font-weight: 600; display: flex; align-items: center;">{{r.tag}}</span>
+              </sc-if>
+            </span>
+            <span style="{{r.pnlStyle}}">{{r.pnl}}</span>
+            <span style="text-align: right; font-family: 'JetBrains Mono', monospace; font-size: 13px;">{{r.value}}</span>
+            <span style="display: flex; align-items: center; justify-content: flex-end; gap: 8px;">
+              <span style="{{r.scoreStyle}}">{{r.score}}</span>
+              <span style="display: flex; gap: 2px;">
+                <sc-for list="{{r.bars}}" as="b" hint-placeholder-count="10">
+                  <span style="{{b.style}}"></span>
+                </sc-for>
+              </span>
+            </span>
+          </button>
+        </sc-for>
+      </sc-if>
+      <sc-if value="{{isAssets}}" hint-placeholder-val="{{ false }}">
+        <sc-for list="{{assetRows}}" as="r" hint-placeholder-count="9">
+          <button class="sp-row" onClick="{{r.open}}" style="{{r.style}}">
+            <span style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+              <span style="{{r.iconStyle}}">{{r.letter}}</span>
+              <span style="font-size: 14px; font-weight: 700;">{{r.sym}}</span>
+              <span style="font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{r.name}}</span>
+            </span>
+            <span><span style="{{r.tagStyle}}">{{r.type}}</span></span>
+            <span style="text-align: right; font-family: 'JetBrains Mono', monospace; font-size: 13px;">{{r.price}}</span>
+            <span style="{{r.chgStyle}}">{{r.chg}}</span>
+            <span style="text-align: right; font-family: 'JetBrains Mono', monospace; font-size: 13px;">{{r.holders}}</span>
+            <span style="text-align: right; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--muted);">{{r.vol}}</span>
+          </button>
+        </sc-for>
+      </sc-if>
+      <sc-if value="{{isEmpty}}" hint-placeholder-val="{{ false }}">
+        <div style="height: 220px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; text-align: center;">
+          <span style="font-size: 15px; font-weight: 600;">No matches for “{{q}}”</span>
+          <span style="font-size: 13px; color: var(--muted);">Try a ticker like TSLA, a name, or paste a full 0x address.</span>
+        </div>
+      </sc-if>
+    </div>
+
+    <div style="height: 44px; flex-shrink: 0; box-sizing: border-box; padding: 0 16px; border-top: 1px solid var(--line-soft); background: var(--surface-2); display: flex; align-items: center; gap: 16px; font-size: 12px; color: var(--muted);">
+      <sc-for list="{{hints}}" as="k" hint-placeholder-count="4">
+        <span style="display: flex; align-items: center; gap: 6px;">
+          <sc-for list="{{k.keys}}" as="kk" hint-placeholder-count="1">
+            <span style="height: 20px; min-width: 20px; box-sizing: border-box; padding: 0 5px; border-radius: 4px; border: 1px solid var(--line); background: var(--surface); font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--fg); display: flex; align-items: center; justify-content: center;">{{kk.k}}</span>
+          </sc-for>
+          {{k.label}}
+        </span>
+      </sc-for>
+      <div style="flex-grow: 1;"></div>
+      <svg width="22" height="22" viewBox="0 0 30 30" aria-hidden="true"><rect style="fill: {{accent}};" x="2" y="9" width="26" height="12" rx="6"></rect><circle cx="9" cy="15" r="3" style="fill: var(--surface-2);"></circle><circle cx="15" cy="15" r="3" style="fill: var(--surface-2);"></circle><circle cx="21" cy="15" r="3" style="fill: var(--surface-2);"></circle></svg>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"onClose":{"editor":null},"onOpenTrader":{"editor":null},"onOpenAsset":{"editor":null},"theme":{"editor":null},"onToggleTheme":{"editor":null},"defaultTheme":{"editor":"enum","options":["light","dark"],"default":"light"},"accent":{"editor":"color","default":"#00B843","options":["#00B843","#2F6BFF","#E8A400"]},"$preview":{"width":860,"height":600}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { q: '', tab: 'traders', sub: 'all', active: 0 };
+    let savedTheme = null;
+    try { savedTheme = window.localStorage.getItem('peapod-theme'); } catch (e) { savedTheme = null; }
+    this.state.theme = savedTheme === 'dark' || savedTheme === 'light' ? savedTheme : (props.defaultTheme === 'dark' ? 'dark' : 'light');
+  }
+  componentDidMount() {
+    this._onThemeStore = (e) => {
+      if (e.key === 'peapod-theme' && (e.newValue === 'dark' || e.newValue === 'light')) this.setState({ theme: e.newValue });
+    };
+    window.addEventListener('storage', this._onThemeStore);
+  }
+  componentWillUnmount() {
+    window.removeEventListener('storage', this._onThemeStore);
+  }
+  themeVals() {
+    const theme = this.props.theme === 'dark' || this.props.theme === 'light' ? this.props.theme : this.state.theme;
+    const isDark = theme === 'dark';
+    const toggleTheme = () => {
+      const next = isDark ? 'light' : 'dark';
+      try { window.localStorage.setItem('peapod-theme', next); } catch (e) { /* storage unavailable */ }
+      if (this.props.onToggleTheme) this.props.onToggleTheme(next);
+      else this.setState({ theme: next });
+    };
+    const slot = 'width: 34px; height: 34px; border-radius: 17px; display: flex; align-items: center; justify-content: center; transition: background-color 200ms ease, color 200ms ease; ';
+    return {
+      theme, isDark, toggleTheme,
+      setTheme: (next) => this.setState({ theme: next }),
+      themeClass: isDark ? 'pp theme-dark' : 'pp',
+      themeAria: isDark ? 'Switch to day mode' : 'Switch to night mode',
+      sunStyle: slot + (isDark ? 'background: transparent; color: #6E7567;' : 'background: #F4EFE3; color: #1E4D2B; box-shadow: 0 1px 3px rgba(17,20,15,0.18);'),
+      moonStyle: slot + (isDark ? 'background: #0B0C0A; color: #EFE6C8; box-shadow: 0 0 0 1px #2E3329;' : 'background: transparent; color: #8A9082;')
+    };
+  }
+  renderVals() {
+    const accent = this.props.accent ?? '#00B843';
+    const st = this.state;
+    const hexOf = (s, len) => { let x = s * 131 + 7, out = ''; for (let i = 0; i < len; i++) { x = (x * 9301 + 49297) % 233280; out += '0123456789abcdef'[Math.floor(x / 233280 * 16)]; } return out; };
+    const TRADERS = [
+      { name: 'pea_whale', pnl: 1284390, roi: 212.4, vol: 48204118, acct: 2410552, win: 64.2, trades: 412, assets: 'TNE', seed: 11, score: 95 },
+      { name: '0x19bd…04af', pnl: 902115, roi: 88.1, vol: 31702440, acct: 1930871, win: 58.0, trades: 97, assets: 'EPW', seed: 23, score: 94 },
+      { name: 'thetaGang', pnl: 641208, roi: 140.9, vol: 22011930, acct: 1104280, win: 61.4, trades: 38, assets: 'NH', seed: 37, score: 94 },
+      { name: '0x5510…ad3c', pnl: 488760, roi: 47.3, vol: 40519002, acct: 1520330, win: 52.1, trades: 590, assets: 'TNEAB', seed: 41, score: 93 },
+      { name: 'nvda_maxi', pnl: 402033, roi: 95.6, vol: 12803577, acct: 840112, win: 71.0, trades: 23, assets: 'N', seed: 53, score: 93 },
+      { name: '0x3c9a…e5d8', pnl: 311480, roi: 33.0, vol: 18904721, acct: 1250004, win: 47.7, trades: 44, assets: 'EBK', seed: 67, score: 93 },
+      { name: 'slowbid', pnl: 276912, roi: 61.2, vol: 9402286, acct: 431023, win: 72.7, trades: 11, assets: 'SG', seed: 71, score: 93 },
+      { name: 'delta0', pnl: 198305, roi: 21.7, vol: 27109954, acct: 1110870, win: 49.3, trades: 259, assets: 'TNHA', seed: 83, score: 92 },
+      { name: '0xf2a4…6e1b', pnl: 154870, roi: 44.8, vol: 6203318, acct: 500216, win: 66.0, trades: 9, assets: 'BW', seed: 97, score: 91 },
+      { name: 'ghostfill', pnl: 121044, roi: 18.2, vol: 14618775, acct: 790442, win: 69.5, trades: 59, assets: 'TEBS', seed: 101, score: 90 },
+      { name: '0x0d6e…b3a9', pnl: 98740, roi: 12.9, vol: 8841002, acct: 612998, win: 55.0, trades: 20, assets: 'GS', seed: 109, score: 89 },
+      { name: 'rh_degen', pnl: 87311, roi: 30.4, vol: 5120449, acct: 184390, win: 48.0, trades: 25, assets: 'EPWK', seed: 113, score: 88 },
+      { name: 'hoodlum', pnl: 79420, roi: 26.8, vol: 7310220, acct: 402118, win: 57.3, trades: 64, assets: 'HTA', seed: 127, score: 88 },
+      { name: '0x7c21…9d0e', pnl: 71205, roi: 58.1, vol: 3902114, acct: 150930, win: 62.5, trades: 16, assets: 'KPE', seed: 131, score: 87 },
+      { name: 'gld_bug', pnl: 64880, roi: 9.4, vol: 11204338, acct: 921004, win: 74.1, trades: 27, assets: 'GS', seed: 137, score: 87 },
+      { name: '0xa3e8…41c7', pnl: 58312, roi: 41.7, vol: 4418870, acct: 196222, win: 51.9, trades: 108, assets: 'NTWB', seed: 149, score: 86 },
+      { name: 'late_bid', pnl: -42110, roi: -12.4, vol: 2904118, acct: 298331, win: 38.2, trades: 71, assets: 'TZ', seed: 151, score: 41 },
+      { name: '0x44af…e7c2', pnl: -88204, roi: -31.0, vol: 6100982, acct: 196402, win: 29.5, trades: 203, assets: 'EBW', seed: 157, score: 22 }
+    ];
+    TRADERS.forEach((t, i) => {
+      t.rank = i + 1;
+      t.addr = t.name.indexOf('0x') === 0 ? t.name.slice(0, 6) + hexOf(t.seed, 30) + t.name.slice(-4) : '0x' + hexOf(t.seed, 38);
+    });
+    const ASSETS = [
+      { sym: 'TSLA', name: 'Tesla', type: 'Stock', price: 342.18, chg: 2.41, key: 'T', vol: 48.2e6, holders: 18420 },
+      { sym: 'NVDA', name: 'Nvidia', type: 'Stock', price: 186.05, chg: 1.12, key: 'N', vol: 41.6e6, holders: 16904 },
+      { sym: 'HOOD', name: 'Robinhood', type: 'Stock', price: 118.37, chg: 4.06, key: 'H', vol: 22.9e6, holders: 12210 },
+      { sym: 'AAPL', name: 'Apple', type: 'Stock', price: 238.92, chg: -0.31, key: 'A', vol: 19.4e6, holders: 11380 },
+      { sym: 'AMZN', name: 'Amazon', type: 'Stock', price: 231.44, chg: 0.25, key: 'Z', vol: 12.8e6, holders: 8420 },
+      { sym: 'META', name: 'Meta Platforms', type: 'Stock', price: 758.10, chg: -0.88, key: 'F', vol: 10.1e6, holders: 6120 },
+      { sym: 'MSTR', name: 'Strategy', type: 'Stock', price: 342.77, chg: 5.12, key: 'M', vol: 9.7e6, holders: 5930 },
+      { sym: 'COIN', name: 'Coinbase', type: 'Stock', price: 318.52, chg: 3.30, key: 'C', vol: 8.2e6, holders: 5210 },
+      { sym: 'SPY', name: 'S&P 500 ETF', type: 'ETF', price: 662.10, chg: -0.18, key: 'S', vol: 16.3e6, holders: 9870 },
+      { sym: 'GLD', name: 'Gold ETF', type: 'ETF', price: 311.40, chg: 0.64, key: 'G', vol: 5.4e6, holders: 3410 },
+      { sym: 'ETH', name: 'Ether', type: 'Crypto', price: 4212.60, chg: -0.84, key: 'E', vol: 61.2e6, holders: 40210 },
+      { sym: 'USDG', name: 'Global Dollar', type: 'Stablecoin', price: 1.0, chg: 0.0, key: '', vol: 88.4e6, holders: 52300 },
+      { sym: 'ROBIN', name: 'Robin', type: 'Memecoin', price: 0.004182, chg: 18.6, key: 'E', vol: 7.9e6, holders: 21840 },
+      { sym: 'SQUAWK', name: 'Squawk', type: 'Memecoin', price: 0.0000871, chg: -6.2, key: 'B', vol: 3.1e6, holders: 9640 },
+      { sym: 'FEATHER', name: 'Feather', type: 'Memecoin', price: 0.0312, chg: 41.0, key: 'P', vol: 5.6e6, holders: 14020 },
+      { sym: 'WORM', name: 'Worm', type: 'Memecoin', price: 0.00219, chg: 3.3, key: 'W', vol: 2.2e6, holders: 7310 },
+      { sym: 'NEST', name: 'Nest', type: 'Memecoin', price: 0.1874, chg: -2.7, key: 'K', vol: 1.8e6, holders: 4980 }
+    ];
+    ASSETS.forEach((a, i) => { a.seed = 300 + i * 17; });
+    const TYPE_BG = { Stock: '#D9E4FF', ETF: '#FFE0DA', Crypto: '#E7E1FF', Stablecoin: '#DDF0FF', Memecoin: '#EBE4FF' };
+    const fmtPrice = (v) => v >= 100 ? '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : v >= 1 ? '$' + v.toFixed(2) : v >= 0.01 ? '$' + v.toFixed(4) : '$' + v.toPrecision(3);
+    const fmtCompact = (v) => { const a = Math.abs(v), s = v < 0 ? '-' : ''; return s + '$' + (a >= 1e6 ? (a / 1e6).toFixed(2) + 'M' : a >= 1e3 ? (a / 1e3).toFixed(1) + 'K' : a.toFixed(0)); };
+    const shortAddr = (a) => a.slice(0, 6) + '…' + a.slice(-4);
+    const q = st.q.trim().toLowerCase();
+    const TRACKED = ['pea_whale', 'thetaGang', 'nvda_maxi'];
+    const COPYING = ['pea_whale', 'delta0'];
+
+    const traderSubs = [['all', 'All'], ['top', 'Top 100'], ['tracked', 'Tracked'], ['copying', 'Copying']];
+    const assetSubs = [['all', 'All'], ['stocks', 'Stocks and ETFs'], ['memes', 'Memecoins'], ['crypto', 'Crypto']];
+
+    const traderMatch = TRADERS.filter((t) => {
+      if (q && t.name.toLowerCase().indexOf(q) < 0 && t.addr.toLowerCase().indexOf(q) < 0) return false;
+      if (st.sub === 'tracked') return TRACKED.indexOf(t.name) >= 0;
+      if (st.sub === 'copying') return COPYING.indexOf(t.name) >= 0;
+      if (st.sub === 'top') return t.score >= 85;
+      return true;
+    });
+    const assetMatch = ASSETS.filter((a) => {
+      if (q && a.sym.toLowerCase().indexOf(q) < 0 && a.name.toLowerCase().indexOf(q) < 0) return false;
+      if (st.sub === 'stocks') return a.type === 'Stock' || a.type === 'ETF';
+      if (st.sub === 'memes') return a.type === 'Memecoin';
+      if (st.sub === 'crypto') return a.type === 'Crypto' || a.type === 'Stablecoin';
+      return true;
+    });
+    const traderAll = TRADERS.filter((t) => !q || t.name.toLowerCase().indexOf(q) >= 0 || t.addr.toLowerCase().indexOf(q) >= 0).length;
+    const assetAll = ASSETS.filter((a) => !q || a.sym.toLowerCase().indexOf(q) >= 0 || a.name.toLowerCase().indexOf(q) >= 0).length;
+
+    const isTraders = st.tab === 'traders';
+    const list = isTraders ? traderMatch : assetMatch;
+    const active = Math.min(st.active, Math.max(0, list.length - 1));
+
+    const openTrader = (t) => { if (this.props.onOpenTrader) this.props.onOpenTrader(Object.assign({}, t)); };
+    const openAsset = (a) => { if (this.props.onOpenAsset) this.props.onOpenAsset(Object.assign({}, a)); };
+    const close = () => { if (this.props.onClose) this.props.onClose(); };
+
+    const switchTab = (id) => this.setState({ tab: id, sub: 'all', active: 0 });
+    const tabs = [['assets', 'Assets', assetAll], ['traders', 'Traders', traderAll]].map(([id, label, n]) => ({
+      label, count: String(n), pick: () => switchTab(id),
+      style: 'padding: 0; border: 0; background: transparent; font-family: "JetBrains Mono", monospace; font-size: 12px; font-weight: 500; letter-spacing: 0.05em; text-transform: uppercase; display: flex; align-items: center; gap: 6px; border-bottom: 2px solid ' + (st.tab === id ? accent : 'transparent') + '; color: ' + (st.tab === id ? 'var(--fg)' : 'var(--muted)') + ';'
+    }));
+    const subs = (isTraders ? traderSubs : assetSubs).map(([id, label]) => ({
+      label, pick: () => this.setState({ sub: id, active: 0 }),
+      style: 'height: 30px; padding: 0 10px; border: 0; border-radius: 7px; font-size: 13px; font-weight: 500; ' + (st.sub === id ? 'background: var(--muted-bg); color: var(--fg);' : 'background: transparent; color: var(--muted);')
+    }));
+
+    const tGrid = 'minmax(0, 2.4fr) minmax(0, 1fr) minmax(0, 1.1fr) 170px';
+    const aGrid = 'minmax(0, 2fr) 104px minmax(0, 1fr) 84px 92px minmax(0, 0.9fr)';
+    const grid = isTraders ? tGrid : aGrid;
+    const headStyle = 'height: 34px; flex-shrink: 0; box-sizing: border-box; padding: 0 20px; border-top: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft); display: grid; grid-template-columns: ' + grid + '; column-gap: 12px; align-items: center; font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted);';
+    const hd = (label, right, sortable) => ({ label, sortable, style: 'display: flex; align-items: center; gap: 4px; justify-content: ' + (right ? 'flex-end' : 'flex-start') + ';' });
+    const heads = isTraders
+      ? [hd('Address', false, true), hd('7D PnL', true, true), hd('Portfolio', true, true), hd('Copy score', true, true)]
+      : [hd('Asset', false, true), hd('Type', false, false), hd('Price', true, true), hd('24H', true, true), hd('Holders', true, true), hd('24H volume', true, false)];
+
+    const rowStyle = (i) => 'width: 100%; height: 44px; box-sizing: border-box; padding: 0 20px; border: 0; background: ' + (i === active ? 'var(--muted-bg)' : 'transparent') + '; color: var(--fg); font: inherit; text-align: left; display: grid; grid-template-columns: ' + grid + '; column-gap: 12px; align-items: center;';
+    const scoreColor = (s) => s >= 80 ? 'var(--up)' : s >= 50 ? 'var(--warn)' : 'var(--down)';
+    const scoreFill = (s) => s >= 80 ? accent : s >= 50 ? '#E8A400' : '#E5532E';
+
+    const traderRows = traderMatch.map((t, i) => {
+      const bars = [];
+      for (let b = 0; b < 10; b++) bars.push({ style: 'width: 3px; height: 14px; border-radius: 1px; display: block; background: ' + (b < Math.round(t.score / 10) ? scoreFill(t.score) : 'var(--line)') + ';' });
+      const named = t.name.indexOf('0x') !== 0;
+      const tag = COPYING.indexOf(t.name) >= 0 ? 'Copying' : TRACKED.indexOf(t.name) >= 0 ? 'Tracked' : '';
+      const pnl7 = t.pnl * 0.31;
+      return {
+        name: named ? t.name : 'Wallet', short: shortAddr(t.addr),
+        initials: named ? t.name.slice(0, 2).toUpperCase() : t.name.slice(2, 4).toUpperCase(),
+        avatarStyle: 'width: 26px; height: 26px; flex-shrink: 0; border-radius: 7px; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; ' + (t.score >= 95 ? 'background: ' + accent + '; color: #0A0B09;' : 'background: var(--muted-bg); color: var(--fg); border: 1px solid var(--line); box-sizing: border-box;'),
+        hasTag: !!tag, tag,
+        pnl: (pnl7 >= 0 ? '+' : '') + fmtCompact(pnl7),
+        pnlStyle: 'text-align: right; font-family: "JetBrains Mono", monospace; font-size: 13px; color: ' + (pnl7 >= 0 ? 'var(--up)' : 'var(--down)') + ';',
+        value: '$' + Math.round(t.acct).toLocaleString('en-US') + '.00',
+        score: String(t.score),
+        scoreStyle: 'font-family: "JetBrains Mono", monospace; font-size: 13px; font-weight: 600; color: ' + scoreColor(t.score) + ';',
+        bars, style: rowStyle(i), open: () => openTrader(t)
+      };
+    });
+
+    const assetRows = assetMatch.map((a, i) => ({
+      sym: a.sym, name: a.name, type: a.type, letter: a.sym.charAt(0),
+      iconStyle: 'width: 26px; height: 26px; flex-shrink: 0; border-radius: 13px; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; color: #0A0B09; background: ' + TYPE_BG[a.type] + ';',
+      tagStyle: 'height: 20px; padding: 0 7px; border-radius: 5px; font-size: 11px; font-weight: 600; display: inline-flex; align-items: center; ' + (a.type === 'Memecoin' ? 'background: var(--meme-bg); color: var(--meme);' : 'background: var(--muted-bg); color: var(--muted);'),
+      price: fmtPrice(a.price),
+      chg: (a.chg >= 0 ? '+' : '') + a.chg.toFixed(2) + '%',
+      chgStyle: 'text-align: right; font-family: "JetBrains Mono", monospace; font-size: 13px; color: ' + (a.chg > 0 ? 'var(--up)' : a.chg < 0 ? 'var(--down)' : 'var(--muted)') + ';',
+      holders: a.holders.toLocaleString('en-US'),
+      vol: fmtCompact(a.vol),
+      style: rowStyle(i), open: () => openAsset(a)
+    }));
+
+    const onKey = (e) => {
+      if (e.key === 'ArrowDown') { e.preventDefault(); this.setState({ active: Math.min(active + 1, list.length - 1) }); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); this.setState({ active: Math.max(active - 1, 0) }); }
+      else if (e.key === 'Enter') { if (list[active]) { if (isTraders) openTrader(list[active]); else openAsset(list[active]); } }
+      else if (e.key === 'Tab') { e.preventDefault(); switchTab(isTraders ? 'assets' : 'traders'); }
+      else if (e.key === 'Escape') { close(); }
+    };
+
+    const K = (k) => ({ k });
+    const hints = [
+      { keys: [K('↑'), K('↓')], label: 'Navigate' },
+      { keys: [K('↵')], label: 'Open' },
+      { keys: [K('TAB')], label: 'Switch tab' },
+      { keys: [K('ESC')], label: 'Close' }
+    ];
+
+    return Object.assign(this.themeVals(), {
+      accent, q: st.q, close, onKey, tabs, subs, heads, headStyle,
+      onQuery: (e) => {
+        const v = e.target.value;
+        const looksAsset = /^[a-z]{2,7}$/i.test(v.trim()) && ASSETS.some((a) => a.sym.toLowerCase().indexOf(v.trim().toLowerCase()) === 0) && !TRADERS.some((t) => t.name.toLowerCase().indexOf(v.trim().toLowerCase()) === 0);
+        this.setState({ q: v, active: 0, tab: v.trim().indexOf('0x') === 0 ? 'traders' : looksAsset ? 'assets' : st.tab });
+      },
+      isTraders, isAssets: !isTraders,
+      traderRows: isTraders ? traderRows : [], assetRows: isTraders ? [] : assetRows,
+      isEmpty: list.length === 0,
+      countLabel: list.length + (isTraders ? (list.length === 1 ? ' trader' : ' traders') : (list.length === 1 ? ' asset' : ' assets')),
+      hints
+    });
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,273 @@
+/* The trader profile pop-up (frame: trader-profile.dc.html).
+ *
+ * Uses .backdrop from base.css for the overlay and layering, and .ev / .ev-track / .ev-band /
+ * .ev-mark / .ev-verdict / .ev-foot — already built for exactly this "region and a mark on a
+ * neutral track" shape — for the win-rate chance band. Every other class here is new: the
+ * frame's aside becomes two rails (see lib/profile.js for why), so nothing in base.css already
+ * carries these measurements.
+ *
+ * Card, tab-bar and table measurements are the frame's own (40px card head, 44px tab bar, 34px
+ * table rows, 12/14/14 card padding) even where the CONTENT of those rows had to change for a
+ * data model built on closed round-trips rather than priced holdings.
+ */
+
+.profile-panel {
+  /* .backdrop reserves 16px each side and 48px top/bottom; sized against that box, not the
+     viewport, so this tracks if that padding ever changes. */
+  width: min(1400px, 100%);
+  height: min(900px, calc(100vh - 96px));
+  min-width: 0;
+  box-sizing: border-box;
+  border-radius: var(--radius-panel);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--fg);
+  box-shadow: var(--shadow-modal);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── head ───────────────────────────────────────────────────────────────────────────── */
+.profile-head {
+  height: 56px; flex: 0 0 auto; min-width: 0;
+  box-sizing: border-box; padding: 0 12px 0 20px;
+  border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; gap: 10px;
+}
+.profile-head-id { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 0 1 auto; }
+.profile-rank {
+  height: 28px; padding: 0 8px; border-radius: var(--radius-control-sm);
+  background: var(--muted-bg); color: var(--fg); font-size: 12px; font-weight: 700;
+  display: inline-flex; align-items: center; flex-shrink: 0;
+}
+.profile-addr {
+  font-size: 13px; color: var(--muted); flex-shrink: 0;
+  display: inline-flex; align-items: center; gap: 2px;
+}
+.profile-tags { display: flex; gap: 6px; min-width: 0; overflow: hidden; }
+.profile-tag {
+  height: 22px; padding: 0 8px; border-radius: 6px;
+  background: var(--muted-bg); color: var(--muted);
+  font-family: var(--font-mono); font-size: 11px; font-weight: 500;
+  letter-spacing: 0.03em; text-transform: uppercase; white-space: nowrap;
+  display: inline-flex; align-items: center; flex-shrink: 0;
+}
+.profile-copy-warn { font-size: 12px; color: var(--down); flex: 0 1 auto; }
+.profile-copy-warn[hidden] { display: none; }
+
+/* ── body: analysis rail | centre | performance rail ───────────────────────────────── */
+.profile-body {
+  flex: 1 1 auto; min-height: 0; min-width: 0;
+  box-sizing: border-box; padding: 12px;
+  display: grid; grid-template-columns: 240px minmax(0, 1fr) 240px; gap: 12px;
+}
+.profile-loading { grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; color: var(--muted); }
+.profile-notfound {
+  grid-column: 1 / -1; margin: auto; max-width: 480px; text-align: center;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.profile-notfound h3 { margin: 0; font-size: 17px; font-weight: 700; }
+.profile-notfound p { margin: 0; font-size: 14px; color: var(--muted); line-height: 1.5; }
+
+.profile-rail {
+  min-height: 0; min-width: 0; overflow-y: auto;
+  box-sizing: border-box; padding: 14px;
+  border-radius: var(--radius-panel); border: 1px solid var(--line);
+  display: flex; flex-direction: column; gap: 4px;
+}
+.profile-rail-title {
+  margin: 0 0 4px; font-family: var(--font-mono); font-size: 11px; font-weight: 500;
+  letter-spacing: 0.04em; text-transform: uppercase; color: var(--fg);
+}
+.profile-rail-sub {
+  margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line-soft);
+  font-family: var(--font-mono); font-size: 11px; font-weight: 500;
+  letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted);
+}
+.profile-rail-row {
+  min-height: 26px; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.profile-rail-label {
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.03em;
+  text-transform: uppercase; color: var(--muted); flex-shrink: 0;
+}
+.profile-rail-value { font-size: 13px; font-weight: 600; text-align: right; min-width: 0; }
+
+.profile-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.profile-more { font-size: 12px; color: var(--muted); align-self: center; }
+
+.profile-legend {
+  display: flex; flex-direction: column; gap: 2px; margin-top: 6px;
+  font-size: 11px; color: var(--muted);
+}
+
+/* A neutral share bar: never a signal, so it never borrows --up or --down. */
+.profile-bar {
+  height: 6px; margin-top: 8px; border-radius: 3px; background: var(--muted-bg); overflow: hidden;
+}
+.profile-bar-fill { height: 100%; background: var(--fg); }
+
+.profile-mini { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
+.profile-mini-row {
+  /* The last column holds a signed dollar figure — "−$1,234.56" plus its ▲/▼ mark is the
+     widest thing in this row, so it gets a floor (not a share) the other three columns never
+     need. Rebuilding it as a flex row (a few sized labels, this one column pushed to the
+     end) rather than four even grid fractions, so it keeps that floor even when the rail
+     itself has less to give — at 1280 the rail loses 40px and an even 1fr would have taken
+     that away from exactly the column that cannot afford to shrink. */
+  height: 22px; display: flex; align-items: center; gap: 6px;
+  font-size: 11px; color: var(--muted);
+}
+.profile-mini-row > * { flex: 0 0 auto; white-space: nowrap; }
+.profile-mini-row > :first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* `margin-left: auto` (not a flex-grow on every column) claims the row's one pool of free
+   space for the realized figure alone, so day/round-trips/win-rate stay packed together on
+   the left and the figure lands flush right — a single moving part instead of two competing
+   for the same space. */
+.profile-mini-row > :last-child { min-width: 68px; text-align: right; margin-left: auto; }
+
+/* ── centre: metric cards, chart, table ─────────────────────────────────────────────── */
+.profile-center {
+  min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 12px; overflow: hidden;
+}
+
+.profile-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; flex: 0 0 auto; }
+.profile-card {
+  border-radius: var(--radius-panel); border: 1px solid var(--line);
+  display: flex; flex-direction: column; min-width: 0;
+}
+.profile-card-head {
+  height: 40px; box-sizing: border-box; padding: 0 14px;
+  border-bottom: 1px solid var(--line-soft);
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 14px; font-weight: 600;
+}
+.profile-card-body {
+  padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 10px; min-height: 0;
+}
+.profile-card-value {
+  font-size: 22px; font-weight: 600; letter-spacing: -0.02em;
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums lining-nums;
+}
+.profile-card-squares { display: grid; gap: 3px; height: 8px; }
+.profile-card-square { border-radius: 2px; }
+.profile-card-square.up { background: var(--up); }
+.profile-card-square.down { background: var(--down); }
+.profile-card-foot { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* The win-rate card body needs no extra padding of its own — .ev already spaces itself. */
+.profile-card-body > .ev { gap: 6px; }
+
+/* base.css declares .up/.down ahead of .ev-verdict, so on plain specificity .ev-verdict's own
+   `color: var(--muted)` would win the tie and the direction would never show. The compound
+   selector outranks both single-class rules regardless of load order, which is what a verdict
+   that is ALLOWED to carry a direction (only when the band says "beyond chance") requires. */
+.ev-verdict.up { color: var(--up); }
+.ev-verdict.down { color: var(--down); }
+/* base.css's .ev assumes a flex-ROW parent: `flex: 1` there means "share the row's width",
+   which is harmless. Both places this build drops it into — a card body, a rail — are flex
+   COLUMNS, where `flex: 1` means "grow to fill the column's HEIGHT" instead. A grid row
+   stretches every cell to the tallest one by default, so the rail (next to a much taller
+   centre column) had real extra height to give, and .ev grew into all of it — the ~200px gap
+   after "Within chance" was that growth, not a spacing choice. `flex: none` keeps it sized to
+   its own content, and the rail's rows then sit at the top the way `flex-direction: column`
+   already means them to. */
+.profile-card-body > .ev, .profile-rail > .ev { flex: none; width: 100%; min-width: 0; }
+.profile-card-body .ev-foot, .profile-rail .ev-foot {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.profile-chart-panel {
+  flex: 0 0 auto; border-radius: var(--radius-panel); border: 1px solid var(--line);
+  display: flex; flex-direction: column;
+}
+.profile-chart-body { padding: 14px 16px 12px; display: flex; flex-direction: column; gap: 6px; }
+.profile-chart-title {
+  font-family: var(--font-mono); font-size: 11px; font-weight: 500;
+  letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted);
+}
+.profile-chart-value {
+  font-size: 26px; font-weight: 600; letter-spacing: -0.02em;
+  display: flex; align-items: baseline; gap: 8px;
+}
+.profile-chart-ts { font-size: 13px; font-weight: 500; color: var(--muted); }
+/* Scoped to this panel, not a bare `.chart` — lib/spark.js hands every page that same class
+   name, and a page that loads both this stylesheet and another component's could otherwise
+   have one silently override the other's chart height depending on <link> order. */
+.profile-chart-body .chart { height: 220px; }
+
+.profile-table-panel {
+  flex: 1 1 auto; min-height: 0; border-radius: var(--radius-panel); border: 1px solid var(--line);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.profile-tabs {
+  height: 44px; flex: 0 0 auto; box-sizing: border-box; padding: 0 16px;
+  border-bottom: 1px solid var(--line-soft);
+  display: flex; align-items: center; gap: 18px;
+}
+.profile-tab-divider { width: 1px; height: 18px; background: var(--line); flex-shrink: 0; }
+.profile-tab {
+  height: 44px; padding: 0; border: 0; background: transparent;
+  font-family: var(--font-mono); font-size: 12px; font-weight: 500;
+  letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted);
+  border-bottom: 2px solid transparent;
+  display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+}
+.profile-tab:hover { color: var(--fg); }
+.profile-tab[aria-selected='true'] { color: var(--fg); border-bottom-color: var(--accent); }
+.profile-tab-count {
+  min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box; border-radius: 5px;
+  background: var(--up-bg); color: var(--up); font-size: 11px;
+  display: flex; align-items: center; justify-content: center;
+}
+
+.profile-table-body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; }
+.profile-thead {
+  height: 34px; flex: 0 0 auto; box-sizing: border-box; padding: 0 16px;
+  border-bottom: 1px solid var(--line-soft);
+  display: grid; column-gap: 12px; align-items: center;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted);
+}
+.profile-th { min-width: 0; }
+.profile-th.right { text-align: right; }
+.profile-rows { display: flex; flex-direction: column; }
+.profile-trow {
+  height: 34px; flex: 0 0 34px; box-sizing: border-box; padding: 0 16px;
+  border-bottom: 1px solid var(--muted-bg);
+  display: grid; column-gap: 12px; align-items: center;
+  font-family: var(--font-mono); font-size: 12px; font-variant-numeric: tabular-nums lining-nums;
+}
+.profile-trow:hover { background: var(--surface-2); }
+.profile-td { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.profile-td.right { text-align: right; }
+.profile-empty { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; font-size: 14px; color: var(--muted); }
+
+.profile-side {
+  height: 20px; padding: 0 7px; border-radius: 5px; font-size: 11px; font-weight: 600;
+  text-transform: uppercase; background: var(--muted-bg); color: var(--muted);
+  display: inline-flex; align-items: center;
+}
+
+/* ── responsive: below 1280 the two rails give up their fixed width before anything else
+   loses a column, since a 240px rail is the first thing this dialog can't afford; below 1024
+   the body collapses to one column (rails stack in source order around the centre column) and
+   the metric-card row drops to two; below 768 the cards drop to one, matching the site-wide
+   4→3→2→1 rule for the specific case of a 4-card row that has nowhere to go but 4→2→1. ───── */
+@media (max-width: 1280px) {
+  .profile-body { grid-template-columns: 200px minmax(0, 1fr) 200px; }
+}
+@media (max-width: 1024px) {
+  .profile-body { grid-template-columns: 1fr; overflow-y: auto; }
+  .profile-rail { max-height: 260px; }
+  .profile-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 768px) {
+  .profile-head { padding-left: 16px; padding-right: 16px; }
+  .profile-body { padding: 8px; gap: 8px; }
+  .profile-metrics { grid-template-columns: 1fr; }
+  .profile-thead, .profile-trow { padding-left: 12px; padding-right: 12px; }
+}
+@media (max-width: 480px) {
+  .profile-tags { display: none; }
+}

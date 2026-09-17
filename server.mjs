@@ -17,11 +17,13 @@ import { readFile, stat } from 'node:fs/promises';
 import { extname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resolveHost } from './net-host.mjs';
+import { PREVIEW_ROUTES, previewEnabled, previewRoute } from './preview-gate.mjs';
 
 const root = fileURLToPath(new URL('./web/', import.meta.url));
 const { host, why: hostWhy } = resolveHost();
 const port = Number(process.env.PORT || 3000);
 const dev = process.env.NODE_ENV !== 'production';
+const preview = previewEnabled(process.env);
 
 /**
  * Where the data comes from.
@@ -206,7 +208,40 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    // A path with no extension is a page: /traders serves traders.html. Without this the
+    // The site's own routes are extensionless, and one of them is a redirect: /traders was
+    // the old copy-trade page and links to it are out in the world, so it moves rather than
+    // breaking. 301 would be cached forever by every browser that ever saw it, which is a
+    // promise this URL scheme is too young to make — 302 keeps the option to move it again.
+    if (path === '/traders') {
+      res.writeHead(302, { Location: '/copy-trade', 'Cache-Control': 'no-store' });
+      res.end();
+      return;
+    }
+
+    // Preview pages exist only under the flag. With it off they are indistinguishable from
+    // a path that never existed — see preview-gate.mjs for why that matters.
+    const gated = previewRoute(path);
+    if (gated) {
+      if (!preview || !gated.file) {
+        res.writeHead(404);
+        res.end('Not found');
+        return;
+      }
+      const body = await readFile(gated.file);
+      res.writeHead(200, {
+        'Content-Type': `${types[extname(gated.file)] || 'application/octet-stream'}; charset=utf-8`,
+        'Content-Length': body.length,
+        // Never cached anywhere: a CDN holding a preview page would keep serving it after
+        // the flag went off.
+        'Cache-Control': 'no-store',
+        'X-Robots-Tag': 'noindex, nofollow',
+        'X-Content-Type-Options': 'nosniff',
+      });
+      res.end(req.method === 'HEAD' ? undefined : body);
+      return;
+    }
+
+    // A path with no extension is a page: /leaderboard serves leaderboard.html. Without this the
     // nav would have to carry .html into every link and every browser history entry.
     const asPage = path === '/' ? '/index.html' : (extname(path) ? path : `${path}.html`);
     const file = resolve(root, '.' + asPage);
@@ -254,6 +289,13 @@ if (dev) {
 server.listen(port, host, () => {
   const bound = /** @type {any} */ (server.address());
   console.log(`peapod on http://${bound.address}:${bound.port} (${hostWhy})`);
+  if (preview) {
+    // Every route, because a partial list is how someone ends up typing a path that was
+    // never a route: copy setup is a dialog inside the other two pages, not a page.
+    console.warn(`PREVIEW ON${process.env.NODE_ENV === 'production' ? ' IN PRODUCTION' : ''}: `
+      + `${PREVIEW_ROUTES.join(', ')}. Copy setup is a dialog on those pages, reachable at `
+      + '/copy-trade?setup=<address>. Unset PEAPOD_PREVIEW to hide them.');
+  }
   if (bound.address === '127.0.0.1' && process.env.NODE_ENV === 'production') {
     // A production process on loopback answers every check made inside the container and
     // 502s every request from outside it. Say so rather than letting it look healthy.

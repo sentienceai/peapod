@@ -1,0 +1,273 @@
+/* The asset page (frame: asset-holders.dc.html).
+ *
+ * Reuses .panel / .panel-head / .seg / .avatar / .mono / .up / .down / .mark / .spacer /
+ * .sr-only from base.css rather than redrawing any of them — the filter row over the cluster
+ * is exactly .seg with three buttons, and the wallet table's rank/PnL figures are exactly
+ * .mono figures with no measurement of their own.
+ *
+ * ONE ADDITION TO BASE.CSS'S SIGN CHANNEL HERE: base.css declares .up/.down ahead of anything
+ * this file adds, so a bare `.as-bubble-pct.up` needs its own rule to win the specificity tie
+ * the same way styles/copy.css's .ev-verdict.up does — see that file's own note.
+ */
+.as-bubble-pct.up { fill: var(--up); }
+.as-bubble-pct.down { fill: var(--down); }
+
+/* ── breadcrumb + asset switcher ───────────────────────────────────────────────────────── */
+.as-crumb {
+  min-height: 56px; flex-shrink: 0; box-sizing: border-box; padding: 10px 40px;
+  border-bottom: 1px solid var(--line); background: var(--surface);
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+}
+.as-crumb-path { display: flex; align-items: center; gap: 8px; font-size: 15px; }
+.as-crumb-root { color: var(--muted); }
+.as-crumb-sep { color: var(--muted); }
+.as-crumb-current { font-weight: 700; }
+.as-crumb-note { font-size: 13px; color: var(--muted); }
+
+.as-switcher select {
+  height: 38px; box-sizing: border-box; padding: 0 12px; border-radius: var(--radius-button);
+  border: 1px solid var(--line); background: var(--surface); color: var(--fg);
+  font-size: 13px; font-weight: 600; max-width: 260px;
+}
+.as-switcher select:hover { border-color: var(--line-strong); }
+
+/* ── page body ──────────────────────────────────────────────────────────────────────────── */
+.as-body {
+  box-sizing: border-box; padding: 24px 40px 40px;
+  display: flex; flex-direction: column; gap: 16px;
+}
+
+/* ── the header card: identity + stats on the left, the price chart on the right ─────────── */
+.as-head { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 460px); min-height: 200px; }
+.as-head-left { box-sizing: border-box; padding: 22px 28px; display: flex; flex-direction: column; justify-content: space-between; gap: 18px; }
+.as-head-top { display: flex; align-items: center; gap: 14px; }
+.as-head-id { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.as-head-line1 { display: flex; align-items: center; gap: 10px; }
+.as-head-sym { font-size: 25px; font-weight: 700; letter-spacing: -0.02em; }
+.as-head-tag {
+  height: 22px; padding: 0 8px; border-radius: 6px; font-size: 12px; font-weight: 600;
+  display: flex; align-items: center; background: var(--muted-bg); color: var(--muted);
+}
+/* The one type this build lets colour off the sign channel: a memecoin is a whole trading
+   universe apart from an equity, and tokens.css already carries --meme/--meme-bg for it — the
+   same pastel base.css's medal/asset-tile family reserves for pure identity, not a verdict. */
+.as-head-tag--meme { background: var(--meme-bg); color: var(--meme); }
+.as-head-name { font-size: 14px; color: var(--muted); }
+.as-head-price-col { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+/* Rule 4: figures are mono, even the ones a frame drew in the body face. */
+.as-head-price { font-size: 32px; font-weight: 600; letter-spacing: -0.02em; }
+.as-head-chg { font-size: 14px; font-weight: 600; }
+
+.as-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.as-stat {
+  box-sizing: border-box; padding: 10px 12px; border-radius: var(--radius-control-sm);
+  background: var(--surface-2); border: 1px solid var(--line-soft);
+  display: flex; flex-direction: column; gap: 2px; min-width: 0;
+}
+.as-stat-label {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.05em;
+  text-transform: uppercase; color: var(--muted);
+}
+.as-stat-value { font-size: 16px; font-weight: 600; }
+
+.as-head-chart {
+  box-sizing: border-box; padding: 16px 20px; border-left: 1px solid var(--line-soft);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.as-chart-label {
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.05em;
+  text-transform: uppercase; color: var(--muted);
+}
+/* Scoped, not a bare `.chart` — lib/spark.js hands every page loading it the same class name,
+   and this page and lib/profile.js's dialog would otherwise fight over its height. */
+.as-head-chart .chart { flex-grow: 1; min-height: 120px; }
+
+/* ── the middle row: the cluster, wider, beside the top-holders table ────────────────────── */
+/* 420px, not the 380px an earlier draft used, and held all the way down to the 1024px
+   breakpoint (where the row stacks to one column) rather than narrowing further at 1280px —
+   measured in a real browser, not just read off this file: shortAddr()'s own "0x1234…5678"
+   is 86px wide in .as-wallet-addr's 13px mono, and at 380px the wallet column's worst case
+   (an avatar AND an LB mark both eating into it) only cleared 57px for it. That forced the
+   column's OWN text-overflow: ellipsis to fire on top of shortAddr()'s already-elided
+   string, drawing a double "…0x3aec…45…" that reads as broken rather than short. 420px
+   gives that worst case ~96px — the ellipsis rule below stays on as a safety net, not the
+   thing actually doing the shortening. The cluster loses nothing: it re-fits its own bubbles
+   to whatever box it is given. */
+.as-mid { display: grid; grid-template-columns: minmax(0, 1fr) 420px; gap: 16px; align-items: stretch; }
+
+.as-cluster-head {
+  min-height: 64px; box-sizing: border-box; padding: 10px 18px; border-bottom: 1px solid var(--line-soft);
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+}
+.as-cluster-headtext { flex-grow: 1; min-width: 220px; display: flex; flex-direction: column; gap: 2px; }
+.as-cluster-headtext h2 { margin: 0; font-size: 16px; font-weight: 700; }
+.as-cluster-headtext p { margin: 0; font-size: 12px; color: var(--muted); }
+
+.as-cluster-stage {
+  position: relative; flex-grow: 1; min-height: 380px; margin: 8px;
+  border-radius: var(--radius-control-sm); overflow: hidden;
+  background-color: var(--surface-2);
+  background-image: radial-gradient(var(--line) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+.as-cluster-svg { position: absolute; inset: 0; display: block; }
+.as-bubble { cursor: pointer; transition: opacity 200ms ease; }
+.as-bubble circle { transition: filter 140ms ease; }
+.as-bubble:hover circle, .as-bubble:focus-visible circle { filter: brightness(1.08); }
+.as-bubble:focus-visible { outline: none; }
+.as-bubble-label { font-size: 11px; font-weight: 600; fill: var(--fg); pointer-events: none; }
+.as-bubble-pct {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 500; fill: var(--muted);
+  pointer-events: none;
+}
+
+.as-legend {
+  position: absolute; left: 12px; bottom: 12px; z-index: 1;
+  box-sizing: border-box; padding: 8px 12px; border-radius: var(--radius-control-sm);
+  border: 1px solid var(--line); background: var(--surface);
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  font-size: 12px; color: var(--muted);
+}
+.as-legend-item { display: flex; align-items: center; gap: 6px; }
+.as-legend-swatch { width: 10px; height: 10px; border-radius: 5px; box-sizing: border-box; display: block; flex-shrink: 0; }
+.as-legend-swatch--up { background: color-mix(in srgb, var(--up) 25%, var(--surface)); border: 1.5px solid var(--up); }
+.as-legend-swatch--down { background: color-mix(in srgb, var(--down) 25%, var(--surface)); border: 1.5px solid var(--down); }
+.as-legend-swatch--board { border: 2px solid var(--fg); background: transparent; }
+
+/* ── top holders table ─────────────────────────────────────────────────────────────────── */
+.as-holders-head {
+  height: 64px; box-sizing: border-box; padding: 0 18px; border-bottom: 1px solid var(--line-soft);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.as-holders-head h2 { margin: 0; font-size: 16px; font-weight: 700; }
+.as-holders-count { font-size: 12px; color: var(--muted); }
+
+/* The wallet column gets a real floor (minmax(112px, 1fr)), not the bare minmax(0, 1fr) this
+   started with: at 0 fr's floor, a flex row that also needs room for a 24px avatar and an
+   LB badge has nothing to shrink but the address, and it shrinks to nothing before the grid
+   track itself would ever ask it to. Position/PnL give up a few px each to make room. */
+.as-thead, .as-trow {
+  display: grid; grid-template-columns: 24px minmax(112px, 1fr) 90px 82px;
+  column-gap: 10px; align-items: center;
+}
+.as-thead {
+  height: 32px; box-sizing: border-box; padding: 0 18px; border-bottom: 1px solid var(--line-soft);
+  font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted);
+}
+.as-thead .right { text-align: right; }
+/* A max-height here, not just flex-grow + overflow-y:auto, is what actually makes this a
+   scrollport: without a bound, an auto-height ancestor (the grid row this panel sits in) has
+   nothing to constrain against, TABLE_N rows stretch the row to fit all of them, and the
+   cluster panel beside it — held to the same row height by `align-items: stretch` — stretches
+   with it far past its own content, which is what let the cluster's box drift out of sync
+   with the fixed CLUSTER_W×CLUSTER_H it was packed for. */
+.as-tbody { flex: 1 1 auto; min-height: 0; max-height: 460px; overflow-y: auto; display: flex; flex-direction: column; }
+.as-trow {
+  width: 100%; height: 46px; flex-shrink: 0; box-sizing: border-box; padding: 0 18px;
+  border: 0; border-bottom: 1px solid var(--line-soft); background: transparent; color: var(--fg);
+  font: inherit; text-align: left;
+}
+.as-trow:hover { background: var(--hover); }
+.as-td { min-width: 0; }
+.as-td.right { text-align: right; }
+.as-wallet { display: flex; align-items: center; gap: 7px; min-width: 0; overflow: hidden; }
+.as-wallet .avatar { width: 24px; height: 24px; border-radius: 7px; font-size: 9px; flex-shrink: 0; }
+.as-wallet-name {
+  display: flex; align-items: center; gap: 5px; min-width: 0; overflow: hidden;
+  font-size: 14px; font-weight: 600;
+}
+/* min-width: 0 is what actually lets this shrink inside .as-wallet-name's own flex row — a
+   flex item's default min-width is auto (its content's width), which overrides `overflow:
+   hidden` and `text-overflow: ellipsis` entirely until this is set. flex: 1 1 auto makes it
+   the column's growable/shrinkable member, so the LB badge (flex-shrink: 0 below) is what
+   gives way last, not first — a reader keeps the address over the badge if only one can fit. */
+.as-wallet-addr {
+  flex: 1 1 auto; min-width: 0; font-size: 13px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.as-badge {
+  height: 17px; padding: 0 5px; border-radius: 5px; background: var(--muted-bg); color: var(--muted);
+  font-size: 9px; font-weight: 700; letter-spacing: 0.03em;
+  display: inline-flex; align-items: center; flex-shrink: 0;
+}
+
+/* ── recent trades table ───────────────────────────────────────────────────────────────── */
+.as-trades-head {
+  height: 52px; box-sizing: border-box; padding: 0 18px; border-bottom: 1px solid var(--line-soft);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.as-trades-head h2 { margin: 0; font-size: 16px; font-weight: 700; }
+.as-live { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.as-live-dot { width: 7px; height: 7px; border-radius: 4px; background: var(--accent); display: block; }
+
+.as-trades-thead, .as-trade-row {
+  display: grid; grid-template-columns: 88px minmax(0, 1.4fr) 76px repeat(3, minmax(0, 1fr));
+  column-gap: 12px; align-items: center;
+}
+.as-trades-thead {
+  height: 32px; box-sizing: border-box; padding: 0 18px; border-bottom: 1px solid var(--line-soft);
+  font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted);
+}
+.as-trades-thead .right { text-align: right; }
+.as-trades-body { max-height: 480px; overflow-y: auto; }
+.as-trade-row {
+  height: 40px; box-sizing: border-box; padding: 0 18px; border-bottom: 1px solid var(--line-soft);
+  font-size: 13px;
+}
+.as-trade-row:last-child { border-bottom: 0; }
+.as-trade-wallet {
+  justify-self: start; padding: 0; border: 0; background: transparent; color: var(--fg);
+  font: inherit; font-weight: 600; text-decoration: underline; text-decoration-color: var(--line-strong);
+  text-underline-offset: 3px; cursor: pointer;
+}
+/* Buy/sell is an action label, not a gain or a loss — rule 2 keeps it off the sign channel,
+   same reasoning lib/profile.js's own .profile-side chip already applies to a trade's side. */
+.as-side {
+  height: 22px; padding: 0 8px; border-radius: 6px; font-size: 12px; font-weight: 600;
+  background: var(--muted-bg); color: var(--muted); display: inline-flex; align-items: center;
+}
+
+/* ── responsive: the frame is drawn at 1440; below that this page follows the site-wide
+   4→3→2→1 column rule for the pieces that have columns to lose. ─────────────────────────── */
+@media (max-width: 1024px) {
+  .as-crumb, .as-body { padding-left: 16px; padding-right: 16px; }
+  .as-head { grid-template-columns: 1fr; }
+  .as-head-chart { border-left: 0; border-top: 1px solid var(--line-soft); }
+  .as-mid { grid-template-columns: 1fr; }
+  .as-holders { min-height: 360px; }
+}
+@media (max-width: 768px) {
+  .as-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .as-head-top { flex-wrap: wrap; }
+  .as-head-price-col { align-items: flex-start; }
+  /* Same floor-not-zero fix as the base rule above, just with Position/PnL giving up a
+     little more of their own width now that the panel itself is narrower. */
+  .as-thead, .as-trow { grid-template-columns: 22px minmax(96px, 1fr) 82px 74px; column-gap: 8px; }
+  .as-trades-thead, .as-trade-row { grid-template-columns: 70px minmax(0, 1.2fr) 64px repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 480px) {
+  .as-stats { grid-template-columns: 1fr; }
+
+  /* Narrower columns ran out of width to give a SIGNED figure before they ran out of holders
+     to show — a clipped "+$66.5k" is a wrong figure, not a shortened one, and rule 4 does not
+     bend for a phone. Fewer columns, not narrower ones: keep the three this table is FOR —
+     which wallet, ranked how, holding how much — and drop PnL. It is one tap away either way,
+     since opening the row's own profile is what a PnL figure was always a shortcut to. */
+  .as-thead, .as-trow { grid-template-columns: 20px minmax(90px, 1fr) 78px; column-gap: 8px; }
+  .as-thead > :nth-child(4), .as-trow > :nth-child(4) { display: none; }
+  .as-wallet .avatar { width: 20px; height: 20px; font-size: 8px; }
+  .as-wallet-addr { font-size: 12px; }
+
+  /* Same call for the trades tape: time, side and the settled value are the three facts this
+     row exists to report; amount and price are both restatements of value ÷ price, and the
+     wallet is one tap away on the holders table above (or the row's own aria-label, either
+     way named in full, never just what fit). */
+  .as-trades-thead, .as-trade-row { grid-template-columns: 62px 58px minmax(64px, 1fr); column-gap: 8px; }
+  .as-trades-thead > :nth-child(2), .as-trade-row > :nth-child(2),
+  .as-trades-thead > :nth-child(4), .as-trade-row > :nth-child(4),
+  .as-trades-thead > :nth-child(5), .as-trade-row > :nth-child(5) { display: none; }
+}
+
+/* The price caveat sits under the figure, not beside it: a price and the sentence that
+   qualifies it should never be read as two separate facts. */
+.as-head-price-note { font-size: 11px; color: var(--muted); text-align: right; display: block; }

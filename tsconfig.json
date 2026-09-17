@@ -26,5 +26,5 @@
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true
   },
-  "include": ["web/**/*.js", "test/**/*.mjs"]
+  "include": ["web/**/*.js", "archive/lib/**/*.js", "test/**/*.mjs", "preview-gate.mjs"]
 }

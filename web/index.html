@@ -2,111 +2,448 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>peapod — traders by realized PnL</title>
-<meta name="description" content="Traders on Robinhood Chain ranked by realized profit on completed round-trips: bought and sold on-chain.">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Peapod · Under the hood of Robinhood Chain</title>
 <link rel="icon" href="/favicon.svg">
+<script>(function(){try{var v=localStorage.getItem('peapod-theme');if(v!=='light'&&v!=='dark')v=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.setAttribute('data-theme',v);}catch(e){}})()</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400&family=Newsreader:opsz,wght@6..72,400&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital,wght@0,400;1,400&family=JetBrains+Mono:wght@400;500&family=Schibsted+Grotesk:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="/styles/tokens.css">
-<link rel="stylesheet" href="/styles/app.css">
-<script type="module" src="/index.js"></script>
+<link rel="stylesheet" href="/styles/base.css">
+<link rel="stylesheet" href="/styles/landing.css">
+<script type="module" src="/lib/landing.js"></script>
 </head>
 <body>
-<a class="skip" href="#board">Skip to the ranking</a>
+<header id="chrome"></header>
+<main id="landing-main">
 
-<header class="topbar">
-  <div class="topbar-inner">
-    <a class="brand" href="/"><i></i>peapod</a>
-    <nav class="topnav" aria-label="Main">
-      <a href="/" aria-current="page">Leaderboard</a>
-      <a href="/traders">Traders</a>
-    </nav>
-    <span class="spacer"></span>
-    <label class="search">
-      <span aria-hidden="true">⌕</span>
-      <input id="search" type="search" placeholder="Search address…" aria-label="Search address">
-      <kbd class="keycap" id="keycap" aria-hidden="true"></kbd>
-    </label>
-  </div>
-</header>
-
-<div class="page-head">
-  <h1>Traders by realized PnL</h1>
-</div>
-
-<div class="shell">
-  <p class="caveat" id="caveat"></p>
-
-  <div class="controls">
-    <div class="tabset" id="categories" role="tablist" aria-label="Token category"></div>
-    <span class="divider"></span>
-    <div class="tabset" id="quotes" role="tablist" aria-label="Quote asset"></div>
-    <span class="spacer"></span>
-    <div class="tabset tabset--segmented" id="windows" role="tablist" aria-label="Timeframe"></div>
-    <div class="toggle" id="unit" role="group" aria-label="Show as dollars or percent">
-      <button type="button" data-unit="abs" aria-pressed="true">$</button>
-      <button type="button" data-unit="pct" aria-pressed="false">%</button>
+  <!-- ── hero ─────────────────────────────────────────────────────────────────────────── -->
+  <section class="lp-hero">
+    <div class="lp-hero-grid" aria-hidden="true"></div>
+    <!-- The pill promised "Strategy builder is in early access". There is no strategy builder
+         and no early-access programme to join: the only thing behind this link is the section
+         that says what automation would need. The pill now points at that. -->
+    <a class="lp-pill lp-reveal" href="#build">
+      <span class="lp-pill-tag">Note</span>
+      <span>Copy trading is not live yet &mdash; here is what it needs</span>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
+    </a>
+    <h1 class="lp-h1 lp-reveal">Look under the hood of <em>Robinhood Chain</em></h1>
+    <!-- Was: "Follow the traders who are actually winning, and copy their trades." The second
+         half promised a feature that does not exist, and the first half claimed every wallet
+         and trade when what is ranked is realized PnL on closed round-trips only. -->
+    <p class="lp-hero-sub lp-reveal">Every address that traded on Robinhood Chain, ranked by
+      realized PnL on round-trips it actually closed &mdash; bought on-chain, sold on-chain,
+      matched first in, first out.</p>
+    <div class="lp-hero-ctas lp-reveal">
+      <a class="lp-btn lp-btn-dark lp-btn-lg" href="/leaderboard">
+        Open the leaderboard
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
+      </a>
+      <!-- "Start copy trading" offered something that cannot be started: /copy-trade lists the
+           board and shows the request a copy would send, and says which endpoint is missing. -->
+      <a class="lp-btn lp-btn-line lp-btn-lg" href="/copy-trade">See the copy-trade preview</a>
     </div>
-  </div>
 
-  <div class="pills">
-    <label class="pill">Min round-trips
-      <select id="min-trips">
-        <option value="1">1</option><option value="5">5</option>
-        <option value="10">10</option><option value="25">25</option>
-      </select>
-    </label>
-    <label class="pill">Min win rate
-      <select id="min-win">
-        <option value="0">any</option><option value="50">50%</option>
-        <option value="60">60%</option><option value="75">75%</option>
-      </select>
-    </label>
-  </div>
-
-  <section class="podium" id="podium" aria-label="Top three"></section>
-
-  <div class="table-wrap" id="board">
-    <table class="board">
-      <thead><tr id="head"></tr></thead>
-      <tbody id="rows"></tbody>
-    </table>
-    <p class="empty" id="empty" hidden>No address matches these filters.</p>
-  </div>
-
-  <div class="footnote" id="footnote"></div>
-</div>
-
-<div class="modal-backdrop" id="modal" hidden role="dialog" aria-modal="true" aria-labelledby="modal-addr">
-  <div class="modal">
-    <div class="modal-head">
-      <span class="crumb">Leaderboard /</span>
-      <span class="who-addr" id="modal-addr"></span>
-      <button class="modal-close" id="modal-close" aria-label="Close">&times;</button>
-    </div>
-    <div class="modal-body">
-      <aside class="rail" id="rail"></aside>
-      <div class="pane">
-        <div class="metric-grid" id="metrics"></div>
-        <div class="chartcard">
-          <div class="chartcard-head">
-            <h5>Cumulative realized</h5>
-            <strong id="chart-total"></strong>
-            <span class="spacer"></span>
-            <div class="tabset tabset--segmented" id="chart-range" role="tablist" aria-label="Chart range"></div>
+    <div class="lp-window lp-reveal">
+      <div class="lp-window-bar">
+        <span class="lp-window-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span class="lp-window-path">peapod / leaderboard</span>
+      </div>
+      <div class="lp-window-body">
+        <div class="lp-hstat-grid" id="hero-stats" aria-live="off"></div>
+        <div class="lp-podium-grid" id="hero-podium"></div>
+        <div class="lp-htable">
+          <div class="lp-hrow lp-hrow--head" role="row">
+            <span role="columnheader">Rank</span>
+            <span role="columnheader">Trader</span>
+            <!-- "Net PnL" and "Volume" named wider figures than the columns hold: the cells
+                 are realized PnL on closed round-trips and the volume that was matched. -->
+            <span role="columnheader" class="lp-num-head">Realized PnL</span>
+            <span role="columnheader" class="lp-num-head">Matched vol</span>
+            <span role="columnheader" class="lp-num-head">Win rate</span>
           </div>
-          <div class="chart-stage" id="chart-stage">
-            <div class="tip" id="tip" hidden></div>
+          <div id="hero-table"></div>
+        </div>
+      </div>
+      <div class="lp-window-fade" aria-hidden="true"></div>
+    </div>
+  </section>
+
+  <!-- ── product: what you get ───────────────────────────────────────────────────────── -->
+  <section id="product" class="lp-section">
+    <div class="lp-section-head lp-reveal">
+      <span class="lp-eyebrow">[ WHAT YOU GET ]</span>
+      <h2 class="lp-h2">Where <em>real</em> wallets meet <em>real</em> data</h2>
+    </div>
+    <div class="lp-feature-grid">
+
+      <article class="lp-feature-card lp-reveal">
+        <span class="lp-eyebrow lp-eyebrow--step">/01&nbsp; EXPLORE</span>
+        <h3 class="lp-h3">Every wallet, <em>in plain sight</em></h3>
+        <!-- "every close behind the number" overstated the profile: it shows per-token stats,
+             hold times and the win/loss run, not a row per close. The cost-basis caveat is
+             added here because it is the single biggest thing the ranking does not cover. -->
+        <p class="lp-feature-p">Rank addresses by realized PnL on closed round-trips. Open one to
+          see its tokens, its hold times and the win/loss run behind the number, with the win
+          rate set against the range a coin-flipper with the same number of closes lands in.
+          Holdings that arrived by transfer, issuance or bridge have no cost basis here and are
+          not scored &mdash; about 72.7% of volume in the current seven-day window.</p>
+        <div class="lp-feature-visual" id="explore-mini"></div>
+      </article>
+
+      <article class="lp-feature-card lp-reveal">
+        <!-- Was "/02 COPY · Copy the best, on your terms · Mirror any wallet on the
+             leaderboard". Nothing here follows a wallet or places an order, so the promise had
+             to go; what is real is the setup screen and the request it prints. -->
+        <span class="lp-eyebrow lp-eyebrow--step">/02&nbsp; COPY &middot; NOT LIVE YET</span>
+        <h3 class="lp-h3">Copy trading, <em>still being built</em></h3>
+        <p class="lp-feature-p">The setup screen is real and the settings below are the ones it
+          asks for. What is missing is execution: no order is placed, copied or simulated, and
+          the last step shows the exact request it would send and names the endpoint that does
+          not exist yet.</p>
+        <div class="lp-feature-visual lp-copy-mock">
+          <div class="lp-mock-panel">
+            <div class="lp-mock-row">
+              <span class="avatar" aria-hidden="true">CT</span>
+              <span class="lp-mock-name">Copy trade setup &middot; preview</span>
+            </div>
+            <!-- The presets were dollar budgets ($500 to $5K) and the toggles were "Copy stock
+                 trades" / "Copy memecoin trades". Neither pair matches the real wizard, which
+                 asks for max size per trade as a percent and has these two switches, so the
+                 mockup now shows the settings that screen actually carries. -->
+            <div class="lp-preset-group" role="group" aria-label="Max size per trade (preview)">
+              <input type="radio" name="lp-preset" id="lp-preset-1" class="lp-preset-input">
+              <label for="lp-preset-1" class="lp-preset-label">5%</label>
+              <input type="radio" name="lp-preset" id="lp-preset-2" class="lp-preset-input" checked>
+              <label for="lp-preset-2" class="lp-preset-label">10%</label>
+              <input type="radio" name="lp-preset" id="lp-preset-3" class="lp-preset-input">
+              <label for="lp-preset-3" class="lp-preset-label">25%</label>
+              <input type="radio" name="lp-preset" id="lp-preset-4" class="lp-preset-input">
+              <label for="lp-preset-4" class="lp-preset-label">50%</label>
+            </div>
+            <label class="lp-toggle-row">
+              <span>Include memecoin trades</span>
+              <input type="checkbox" class="lp-switch-input" checked>
+              <span class="lp-switch" aria-hidden="true"></span>
+            </label>
+            <label class="lp-toggle-row">
+              <span>Only new positions</span>
+              <input type="checkbox" class="lp-switch-input">
+              <span class="lp-switch" aria-hidden="true"></span>
+            </label>
+          </div>
+          <!-- Was "Mirrors within seconds of the trade" — a latency promise for a feature with
+               no backend at all. -->
+          <p class="lp-copy-note">A preview of the settings, not a working feature: nothing here
+            places, copies or simulates a trade.</p>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- ── stats strip ─────────────────────────────────────────────────────────────────── -->
+  <section class="lp-strip">
+    <div class="lp-strip-head lp-reveal">
+      <h2 class="lp-h2">Built from the <em>swap tape</em></h2>
+      <!-- "No delayed feeds" claimed something like a live feed. The build is a batch over the
+           swap tape, so the cadence is stated instead of denied. -->
+      <p class="lp-strip-p">Every figure on this page is read from a build of the Robinhood Chain
+        swap tape, refreshed every 15 minutes. Nothing is estimated, and a figure the tape
+        cannot answer is left unfilled rather than guessed.</p>
+    </div>
+    <div class="lp-strip-grid lp-reveal" id="signal-stats"></div>
+  </section>
+
+  <!-- ── markets ──────────────────────────────────────────────────────────────────────── -->
+  <section class="lp-section">
+    <div class="lp-markets-head lp-reveal">
+      <!-- "Every market on the chain" for a grid of five tiles per tab. What the tabs show is
+           the busiest tokens and the top of the board, so the heading says that. -->
+      <h2 class="lp-h2 lp-h2--wide">The busiest tokens, <em>by 24-hour volume</em></h2>
+      <a class="lp-btn lp-btn-line" href="/leaderboard">
+        Open the leaderboard
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
+      </a>
+    </div>
+    <div class="lp-markets lp-reveal">
+      <input type="radio" name="lp-mtab" id="lp-mtab-stocks" class="lp-tab-input" checked>
+      <input type="radio" name="lp-mtab" id="lp-mtab-memes" class="lp-tab-input">
+      <input type="radio" name="lp-mtab" id="lp-mtab-wallets" class="lp-tab-input">
+      <div class="lp-tabs" role="group" aria-label="Market category">
+        <label for="lp-mtab-stocks" class="lp-tab"><span class="mono lp-tab-idx">01</span>Stocks</label>
+        <label for="lp-mtab-memes" class="lp-tab"><span class="mono lp-tab-idx">02</span>Memecoins</label>
+        <label for="lp-mtab-wallets" class="lp-tab"><span class="mono lp-tab-idx">03</span>Wallets</label>
+      </div>
+      <div class="lp-market-panels">
+        <div class="lp-market-panel" id="panel-stocks"></div>
+        <div class="lp-market-panel" id="panel-memes"></div>
+        <div class="lp-market-panel" id="panel-wallets"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── build & automate (early access) ─────────────────────────────────────────────── -->
+  <section id="build" class="lp-section lp-section--sunken">
+    <div class="lp-split lp-reveal">
+      <div class="lp-split-copy">
+        <!-- Was "/03 BUILD AND AUTOMATE · EARLY ACCESS", with a rule builder described as
+             something you could use today and "Always-on execution" listed as a feature. None
+             of the three exists: there is no builder, no backtest and no execution backend. The
+             section keeps the sketch and says what each part is waiting on. -->
+        <span class="lp-eyebrow lp-eyebrow--step">/03&nbsp; BUILD AND AUTOMATE &middot; NOT BUILT</span>
+        <h2 class="lp-h2">Strategies, <em>on paper so far</em></h2>
+        <p class="lp-split-p">The card beside this is a sketch of the rule shape we want, not a
+          screen you can open. A rule that runs needs execution, and a rule you can check first
+          needs a backtest over the tape; neither is built.</p>
+        <ul class="lp-points">
+          <li><span class="mono lp-points-n">01</span><span class="lp-points-t">No-code rule builder</span><span class="lp-points-note">Not built</span></li>
+          <li><span class="mono lp-points-n">02</span><span class="lp-points-t">Backtests on the swap tape</span><span class="lp-points-note">Not built</span></li>
+          <li><span class="mono lp-points-n">03</span><span class="lp-points-t">Running a rule</span><span class="lp-points-note">Needs execution</span></li>
+        </ul>
+      </div>
+      <div class="lp-split-visual">
+        <!-- The rule card carried worked figures — "TSLA falls 5% in 24H", "buy $500",
+             "max 3 trades per day". Nothing runs them, so every one of those numbers was a
+             measurement-shaped thing with no measurement behind it, on a page whose whole
+             job is to be believed. The shape is the point here, so the shape is what is
+             left and the quantities read as blanks. -->
+        <div class="lp-rule-card">
+          <div class="lp-rule-head">
+            <span>Dip buyer &middot; TSLA</span>
+            <span class="lp-rule-deploy" aria-hidden="true">Sketch</span>
+          </div>
+          <div class="lp-rule-row">
+            <span class="lp-rule-kw lp-rule-kw--if">IF</span>
+            <span class="lp-rule-parts">a token falls by <b>a set amount</b> within <b>a window</b></span>
+          </div>
+          <div class="lp-rule-connector" aria-hidden="true"></div>
+          <div class="lp-rule-row">
+            <span class="lp-rule-kw lp-rule-kw--then">THEN</span>
+            <span class="lp-rule-parts">buy <b>a set size</b>, take profit at <b>a set level</b></span>
+          </div>
+          <div class="lp-rule-connector" aria-hidden="true"></div>
+          <div class="lp-rule-row">
+            <span class="lp-rule-kw lp-rule-kw--limit">LIMIT</span>
+            <span class="lp-rule-parts">at most <b>a set number</b> of trades a day</span>
           </div>
         </div>
-        <div class="subtabs" id="subtabs" role="tablist"></div>
-        <div class="scroller" id="subtable"></div>
+        <div class="lp-activity-card">
+          <div class="lp-activity-head">
+            <span>Activity</span>
+            <!-- This card read as a log of a rule that had run: "Running", a filled buy of 1.46
+                 shares, a sold-at-+8.1% line. No rule has ever run and no order has been
+                 placed, so the rows now describe what such a log would hold. -->
+            <span class="lp-activity-badge"><i class="lp-dot" aria-hidden="true"></i>Nothing runs</span>
+          </div>
+          <div class="lp-activity-row"><i class="lp-dot lp-dot--warn" aria-hidden="true"></i><span>A log would open when the IF above became true</span></div>
+          <div class="lp-activity-row"><i class="lp-dot" aria-hidden="true"></i><span>Then the order, its size and where it filled</span></div>
+          <div class="lp-activity-row"><i class="lp-dot lp-dot--accent" aria-hidden="true"></i><span>Then the close, at the take-profit or the limit</span></div>
+          <div class="lp-activity-row"><i class="lp-dot lp-dot--faint" aria-hidden="true"></i><span>All three wait on the same missing piece</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── mobile (coming soon) ────────────────────────────────────────────────────────── -->
+  <section id="mobile" class="lp-section">
+    <div class="lp-split lp-split--reverse lp-reveal">
+      <div class="lp-phones" aria-hidden="true">
+        <!-- The first phone showed a "Portfolio" with a rising curve and a "Copying" list.
+             Nothing here manages a portfolio or copies anyone, so the screen shows the two
+             things the site does have: a price series and board rows. -->
+        <div class="lp-phone lp-phone--a">
+          <div class="lp-phone-screen">
+            <span class="lp-phone-label">Leaderboard</span>
+            <svg class="lp-phone-spark" viewBox="0 0 226 90" preserveAspectRatio="none"><path d="M1,70 L25,58 L48,64 L72,40 L96,46 L120,24 L144,32 L168,16 L192,22 L225,6" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span class="lp-phone-sub">Top of the board</span>
+            <div class="lp-phone-copy-row"><span class="avatar" aria-hidden="true">TR</span><span>Rank 1 by realized PnL</span></div>
+            <div class="lp-phone-copy-row"><span class="avatar" aria-hidden="true">TR</span><span>Rank 2 by realized PnL</span></div>
+          </div>
+        </div>
+        <div class="lp-phone lp-phone--b">
+          <div class="lp-phone-screen lp-phone-screen--muted">
+            <!-- These alerts were written as things that had happened ("Copied instantly", "On
+                 your watchlist"). There are no alerts, no watchlist and no accounts to send one
+                 to, so each row now names what it would need first. -->
+            <span class="lp-phone-title">Alerts</span>
+            <div class="lp-phone-alert"><span>A wallet you watch trades</span><small>Needs accounts</small></div>
+            <div class="lp-phone-alert"><span>A token you watch moves</span><small>Needs accounts</small></div>
+            <div class="lp-phone-alert"><span>A rule stops itself</span><small>Needs execution</small></div>
+          </div>
+        </div>
+      </div>
+      <div class="lp-split-copy">
+        <!-- "COMING SOON" with "Get pinged the moment a trader you follow makes a move" read as
+             a dated promise. There is no app, no account to follow a trader from and nothing to
+             pause, so the chip states the state and the paragraph states the gap. -->
+        <span class="lp-chip-note">MOBILE &middot; NOT BUILT</span>
+        <h2 class="lp-h2">A phone app, <em>none of it yet</em></h2>
+        <p class="lp-split-p">Being told when a wallet you watch trades would need accounts to
+          send it to, and pausing a rule would need a rule that runs. Neither exists. The phones
+          beside this are a sketch of the idea, not screenshots.</p>
+        <ul class="lp-check-grid">
+          <li><span class="lp-check-icon" aria-hidden="true">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>
+          </span>Trade alerts &mdash; needs accounts</li>
+          <li><span class="lp-check-icon" aria-hidden="true">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>
+          </span>Pause a rule &mdash; needs execution</li>
+          <li><span class="lp-check-icon" aria-hidden="true">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>
+          </span>Wallet sign-in &mdash; needs wallet support</li>
+          <li><span class="lp-check-icon" aria-hidden="true">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>
+          </span>Strategy logs &mdash; needs execution</li>
+        </ul>
+        <!-- "Get early access" implied a list to join. There is none, so the button says what
+             it is: a disabled control on a feature that has not been started. -->
+        <button type="button" class="lp-btn lp-btn-dark lp-btn-disabled" aria-disabled="true" disabled>No early access to sign up for</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── api ──────────────────────────────────────────────────────────────────────────── -->
+  <section id="api" class="lp-section lp-section--dark">
+    <div class="lp-split lp-reveal">
+      <div class="lp-split-copy">
+        <!-- This section sold an API product: an "@peapod/sdk" import, a PEAPOD_KEY, a
+             leaderboard() call and a .on('trade') stream. None of that exists — there is no
+             SDK, no key, no stream and nothing published for anyone else to build on. What is
+             real is the handful of JSON paths these pages themselves read, so the section
+             shows those and says plainly that they are not a product. -->
+        <span class="lp-eyebrow lp-eyebrow--dark">/04&nbsp; DATA</span>
+        <h2 class="lp-h2 lp-h2--inv">The paths <em>this page reads</em></h2>
+        <p class="lp-split-p lp-split-p--dark">There is no SDK, no key and no published
+          interface. Each page here reads the build over plain JSON, and those paths are open to
+          anyone who opens the network tab &mdash; unversioned, unsupported, and free to change
+          with the build.</p>
+      </div>
+      <div class="lp-code-card">
+        <div class="lp-code-tabs">
+          <span class="lp-code-tab lp-code-tab--active">manifest</span>
+          <span class="lp-code-tab">leaderboard</span>
+          <span class="lp-code-tab">address</span>
+        </div>
+        <pre class="lp-code-body"><code><span class="ln">1</span><span class="tk-cm">// What the pages on this site fetch. No key, no version, no promise.</span>
+<span class="ln">2</span>
+<span class="ln">3</span><span class="tk-kw">const</span><span class="tk-p"> manifest = </span><span class="tk-kw">await</span><span class="tk-fn"> fetch</span><span class="tk-p">(</span><span class="tk-str">'/api/manifest'</span><span class="tk-p">).</span><span class="tk-fn">then</span><span class="tk-p">(r =&gt; r.</span><span class="tk-fn">json</span><span class="tk-p">())</span>
+<span class="ln">4</span><span class="tk-cm">// build, built_at, windows, scopes, addresses, qualifying</span>
+<span class="ln">5</span>
+<span class="ln">6</span><span class="tk-cm">// One scope, one window: the board, already ranked</span>
+<span class="ln">7</span><span class="tk-kw">const</span><span class="tk-p"> board = </span><span class="tk-kw">await</span><span class="tk-fn"> fetch</span><span class="tk-p">(</span><span class="tk-str">'/api/leaderboard/rwa/7d'</span><span class="tk-p">).</span><span class="tk-fn">then</span><span class="tk-p">(r =&gt; r.</span><span class="tk-fn">json</span><span class="tk-p">())</span>
+<span class="ln">8</span><span class="tk-cm">// rows: rank, address, realized, matched_volume, win_rate, round_trips</span>
+<span class="ln">9</span>
+<span class="ln">10</span><span class="tk-cm">// One address. 404 is a real answer: the tape never saw it trade.</span>
+<span class="ln">11</span><span class="tk-kw">const</span><span class="tk-p"> one = </span><span class="tk-kw">await</span><span class="tk-fn"> fetch</span><span class="tk-p">(</span><span class="tk-str">`/api/address/${board.rows[</span><span class="tk-num">0</span><span class="tk-str">].address}`</span><span class="tk-p">)</span>
+<span class="ln">12</span><span class="tk-p">  .</span><span class="tk-fn">then</span><span class="tk-p">(r =&gt; r.</span><span class="tk-fn">json</span><span class="tk-p">())</span></code></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── faq ──────────────────────────────────────────────────────────────────────────── -->
+  <section id="faq" class="lp-section">
+    <div class="lp-faq-grid lp-reveal">
+      <div class="lp-faq-head">
+        <h2 class="lp-h2">Frequently <em>asked</em></h2>
+        <!-- "Everything above comes straight from what the chain shows" was true of the
+             figures and false of the sections describing features that do not exist. Narrowed
+             to the figures, with the one limit that decides what gets ranked. -->
+        <p class="lp-faq-p">Every figure here comes from the swap tape, and only closed
+          round-trips are scored. The board and every address on it are open to read without an
+          account.</p>
+      </div>
+      <div class="lp-faq-list">
+        <details class="lp-faq">
+          <summary><span class="mono lp-faq-n">01</span><span class="lp-faq-q">What is Peapod?</span><span class="lp-faq-icon" aria-hidden="true"></span></summary>
+          <!-- Was "...so you can see who is actually making money and copy them." The copying
+               half is not a feature, and "every wallet, trade and token" overstated a ranking
+               that scores closed round-trips only. -->
+          <p>A read-only view of Robinhood Chain. Every address that traded in the window is
+            ranked by realized PnL on the round-trips it closed, each one searchable, with a page
+            per token carrying its price, 24-hour volume, price series and recent trades from the
+            same tape.</p>
+        </details>
+        <details class="lp-faq">
+          <summary><span class="mono lp-faq-n">02</span><span class="lp-faq-q">Do I need a wallet to use it?</span><span class="lp-faq-icon" aria-hidden="true"></span></summary>
+          <!-- Implied connecting a wallet was a supported step waiting on a feature flag.
+               There is no wallet connection at all: the button in the header is disabled. -->
+          <p>No, and there is no way to connect one. Every page is open to read without an
+            account, and nothing here signs in, holds a key or touches a balance.</p>
+        </details>
+        <details class="lp-faq">
+          <summary><span class="mono lp-faq-n">03</span><span class="lp-faq-q">Does Peapod hold my funds?</span><span class="lp-faq-icon" aria-hidden="true"></span></summary>
+          <p>No. Nothing here places, copies or simulates a trade, so there is nothing to hold
+            &mdash; the copy-setup screens show exactly what a request would look like and say
+            plainly which endpoint is not built.</p>
+        </details>
+        <details class="lp-faq">
+          <summary><span class="mono lp-faq-n">04</span><span class="lp-faq-q">Which assets are covered?</span><span class="lp-faq-icon" aria-hidden="true"></span></summary>
+          <p>Tokenized equities and memecoins traded on Robinhood Chain, including tokens launched
+            on Pons. Spot only &mdash; no perps, no leverage, no funding, no liquidation.</p>
+        </details>
+        <details class="lp-faq">
+          <summary><span class="mono lp-faq-n">05</span><span class="lp-faq-q">What does it cost?</span><span class="lp-faq-icon" aria-hidden="true"></span></summary>
+          <!-- "Pricing hasn't launched" implied a plan on the way. Nothing is sold here. -->
+          <p>Nothing. There is no plan to buy, no account to make and no paid tier; the board,
+            the token pages and every address are free to read.</p>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── cta banner ───────────────────────────────────────────────────────────────────── -->
+  <section class="lp-cta lp-reveal">
+    <div class="lp-cta-grid" aria-hidden="true"></div>
+    <!-- "OPEN 24/7 · Markets never sleep. Neither does Peapod." claimed an always-on service.
+         The build is a batch over the tape, so the banner states its cadence instead. "Launch
+         app" pointed at the board, which is what the button now says. -->
+    <span class="lp-cta-pill"><i class="lp-dot lp-dot--accent" aria-hidden="true"></i>REBUILT EVERY 15 MINUTES</span>
+    <h2 class="lp-cta-h">The tape keeps moving.<br><em>The board keeps up.</em></h2>
+    <a class="lp-btn lp-btn-accent lp-btn-lg" href="/leaderboard">
+      Open the leaderboard
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
+    </a>
+  </section>
+
+</main>
+
+<!-- ── the frame's own footer: brand, product links, and the risk disclaimer. Separate from
+     the shared #foot bar below, which every page mounts the same way. ─────────────────── -->
+<footer class="lp-foot">
+  <div class="lp-foot-top">
+    <div class="lp-foot-brand">
+      <div class="lp-foot-brand-row">
+        <span class="lp-foot-mark" aria-hidden="true">
+          <svg width="26" height="26" viewBox="0 0 30 30"><rect x="2" y="9" width="26" height="12" rx="6"/><circle cx="9" cy="15" r="3"/><circle cx="15" cy="15" r="3"/><circle cx="21" cy="15" r="3"/></svg>
+        </span>
+        <span class="lp-foot-name">Peapod</span>
+      </div>
+      <span class="mono lp-foot-tag">UNDER THE HOOD OF ROBINHOOD CHAIN</span>
+    </div>
+    <div class="lp-foot-cols">
+      <div class="lp-foot-col">
+        <span class="mono lp-foot-col-title">PRODUCT</span>
+        <a href="/leaderboard">Leaderboard</a>
+        <a href="/copy-trade">Copy trade</a>
+        <a href="/asset?symbol=TSLA">Markets</a>
+        <!-- Listed under PRODUCT as though it were one; it links to the section that says it
+             is not built. -->
+        <a href="#build">Strategy builder (not built)</a>
+      </div>
+      <div class="lp-foot-col">
+        <span class="mono lp-foot-col-title">DEVELOPERS</span>
+        <!-- Was "API", which named a product that does not exist. -->
+        <a href="#api">Data paths</a>
       </div>
     </div>
   </div>
-</div>
-<footer class="statusbar" id="statusbar" aria-label="Build status"></footer>
+  <p class="lp-foot-disclaimer">Peapod is an independent project and is not affiliated with or
+    endorsed by Robinhood Markets, Inc. Nothing on this site is investment advice. Trading
+    tokenized equities and memecoins involves risk, including the loss of principal. Past
+    performance of any wallet does not guarantee future results.</p>
+</footer>
+<footer id="foot"></footer>
 </body>
 </html>

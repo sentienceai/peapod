@@ -16,7 +16,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 
-import { headline } from '../web/lib/findings.js';
+import { headline } from '../archive/lib/findings.js';
 import { install } from './dom-stub.mjs';
 
 const depthPools = JSON.parse(

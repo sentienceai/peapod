@@ -1,0 +1,10 @@
+# Two independent barriers in front of the preview pages, so neither alone is load-bearing:
+#   1. PEAPOD_PREVIEW=1 at runtime (preview-gate.mjs), off by default.
+#   2. this line, which keeps the files out of the image entirely.
+# A flag flipped by accident on a production deploy therefore finds nothing to serve.
+# Remove this when there is a staging deploy that needs them, and the runtime flag —
+# which stays off in production — becomes the only switch.
+preview/
+
+# Never ship the design handoff or the raw screenshots: they are working material.
+design-refs/

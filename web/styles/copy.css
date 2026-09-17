@@ -1,0 +1,357 @@
+/* Copy trade (frame: copy-trade.dc.html) and the copy-setup wizard (frame: copy-setup.dc.html).
+ *
+ * Reuses .tabs / .seg / .chip / .btn / .btn-copy / .avatar / .medal / .asset-tile / .backdrop /
+ * .ev* from base.css rather than redrawing any of them — the grid's universe tabs, sort chip
+ * and window segment are exactly those primitives with no measurement of their own to add.
+ *
+ * THE CHANCE VERDICT STAYS NEUTRAL. Unlike lib/profile.js's rail, this file never colours
+ * .ev-verdict up/down — a verdict is not a signed quantity (rule 2), so "Beyond chance" only
+ * gets MORE WEIGHT (var(--fg)), never a direction's colour. See .ev-verdict-strong below.
+ */
+
+/* ── hero ───────────────────────────────────────────────────────────────────────────────── */
+.hero {
+  min-height: 260px; flex-shrink: 0; box-sizing: border-box; padding: 32px 40px;
+  background: var(--surface); border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: space-between; gap: 24px;
+  position: relative; overflow: hidden;
+}
+.hero-text { display: flex; flex-direction: column; gap: 14px; max-width: 640px; z-index: 1; }
+.hero-text h1 {
+  margin: 0; font-family: var(--font-display); font-weight: 400; font-size: 56px;
+  line-height: 0.98; letter-spacing: -0.02em;
+}
+.hero-text h1 em { font-style: normal;
+  /* --accent is 2.65:1 on the surface: a fine fill and an illegible letter, which is the
+     note in tokens.css beside --accent-text. Display type still needs 3:1, and this is the
+     value that has it. */
+  color: var(--accent-text); }
+.hero-text p { margin: 0; font-size: 17px; line-height: 1.45; color: var(--muted); }
+
+.hero-decor {
+  position: relative; flex: 0 0 auto; width: 640px; height: 260px;
+  /* A faint dot grid, the frame's own texture — var(--line) is the nearest neutral divider
+     token to the literal rgba(17,20,15,0.08) the frame drew, so no new colour is added. */
+  background-image: radial-gradient(var(--line) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+.hero-decor::before {
+  content: ''; position: absolute; left: 210px; top: 40px; width: 260px; height: 260px;
+  border-radius: 130px; background: var(--accent); opacity: 0.16; filter: blur(80px);
+}
+.hero-fan { position: absolute; inset: 0; }
+/* WIDENED, NOT OVERLAPPED: 180px cards with a 40px gap between them (220 apart) so a ±8°
+   rotation — whose corners swing by roughly half the card's diagonal times sin(8°), ~15px —
+   can never bring one card's edge over the figure sitting in the card behind it. The frame's
+   own cards touched by 30–50px, which is exactly what clipped "+9.79%" under the next card. */
+.hero-fan-card {
+  position: absolute; width: 180px; box-sizing: border-box; padding: 14px;
+  border-radius: var(--radius-card); background: var(--surface);
+  box-shadow: var(--shadow-float);
+  display: flex; flex-direction: column; gap: 12px;
+}
+.hero-fan-card--1 { left: 10px; top: 66px; rotate: -8deg; z-index: 1; }
+.hero-fan-card--2 { left: 230px; top: 36px; rotate: 0deg; z-index: 3; }
+.hero-fan-card--3 { left: 440px; top: 74px; rotate: 7deg; z-index: 2; }
+.hero-fan-top { display: flex; align-items: center; gap: 10px; }
+.hero-fan-id { flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.hero-fan-addr { font-size: 14px; font-weight: 700; }
+.hero-fan-ago { font-size: 11px; color: var(--muted); white-space: nowrap; }
+/* No sparkline here — see lib/copy-page.js's heroCard() comment. Just the figure and a short
+   caption, neither of which is long enough to wrap at this card's content width. */
+.hero-fan-fig { display: flex; flex-direction: column; gap: 1px; }
+.hero-fan-fig strong { font-size: 18px; white-space: nowrap; }
+.hero-fan-fig-label { font-size: 11px; color: var(--muted); white-space: nowrap; }
+
+/* ── controls row ───────────────────────────────────────────────────────────────────────── */
+.ct-controls {
+  min-height: 60px; flex-shrink: 0; box-sizing: border-box; padding: 12px 40px;
+  background: var(--surface); border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+}
+.ct-controls-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+.copy-search {
+  width: 240px; height: 38px; box-sizing: border-box; padding: 0 12px;
+  border-radius: var(--radius-button); border: 1px solid var(--line); background: var(--surface);
+  display: flex; align-items: center; gap: 8px;
+}
+.copy-search svg { flex-shrink: 0; color: var(--muted); }
+.copy-search input {
+  flex-grow: 1; min-width: 0; border: 0; outline: none; background: transparent;
+  color: var(--fg); font-size: 14px;
+}
+
+/* ── grid section ───────────────────────────────────────────────────────────────────────── */
+.ct-grid-section { box-sizing: border-box; padding: 20px 40px 32px; display: flex; flex-direction: column; gap: 14px; }
+.ct-grid-head { display: flex; align-items: center; }
+.ct-count { font-size: 14px; color: var(--muted); }
+.ct-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.ct-empty {
+  grid-column: 1 / -1; min-height: 160px; display: flex; align-items: center;
+  justify-content: center; color: var(--muted); font-size: 14px;
+}
+.ct-showmore { align-self: center; }
+
+/* ── the card: a landscape rectangle, wider than tall, per the task's grid spec ────────────
+   position:relative + the covering open-button underneath is what lets a card be one big
+   click target while still carrying two of its own real buttons (copy-address, Copy trade) —
+   see the file header in lib/copy-page.js for why this beats a <button> nested in a <button>. */
+.ct-card { position: relative; }
+.ct-card-open {
+  position: absolute; inset: 0; z-index: 0; width: 100%; height: 100%;
+  padding: 0; border: 0; background: transparent; cursor: pointer;
+}
+.ct-card-head, .ct-card-body, .ct-card-foot { position: relative; z-index: 1; }
+
+.ct-card-head {
+  height: 58px; box-sizing: border-box; padding: 0 16px; display: flex; align-items: center; gap: 10px;
+}
+.ct-card-head .medal { flex-shrink: 0; }
+.ct-card-head .avatar { width: 32px; height: 32px; border-radius: 10px; font-size: 11px; }
+.ct-card-id { flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.ct-card-addr { font-size: 14px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; }
+/* Overlapped tiles, the board's compact stack — no gap here, lib/copy-page.js sets each
+   tile's -7px overlap inline (the one piece of per-item geometry not worth a CSS rule). */
+.ct-tokens { display: flex; align-items: center; min-width: 0; overflow: visible; }
+/* The ring is drawn as a box-shadow rather than a border so it doesn't change the tile's own
+   22×22 box (a border would need the tile 4px smaller to still measure 22px outside it). */
+.ct-token-tile { box-shadow: 0 0 0 2px var(--surface); }
+.ct-more { margin-left: 6px; font-size: 11px; color: var(--muted); flex-shrink: 0; }
+.ct-ago {
+  flex-shrink: 0; height: 22px; padding: 0 7px; border-radius: 11px; background: var(--muted-bg);
+  color: var(--muted); font-size: 10px; display: inline-flex; align-items: center; gap: 5px;
+}
+
+.ct-card-body { box-sizing: border-box; padding: 0 16px 12px; display: flex; align-items: stretch; gap: 10px; }
+.ct-card-stats { width: 100px; flex-shrink: 0; display: flex; flex-direction: column; justify-content: center; gap: 10px; }
+.ct-stat { display: flex; flex-direction: column; gap: 1px; }
+.ct-stat-value { font-family: var(--font-mono); font-size: 15px; font-weight: 500; }
+.ct-stat-label { font-size: 11px; color: var(--muted); }
+.ct-card-body .spark { flex-grow: 1; min-width: 0; height: 84px; align-self: center; }
+
+/* Fixed height, never auto: every card in a row must stand the same height regardless of how
+   long its own footnote is, so the .ev-foot line below is clipped with an ellipsis rather than
+   wrapped — a wrapped line is what pushed this footer under the Copy button in the first
+   place. .ev already centres itself as a flex item (base.css), so the button stays centred
+   beside it at any content length. */
+.ct-card-foot {
+  height: 72px; flex-shrink: 0; box-sizing: border-box; padding: 10px 12px 10px 16px;
+  border-top: 1px solid var(--line-soft); background: var(--surface-2);
+  display: flex; align-items: center; gap: 12px; overflow: hidden;
+}
+.ct-card-foot .btn-copy { flex-shrink: 0; }
+.ct-card-foot .ev-head,
+.ct-card-foot .ev-verdict,
+.ct-card-foot .ev-foot {
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* A verdict is not a signed figure (rule 2): "Beyond chance" only ever gets MORE WEIGHT, never
+   a direction's colour. base.css's .ev-verdict is already var(--muted); this is the one step
+   up from it in the same neutral channel. */
+.ev-verdict-strong { color: var(--fg); font-weight: 600; }
+
+/* ── responsive: the site-wide 4→3→2→1 rule ────────────────────────────────────────────── */
+@media (max-width: 1280px) { .ct-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 1024px) {
+  .ct-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .hero-decor { display: none; }
+  .hero { justify-content: flex-start; }
+}
+@media (max-width: 768px) {
+  .ct-grid { grid-template-columns: 1fr; }
+  .hero, .ct-controls, .ct-grid-section { padding-left: 16px; padding-right: 16px; }
+  .copy-search { width: 100%; }
+  .ct-controls-right { width: 100%; }
+}
+
+/* ══ copy-setup wizard (frame: copy-setup.dc.html) ══════════════════════════════════════ */
+
+.wz-panel {
+  width: min(640px, 100%); min-width: 0; max-height: min(1000px, calc(100vh - 96px));
+  box-sizing: border-box; border-radius: var(--radius-panel); border: 1px solid var(--line);
+  background: var(--surface); color: var(--fg); box-shadow: var(--shadow-dialog);
+  overflow: hidden; display: flex; flex-direction: column;
+}
+.wz-head {
+  box-sizing: border-box; padding: 20px 20px 16px 24px; display: flex; align-items: flex-start; gap: 12px;
+}
+.wz-head-text { flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.wz-title { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
+.wz-sub { font-size: 13px; color: var(--muted); }
+
+.wz-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.wz-step { box-sizing: border-box; padding: 4px 24px 20px; display: flex; flex-direction: column; gap: 16px; }
+
+.wz-stats {
+  box-sizing: border-box; margin: 0 -24px; padding: 12px 24px;
+  border-top: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft);
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px;
+}
+.wz-stat { display: flex; flex-direction: column; gap: 4px; }
+.wz-stat-label { font-size: 10px; letter-spacing: 0.05em; color: var(--muted); }
+.wz-stat-value { font-size: 16px; font-weight: 600; }
+
+.wz-section-label {
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.05em; color: var(--muted);
+}
+
+/* Copytrade / Countertrade: a segmented pair whose ON state borrows --up / --down, the same
+   "up = with the trader, down = against them" convention lib/profile.js already uses for its
+   win/loss sequence squares — words carry the meaning first, colour only reinforces it. */
+.wz-modes {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px;
+  padding: 4px; border-radius: 12px; background: var(--muted-bg);
+}
+.wz-mode-btn {
+  height: 38px; border: 0; border-radius: var(--radius-control-sm); background: transparent;
+  color: var(--muted); font-size: 14px; font-weight: 600;
+}
+.wz-mode-btn.is-on { background: var(--surface); color: var(--fg); box-shadow: var(--shadow-segment); }
+/* A mode is a choice, not a gain or a loss. Copytrade and Countertrade are marked as
+   selected the way every other segmented control here marks selection — a raised surface
+   and the foreground colour — so the sign channel stays on signed figures. */
+.wz-mode-btn.is-on { background: var(--surface); color: var(--fg); box-shadow: var(--shadow-segment); }
+
+.wz-wallets { display: flex; flex-direction: column; gap: 10px; }
+.wz-wallet-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.wz-wallet-chip {
+  height: 40px; box-sizing: border-box; padding: 0 6px; border-radius: var(--radius-control-sm);
+  border: 1px solid var(--line); background: var(--surface-2);
+  display: flex; align-items: center; gap: 8px;
+}
+.wz-wallet-name { font-size: 14px; font-weight: 600; }
+.wz-wallet-addr { font-size: 12px; color: var(--muted); }
+.wz-wallet-remove {
+  width: 24px; height: 24px; border: 0; border-radius: 6px; background: transparent;
+  color: var(--muted); display: flex; align-items: center; justify-content: center;
+}
+.wz-wallet-remove:hover { background: var(--muted-bg); }
+.wz-add-row { display: flex; gap: 8px; }
+.wz-add-field {
+  flex-grow: 1; min-width: 0; height: 42px; box-sizing: border-box; padding: 0 14px;
+  border-radius: var(--radius-button); border: 1px solid var(--line); background: var(--surface);
+  display: flex; align-items: center;
+}
+.wz-add-field input {
+  flex-grow: 1; min-width: 0; border: 0; outline: none; background: transparent;
+  color: var(--fg); font-family: var(--font-mono); font-size: 13px;
+}
+.wz-add-btn { height: 42px; padding: 0 16px; font-size: 14px; }
+
+.wz-config { display: flex; flex-direction: column; gap: 8px; }
+.wz-row {
+  min-height: 64px; box-sizing: border-box; padding: 12px 14px; border-radius: var(--radius-panel);
+  border: 1px solid var(--line-soft); background: var(--surface-2);
+  display: flex; align-items: center; gap: 16px;
+}
+.wz-row-info { flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.wz-row-label { font-size: 15px; font-weight: 600; }
+.wz-row-desc { font-size: 13px; color: var(--muted); }
+
+/* The range control: a rectangular track and a rectangular handle, never a round thumb. */
+.wz-range-box {
+  width: 196px; height: 38px; flex-shrink: 0; box-sizing: border-box; padding: 3px;
+  border-radius: var(--radius-control-sm); border: 1px solid var(--line);
+  display: flex; align-items: stretch; gap: 3px;
+}
+.wz-range-track {
+  position: relative; width: 112px; flex-shrink: 0; border-radius: 5px; background: var(--muted-bg);
+  overflow: hidden;
+}
+.wz-range-fill { position: absolute; inset: 0 auto 0 0; background: color-mix(in srgb, var(--fg) 16%, transparent); }
+.wz-range-handle {
+  position: absolute; top: 6px; bottom: 6px; width: 4px; border-radius: 2px; background: var(--fg);
+}
+.wz-range-input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: ew-resize; }
+.wz-range-num {
+  flex-grow: 1; box-sizing: border-box; padding-right: 6px;
+  display: flex; align-items: center; justify-content: flex-end; gap: 3px;
+}
+.wz-range-value { font-size: 14px; font-weight: 500; }
+.wz-range-unit { font-size: 11px; color: var(--muted); }
+
+/* The toggle: a rectangular pill track (see the file header for why the knob is a rounded
+   square rather than the usual circle) — .knob's colour comes from tokens.css so no page needs
+   its own literal for "the thing that slides". */
+.wz-toggle {
+  width: 44px; height: 26px; flex-shrink: 0; box-sizing: border-box; padding: 3px; border: 0;
+  border-radius: var(--radius-control-sm); background: var(--line-strong);
+  display: flex; justify-content: flex-start;
+}
+.wz-toggle.is-on { background: var(--fg); justify-content: flex-end; }
+.wz-toggle-knob { width: 18px; height: 18px; border-radius: 6px; background: var(--knob); box-shadow: var(--shadow-knob); }
+
+/* ── step 2: funding + review ───────────────────────────────────────────────────────────── */
+.wz-funding { display: flex; flex-direction: column; gap: 8px; }
+.wz-funding-label { font-size: 14px; font-weight: 600; }
+.wz-amount-box {
+  height: 52px; box-sizing: border-box; padding: 0 14px; border-radius: var(--radius-button);
+  border: 1px solid var(--line); background: var(--surface-2); display: flex; align-items: center; gap: 10px;
+}
+.wz-amount-box input {
+  flex-grow: 1; min-width: 0; border: 0; outline: none; background: transparent;
+  color: var(--fg); font-family: var(--font-mono); font-size: 17px;
+}
+.wz-token-seg { display: flex; gap: 2px; padding: 3px; border-radius: var(--radius-control-sm); background: var(--muted-bg); }
+.wz-token-btn {
+  height: 30px; padding: 0 10px; border: 0; border-radius: var(--radius-control-sm); background: transparent;
+  color: var(--muted); font-family: var(--font-mono); font-size: 12px; font-weight: 500;
+}
+.wz-token-btn.is-on { background: var(--surface); color: var(--fg); box-shadow: var(--shadow-segment); }
+
+.wz-review { border-radius: var(--radius-panel); border: 1px solid var(--line-soft); background: var(--surface-2); }
+.wz-review-row {
+  height: 42px; box-sizing: border-box; padding: 0 14px;
+  display: flex; align-items: center; justify-content: space-between; font-size: 14px;
+}
+.wz-review-row + .wz-review-row { border-top: 1px solid var(--line-soft); }
+.wz-review-label { color: var(--muted); }
+
+/* ── done: the honest ending, never a celebration for a request that was never sent ───────── */
+.wz-done {
+  box-sizing: border-box; padding: 8px 24px 20px; display: flex; flex-direction: column;
+  align-items: center; gap: 10px; text-align: center;
+}
+.wz-done-icon {
+  width: 48px; height: 48px; border-radius: 14px; background: var(--muted-bg); color: var(--muted);
+  font-size: 20px; font-weight: 700; display: flex; align-items: center; justify-content: center;
+}
+.wz-done-title { margin: 0; font-family: var(--font-display); font-size: 26px; letter-spacing: -0.01em; }
+.wz-done-body { margin: 0; max-width: 460px; font-size: 14px; line-height: 1.5; color: var(--muted); }
+.wz-endpoint {
+  font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px;
+}
+.wz-endpoint code { color: var(--fg); }
+.wz-json {
+  width: 100%; margin: 0; box-sizing: border-box; padding: 14px 16px; text-align: left;
+  border-radius: var(--radius-panel); border: 1px solid var(--line-soft); background: var(--sunken);
+  overflow-x: auto; font-size: 12px; line-height: 1.5;
+}
+
+/* ── footer: progress + Back/Next/Confirm ──────────────────────────────────────────────── */
+.wz-foot {
+  height: 72px; flex-shrink: 0; box-sizing: border-box; padding: 0 20px 0 24px;
+  border-top: 1px solid var(--line-soft); display: flex; align-items: center; gap: 10px;
+}
+.wz-progress-track { width: 96px; height: 4px; border-radius: 2px; background: var(--muted-bg); overflow: hidden; }
+.wz-progress-fill { height: 100%; border-radius: 2px; transition: width 200ms ease; }
+/* Progress through a two-step form is not a quantity with a direction either. */
+.wz-progress-fill { background: var(--inv-bg); }
+.wz-progress-label { font-size: 12px; color: var(--muted); }
+/* The counter-mode primary borrows --down-bg/--down rather than a solid --down fill: --down
+   is calibrated for TEXT on a light surface (both themes), not for text sitting ON TOP of it,
+   and a solid fill would need a third ink colour this build has no token for. */
+.wz-primary--up { background: var(--accent); color: var(--accent-ink); }
+/* Countertrade's button takes --loss-fill, the token that exists for exactly this: a red
+   that reads as the counter action without being the negative sign colour. */
+.wz-primary--down { background: var(--loss-fill); color: var(--accent-ink); }
+.wz-primary--up:disabled, .wz-primary--down:disabled { background: var(--muted-bg); color: var(--subtle); }
+
+@media (max-width: 480px) {
+  .wz-head, .wz-foot { padding-left: 16px; padding-right: 16px; }
+  .wz-step { padding-left: 16px; padding-right: 16px; }
+  .wz-stats { margin-left: -16px; margin-right: -16px; padding-left: 16px; padding-right: 16px; }
+  .wz-range-box { width: 168px; }
+  .wz-range-track { width: 90px; }
+}

@@ -6,19 +6,19 @@
  * why the sub-pixel line in particular is a function rather than markup.
  */
 
-import { bandSegments, belowMedian, headline, subPixelNote, subsidyNote } from '../../web/lib/findings.js';
+import { bandSegments, belowMedian, headline, subPixelNote, subsidyNote } from '../lib/findings.js';
 /**
  * A row of depth.json. findings.js declares only the subset it reads; this is the rest of
  * what the table renders.
- * @typedef {import('../../web/lib/findings.js').Pool & {
+ * @typedef {import('../lib/findings.js').Pool & {
  *   depth_flat: number,
  *   median_7d_executable: number,
  *   executable_over_flat_pct: number|null,
  *   volume_per_day_usd: number|null,
  * }} DepthRow
  */
-/** @typedef {import('../../web/lib/findings.js').Pool} Pool */
-import { compact, delta, money, pct, shortAddress, stamp } from '../../web/lib/format.js';
+/** @typedef {import('../lib/findings.js').Pool} Pool */
+import { compact, delta, money, pct, shortAddress, stamp } from '../lib/format.js';
 
 /** @param {string} id */
 const el = (id) => /** @type {HTMLElement} */ (document.getElementById(id));

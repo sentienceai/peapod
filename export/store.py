@@ -61,7 +61,22 @@ CREATE TABLE IF NOT EXISTS address (
 );
 CREATE INDEX IF NOT EXISTS address_realized ON address(realized DESC);
 CREATE INDEX IF NOT EXISTS address_build ON address(build);
+CREATE TABLE IF NOT EXISTS asset (
+  symbol TEXT PRIMARY KEY,
+  kind TEXT NOT NULL,
+  price REAL,
+  volume REAL NOT NULL,
+  volume24h REAL NOT NULL,
+  traders INTEGER NOT NULL,
+  build TEXT NOT NULL,
+  payload BLOB NOT NULL
+);
+CREATE TABLE IF NOT EXISTS asset_list (
+  id TEXT PRIMARY KEY,
+  payload BLOB NOT NULL
+);
 """
+
 
 
 def pack(obj) -> bytes:
@@ -124,6 +139,39 @@ class Store:
             n += len(buf)
         return n
 
+    def put_assets(self, assets, build: str) -> int:
+        """Upsert one payload per asset, and the whole listing as a second payload.
+
+        THE LISTING IS STORED BUILT, NOT ASSEMBLED PER REQUEST. /api/assets is the first
+        thing the asset page asks for, and composing it would mean opening and
+        decompressing every per-asset blob on every cold request -- the one thing the
+        gzip-as-stored convention exists to avoid. It costs a few kilobytes to hold twice.
+
+        Written in the caller's transaction, like everything else in a cycle: a reader must
+        never see this build's assets beside the previous build's leaderboard.
+
+        Rows are upserted and never deleted, as addresses are, so a symbol that stopped
+        trading keeps its last payload while falling out of the listing. `build` is what
+        tells those two apart afterwards. `price` is nullable because an asset whose every
+        trade in the window was dust has no price anyone paid.
+        """
+        sql = ("INSERT INTO asset(symbol, kind, price, volume, volume24h, traders, build, "
+               "payload) VALUES (?,?,?,?,?,?,?,?) "
+               "ON CONFLICT(symbol) DO UPDATE SET kind=excluded.kind, price=excluded.price, "
+               "volume=excluded.volume, volume24h=excluded.volume24h, "
+               "traders=excluded.traders, build=excluded.build, payload=excluded.payload")
+        rows, listing = [], []
+        for payload in assets:
+            a = payload["asset"]
+            rows.append((a["symbol"], a["kind"], a["price"], a["volume"], a["volume24h"],
+                         a["traders"], build, pack(payload)))
+            listing.append(a)
+        self.db.executemany(sql, rows)
+        self.db.execute(
+            "INSERT INTO asset_list(id, payload) VALUES ('assets', ?) "
+            "ON CONFLICT(id) DO UPDATE SET payload=excluded.payload", (pack(listing),))
+        return len(rows)
+
     def set_meta(self, **kv) -> None:
         self.db.executemany(
             "INSERT INTO meta(key, value) VALUES (?,?) "
@@ -139,8 +187,9 @@ class Store:
             "SELECT COUNT(*), SUM(round_trips > 0), SUM(LENGTH(payload)) FROM address"
         ).fetchone()
         lb = self.db.execute("SELECT COUNT(*) FROM leaderboard").fetchone()[0]
+        assets = self.db.execute("SELECT COUNT(*) FROM asset").fetchone()[0]
         return {"addresses": one[0] or 0, "qualifying": one[1] or 0,
-                "payload_bytes": one[2] or 0, "leaderboards": lb}
+                "payload_bytes": one[2] or 0, "leaderboards": lb, "assets": assets}
 
     def optimize(self) -> None:
         self.db.execute("PRAGMA wal_checkpoint(TRUNCATE)")

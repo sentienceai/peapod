@@ -1,0 +1,180 @@
+/* The leaderboard. Measurements are the frame's: a 56px control bar, 300px podium cards, a
+   48px table head and 64px rows on a seven-column grid. */
+
+.page { display: flex; flex-direction: column; min-height: 100vh; }
+.skip { position: absolute; left: -9999px; }
+.skip:focus {
+  left: 16px; top: 8px; z-index: 80; padding: 8px 12px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-button);
+}
+
+.board-main { flex-grow: 1; padding: 40px 40px 32px; display: flex; flex-direction: column; }
+
+/* ── hero ──────────────────────────────────────────────────────────────────────────────
+   The display face carries the headline and the italic clause inside it is the only italic
+   on the page: it marks the phrase the sentence turns on. */
+.board-hero { display: flex; flex-direction: column; gap: 12px; margin-bottom: 32px; }
+.board-hero h1 {
+  margin: 0; font-family: var(--font-display); font-weight: 400;
+  font-size: 60px; line-height: 1; letter-spacing: -0.015em;
+}
+.board-hero h1 em { font-style: italic; }
+.board-hero p { margin: 0; font-size: 18px; color: var(--muted); max-width: 78ch; }
+.sample-inline { color: var(--muted); }
+
+/* ── controls ──────────────────────────────────────────────────────────────────────── */
+.board-controls {
+  min-height: 56px; padding: 8px 0;
+  border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.board-search {
+  width: 260px; height: 40px; padding: 0 14px;
+  border-radius: var(--radius-button); border: 1px solid var(--line); background: var(--surface);
+  display: flex; align-items: center; gap: 8px;
+}
+.board-search svg { stroke: var(--muted); flex: none; }
+.board-search input { flex-grow: 1; min-width: 0; border: 0; outline: none; background: transparent; font-size: 14px; }
+.board-search:focus-within { border-color: var(--line-strong); }
+
+.board-filters { display: flex; gap: 8px; padding: 16px 0 24px; flex-wrap: wrap; }
+.filterchip { height: 40px; position: relative; font-weight: 500; }
+.filterchip-label { color: var(--muted); }
+.filterchip select {
+  appearance: none; border: 0; background: transparent; padding: 0 2px;
+  font-size: 14px; font-weight: 600; color: var(--fg);
+}
+.filterchip select:focus-visible { outline: 2px solid var(--fg); outline-offset: 4px; }
+.filterchip svg { stroke: var(--muted); }
+
+/* ── podium ────────────────────────────────────────────────────────────────────────── */
+.podium {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px; margin-bottom: 24px;
+}
+.pcard { height: 300px; padding: 0; text-align: left; font: inherit; color: inherit; }
+.pcard-head {
+  height: 84px; flex-shrink: 0; padding: 0 22px;
+  border-bottom: 1px solid var(--line-soft);
+  display: flex; align-items: center; gap: 14px;
+}
+.pcard-who { flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.pcard-addr { display: flex; align-items: center; gap: 2px; font-size: 16px; }
+.pcard-body { flex-grow: 1; min-height: 0; padding: 20px 22px; display: flex; gap: 16px; }
+.pcard-figs {
+  width: 168px; flex-shrink: 0;
+  display: flex; flex-direction: column; justify-content: center; gap: 20px;
+}
+.pcard-fig { display: flex; flex-direction: column; gap: 2px; }
+/* The figure is mono and of unknown length — $8.40 to $18,412.90 — so it scales with the
+   card rather than being pinned at a size that fits the shortest one. */
+.pcard-num { font-size: clamp(16px, 2.4cqw, 20px); font-weight: 500; white-space: nowrap; }
+.pcard { container-type: inline-size; }
+.pcard-label { font-size: 13px; color: var(--muted); }
+/* One line, and it stays one line: the card is 300px tall and a meta row that wraps pushes
+   the figures off their centre. */
+.pcard-meta {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 11px; color: var(--muted); font-family: var(--font-mono);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.dot-sep { color: var(--faint); }
+.pcard-chart { flex-grow: 1; min-width: 0; display: flex; align-items: center; }
+.pcard-chart .spark { width: 100%; height: 176px; }
+
+/* ── the table ─────────────────────────────────────────────────────────────────────── */
+.tablewrap { flex-grow: 1; min-height: 0; border-radius: var(--radius-card); }
+.thead, .row {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1.6fr) repeat(5, minmax(0, 1fr)) 132px;
+  column-gap: 16px; align-items: center;
+}
+.thead {
+  height: 48px; flex-shrink: 0; padding: 0 22px;
+  border-bottom: 1px solid var(--line); background: var(--surface-2);
+  font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--muted);
+}
+.th { display: flex; align-items: center; gap: 6px; }
+.th--r { justify-content: flex-end; text-align: right; }
+.th--sort { border: 0; background: transparent; color: inherit; font: inherit; letter-spacing: inherit; text-transform: inherit; padding: 0; }
+.th--sort:hover { color: var(--fg); }
+.th--sort svg { stroke: currentColor; }
+
+.tbody { overflow-y: auto; }
+.row {
+  width: 100%; height: 64px; padding: 0 22px;
+  border: 0; border-bottom: 1px solid var(--line-soft); background: transparent;
+  color: var(--fg); font: inherit; text-align: left; font-size: 15px;
+}
+.row:hover { background: var(--hover); }
+.row-rank { display: flex; align-items: center; }
+.row-rank .num { font-size: 14px; color: var(--muted); }
+.row-who { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.row-addr { font-size: 14px; font-weight: 500; }
+.row-ago { margin-left: auto; font-family: var(--font-mono); font-size: 10px; color: var(--faint); }
+.row-cell { display: flex; justify-content: flex-end; align-items: center; font-size: 14px; }
+.row-cell .num, .row-cell strong { font-size: 14px; font-weight: 500; }
+
+.covered { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; min-width: 64px; }
+.covered-track { width: 100%; height: 4px; border-radius: 2px; background: var(--muted-bg); overflow: hidden; }
+/* Neutral: coverage is a share, not a direction. */
+.covered-track i { display: block; height: 100%; background: var(--line-strong-2); }
+
+/* Overlapped so they read as one set, and ringed in the surface colour so the one in front
+   is legible against the one behind. The ring is a shadow rather than a border: a border
+   would make each tile 2px bigger and the two-letter label would no longer be centred. */
+.chipstack { display: flex; align-items: center; }
+.chipstack .asset-tile { width: 24px; height: 24px; border-radius: 12px; font-size: 10px; }
+.chipstack .asset-tile + .asset-tile { margin-left: -8px; }
+.chipstack .asset-tile { box-shadow: 0 0 0 2px var(--surface); }
+.row:hover .chipstack .asset-tile { box-shadow: 0 0 0 2px var(--hover); }
+.chipstack-more { margin-left: 6px; font-size: 11px; color: var(--muted); font-family: var(--font-mono); }
+
+.copybtn {
+  border: 0; background: transparent; color: var(--muted);
+  padding: 2px 4px; border-radius: 6px; display: inline-flex; align-items: center;
+}
+.copybtn:hover { background: var(--muted-bg); color: var(--fg); }
+.copybtn.is-ok { color: var(--up); }
+.copybtn.is-fail { color: var(--down); }
+
+.board-empty { padding: 40px; text-align: center; color: var(--muted); }
+.board-more { display: flex; justify-content: center; padding: 20px 0 8px; }
+.board-more button[hidden] { display: none; }
+.board-note {
+  margin: 8px 0 0; max-width: 100ch; font-size: 13px; line-height: 1.55; color: var(--muted);
+}
+
+.sample-tag {
+  padding: 2px 8px; border-radius: 6px; border: 1px dashed var(--line-strong);
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--muted);
+}
+
+/* ── narrower than the frame ───────────────────────────────────────────────────────── */
+@media (max-width: 1280px) {
+  .podium { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .podium > :last-child { display: none; }
+  .thead, .row { grid-template-columns: 64px minmax(0, 1.4fr) repeat(4, minmax(0, 1fr)) 110px; }
+  .thead > :nth-child(7), .row > :nth-child(7) { display: none; } /* covered */
+}
+@media (max-width: 1024px) {
+  .board-main { padding: 28px 16px 24px; }
+  .board-hero h1 { font-size: 44px; }
+  .podium { grid-template-columns: minmax(0, 1fr); }
+  .podium > :nth-child(2) { display: none; }
+  .thead, .row { grid-template-columns: 56px minmax(0, 1.4fr) repeat(3, minmax(0, 1fr)); }
+  .thead > :nth-child(6), .row > :nth-child(6),
+  .thead > :last-child, .row > :last-child { display: none; } /* closed, assets */
+}
+@media (max-width: 768px) {
+  .board-hero h1 { font-size: 34px; }
+  .board-search { width: 100%; }
+  .thead, .row { grid-template-columns: 44px minmax(0, 1.2fr) repeat(2, minmax(0, 1fr)); padding: 0 14px; }
+  .thead > :nth-child(5), .row > :nth-child(5) { display: none; } /* win rate */
+  /* The trader cell keeps the address and nothing else: on a 390px screen the avatar and the
+     copy button are 56px of decoration in front of the only thing that identifies the row. */
+  .row-ago, .row-who .avatar, .row-who .copybtn { display: none; }
+  .row-addr { overflow: hidden; text-overflow: ellipsis; }
+}

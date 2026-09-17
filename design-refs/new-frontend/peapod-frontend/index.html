@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Peapod · Under the hood of Robinhood Chain</title>
+<link rel="icon" href="/favicon.svg">
+<script>(function(){try{var v=localStorage.getItem('peapod-theme');if(v!=='light'&&v!=='dark')v=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.setAttribute('data-theme',v);}catch(e){}})()</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital,wght@0,400;1,400&family=JetBrains+Mono:wght@400;500&family=Schibsted+Grotesk:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/styles/tokens.css">
+<link rel="stylesheet" href="/styles/base.css">
+<link rel="stylesheet" href="/styles/landing.css">
+<script type="module" src="/lib/landing.js"></script>
+</head>
+<body>
+<header id="chrome"></header>
+<main id="landing-main">
+
+  <!-- ── hero ─────────────────────────────────────────────────────────────────────────── -->
+  <section class="lp-hero">
+    <div class="lp-hero-grid" aria-hidden="true"></div>
+    <a class="lp-pill lp-reveal" href="#build">
+      <span class="lp-pill-tag">New</span>
+      <span>Strategy builder is in early access</span>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
+    </a>
+    <h1 class="lp-h1 lp-reveal">Look under the hood of <em>Robinhood Chain</em></h1>
+    <p class="lp-hero-sub lp-reveal">Every wallet, trade and token on-chain, in one place. Follow the
+      traders who are actually winning, and copy their trades.</p>
+    <div class="lp-hero-ctas lp-reveal">
+      <a class="lp-btn lp-btn-dark lp-btn-lg" href="/leaderboard.html">
+        Open the leaderboard
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
+      </a>
+      <a class="lp-btn lp-btn-line lp-btn-lg" href="/copy-trade.html">Start copy trading</a>
+    </div>
+
+    <div class="lp-window lp-reveal">
+      <div class="lp-window-bar">
+        <span class="lp-window-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span class="lp-window-path">peapod / leaderboard</span>
+      </div>
+      <div class="lp-window-body">
+        <div class="lp-hstat-grid" id="hero-stats" aria-live="off"></div>
+        <div class="lp-podium-grid" id="hero-podium"></div>
+        <div class="lp-htable">
+          <div class="lp-hrow lp-hrow--head" role="row">
+            <span role="columnheader">Rank</span>
+            <span role="columnheader">Trader</span>
+            <span role="columnheader" class="lp-num-head">Net PnL</span>
+            <span role="columnheader" class="lp-num-head">Volume</span>
+            <span role="columnheader" class="lp-num-head">Win rate</span>
+          </div>
+          <div id="hero-table"></div>
+        </div>
+      </div>
+      <div class="lp-window-fade" aria-hidden="true"></div>
+    </div>
+  </section>
+
+  <!-- ── product: what you get ───────────────────────────────────────────────────────── -->
+  <section id="product" class="lp-section">
+    <div class="lp-section-head lp-reveal">
+      <span class="lp-eyebrow">[ WHAT YOU GET ]</span>
+      <h2 class="lp-h2">Where <em>real</em> wallets meet <em>real</em> data</h2>
+    </div>
+    <div class="lp-feature-grid">
+
+      <article class="lp-feature-card lp-reveal">
+        <span class="lp-eyebrow lp-eyebrow--step">/01&nbsp; EXPLORE</span>
+        <h3 class="lp-h3">Every wallet, <em>in plain sight</em></h3>
+        <p class="lp-feature-p">Rank traders by realized PnL on closed round-trips. Open any wallet
+          to see its tokens, its win rate and every close behind the number.</p>
+        <div class="lp-feature-visual" id="explore-mini"></div>
+      </article>
+
+      <article class="lp-feature-card lp-reveal">
+        <span class="lp-eyebrow lp-eyebrow--step">/02&nbsp; COPY</span>
+        <h3 class="lp-h3">Copy the best, <em>on your terms</em></h3>
+        <p class="lp-feature-p">Mirror any wallet on the leaderboard. You choose the budget, the
+          loss limit and which assets to follow &mdash; nothing here places a trade for you.</p>
+        <div class="lp-feature-visual lp-copy-mock">
+          <div class="lp-mock-panel">
+            <div class="lp-mock-row">
+              <span class="avatar" aria-hidden="true">CT</span>
+              <span class="lp-mock-name">Copy trade setup</span>
+            </div>
+            <div class="lp-preset-group" role="group" aria-label="Budget preset (demo)">
+              <input type="radio" name="lp-preset" id="lp-preset-1" class="lp-preset-input">
+              <label for="lp-preset-1" class="lp-preset-label">$500</label>
+              <input type="radio" name="lp-preset" id="lp-preset-2" class="lp-preset-input" checked>
+              <label for="lp-preset-2" class="lp-preset-label">$1K</label>
+              <input type="radio" name="lp-preset" id="lp-preset-3" class="lp-preset-input">
+              <label for="lp-preset-3" class="lp-preset-label">$2.5K</label>
+              <input type="radio" name="lp-preset" id="lp-preset-4" class="lp-preset-input">
+              <label for="lp-preset-4" class="lp-preset-label">$5K</label>
+            </div>
+            <label class="lp-toggle-row">
+              <span>Copy stock trades</span>
+              <input type="checkbox" class="lp-switch-input" checked>
+              <span class="lp-switch" aria-hidden="true"></span>
+            </label>
+            <label class="lp-toggle-row">
+              <span>Copy memecoin trades</span>
+              <input type="checkbox" class="lp-switch-input">
+              <span class="lp-switch" aria-hidden="true"></span>
+            </label>
+          </div>
+          <p class="lp-copy-note">Mirrors within seconds of the trade. You set the limits &mdash;
+            this build doesn&rsquo;t place, copy or simulate one yet.</p>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- ── stats strip ─────────────────────────────────────────────────────────────────── -->
+  <section class="lp-strip">
+    <div class="lp-strip-head lp-reveal">
+      <h2 class="lp-h2">Built for <em>signal</em></h2>
+      <p class="lp-strip-p">Indexed straight from Robinhood Chain. No delayed feeds, no
+        screenshots, no guesswork.</p>
+    </div>
+    <div class="lp-strip-grid lp-reveal" id="signal-stats"></div>
+  </section>
+
+  <!-- ── markets ──────────────────────────────────────────────────────────────────────── -->
+  <section class="lp-section">
+    <div class="lp-markets-head lp-reveal">
+      <h2 class="lp-h2 lp-h2--wide">Every market on the chain, <em>in one view</em></h2>
+      <a class="lp-btn lp-btn-line" href="/leaderboard.html">
+        Open the leaderboard
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
+      </a>
+    </div>
+    <div class="lp-markets lp-reveal">
+      <input type="radio" name="lp-mtab" id="lp-mtab-stocks" class="lp-tab-input" checked>
+      <input type="radio" name="lp-mtab" id="lp-mtab-memes" class="lp-tab-input">
+      <input type="radio" name="lp-mtab" id="lp-mtab-wallets" class="lp-tab-input">
+      <div class="lp-tabs" role="group" aria-label="Market category">
+        <label for="lp-mtab-stocks" class="lp-tab"><span class="mono lp-tab-idx">01</span>Stocks</label>
+        <label for="lp-mtab-memes" class="lp-tab"><span class="mono lp-tab-idx">02</span>Memecoins</label>
+        <label for="lp-mtab-wallets" class="lp-tab"><span class="mono lp-tab-idx">03</span>Wallets</label>
+      </div>
+      <div class="lp-market-panels">
+        <div class="lp-market-panel" id="panel-stocks"></div>
+        <div class="lp-market-panel" id="panel-memes"></div>
+        <div class="lp-market-panel" id="panel-wallets"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── build & automate (early access) ─────────────────────────────────────────────── -->
+  <section id="build" class="lp-section lp-section--sunken">
+    <div class="lp-split lp-reveal">
+      <div class="lp-split-copy">
+        <span class="lp-eyebrow lp-eyebrow--step">/03&nbsp; BUILD AND AUTOMATE &middot; EARLY ACCESS</span>
+        <h2 class="lp-h2">Strategies, <em>written like sentences</em></h2>
+        <p class="lp-split-p">Stack simple conditions and preview them against real chain history
+          before anything runs. The rule builder below is what early access looks like today.</p>
+        <ul class="lp-points">
+          <li><span class="mono lp-points-n">01</span><span class="lp-points-t">No-code rule builder</span><span class="lp-points-note">IF, THEN, LIMIT</span></li>
+          <li><span class="mono lp-points-n">02</span><span class="lp-points-t">Backtests on chain history</span><span class="lp-points-note">Before any money moves</span></li>
+          <li><span class="mono lp-points-n">03</span><span class="lp-points-t">Always-on execution</span><span class="lp-points-note">Pause any time</span></li>
+        </ul>
+      </div>
+      <div class="lp-split-visual">
+        <div class="lp-rule-card">
+          <div class="lp-rule-head">
+            <span>Dip buyer &middot; TSLA</span>
+            <span class="lp-rule-deploy" aria-hidden="true">Preview</span>
+          </div>
+          <div class="lp-rule-row">
+            <span class="lp-rule-kw lp-rule-kw--if">IF</span>
+            <span class="lp-rule-parts"><b>TSLA</b> falls <b>5%</b> in <b>24H</b></span>
+          </div>
+          <div class="lp-rule-connector" aria-hidden="true"></div>
+          <div class="lp-rule-row">
+            <span class="lp-rule-kw lp-rule-kw--then">THEN</span>
+            <span class="lp-rule-parts">buy <b>$500</b>, take profit at <b>+8%</b></span>
+          </div>
+          <div class="lp-rule-connector" aria-hidden="true"></div>
+          <div class="lp-rule-row">
+            <span class="lp-rule-kw lp-rule-kw--limit">LIMIT</span>
+            <span class="lp-rule-parts">max <b>3 trades</b> per day</span>
+          </div>
+        </div>
+        <div class="lp-activity-card">
+          <div class="lp-activity-head">
+            <span>Activity</span>
+            <span class="lp-activity-badge"><i class="lp-dot" aria-hidden="true"></i>Running</span>
+          </div>
+          <div class="lp-activity-row"><i class="lp-dot lp-dot--warn" aria-hidden="true"></i><span>Rule matched &mdash; TSLA down 5.2% in 24H</span></div>
+          <div class="lp-activity-row"><i class="lp-dot" aria-hidden="true"></i><span>Bought TSLA &mdash; 1.46 shares</span></div>
+          <div class="lp-activity-row"><i class="lp-dot lp-dot--accent" aria-hidden="true"></i><span>Sold TSLA &mdash; take profit at +8.1%</span></div>
+          <div class="lp-activity-row"><i class="lp-dot lp-dot--faint" aria-hidden="true"></i><span>Watching the chain &mdash; waiting for the next dip</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── mobile (coming soon) ────────────────────────────────────────────────────────── -->
+  <section id="mobile" class="lp-section">
+    <div class="lp-split lp-split--reverse lp-reveal">
+      <div class="lp-phones" aria-hidden="true">
+        <div class="lp-phone lp-phone--a">
+          <div class="lp-phone-screen">
+            <span class="lp-phone-label">Portfolio</span>
+            <svg class="lp-phone-spark" viewBox="0 0 226 90" preserveAspectRatio="none"><path d="M1,70 L25,58 L48,64 L72,40 L96,46 L120,24 L144,32 L168,16 L192,22 L225,6" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span class="lp-phone-sub">Copying</span>
+            <div class="lp-phone-copy-row"><span class="avatar" aria-hidden="true">TR</span><span>Top trader</span></div>
+            <div class="lp-phone-copy-row"><span class="avatar" aria-hidden="true">TR</span><span>Second trader</span></div>
+          </div>
+        </div>
+        <div class="lp-phone lp-phone--b">
+          <div class="lp-phone-screen lp-phone-screen--muted">
+            <span class="lp-phone-title">Alerts</span>
+            <div class="lp-phone-alert"><span>pea_whale bought TSLA</span><small>Copied instantly</small></div>
+            <div class="lp-phone-alert"><span>ROBIN is moving</span><small>On your watchlist</small></div>
+            <div class="lp-phone-alert"><span>Dip buyer paused</span><small>Daily limit reached</small></div>
+          </div>
+        </div>
+      </div>
+      <div class="lp-split-copy">
+        <span class="lp-chip-note">MOBILE &middot; COMING SOON</span>
+        <h2 class="lp-h2">The whole chain, <em>in your pocket</em></h2>
+        <p class="lp-split-p">Get pinged the moment a trader you follow makes a move. Pause a
+          strategy from anywhere.</p>
+        <ul class="lp-check-grid">
+          <li><span class="lp-check-icon" aria-hidden="true">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>
+          </span>Instant copy alerts</li>
+          <li><span class="lp-check-icon" aria-hidden="true">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>
+          </span>One-tap pause</li>
+          <li><span class="lp-check-icon" aria-hidden="true">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>
+          </span>Wallet sign-in</li>
+          <li><span class="lp-check-icon" aria-hidden="true">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>
+          </span>Strategy logs</li>
+        </ul>
+        <button type="button" class="lp-btn lp-btn-dark lp-btn-disabled" aria-disabled="true" disabled>Get early access &mdash; not live yet</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── api ──────────────────────────────────────────────────────────────────────────── -->
+  <section id="api" class="lp-section lp-section--dark">
+    <div class="lp-split lp-reveal">
+      <div class="lp-split-copy">
+        <span class="lp-eyebrow lp-eyebrow--dark">/04&nbsp; API</span>
+        <h2 class="lp-h2 lp-h2--inv">Build on the <em>same data</em></h2>
+        <p class="lp-split-p lp-split-p--dark">Leaderboards, wallet histories and trade activity
+          through one feed &mdash; the same shape that powers Peapod itself.</p>
+      </div>
+      <div class="lp-code-card">
+        <div class="lp-code-tabs">
+          <span class="lp-code-tab lp-code-tab--active">stream.ts</span>
+          <span class="lp-code-tab">leaderboard.py</span>
+          <span class="lp-code-tab">curl</span>
+        </div>
+        <pre class="lp-code-body"><code><span class="ln">1</span><span class="tk-kw">import</span><span class="tk-p"> { Peapod } </span><span class="tk-kw">from</span><span class="tk-str"> '@peapod/sdk'</span>
+<span class="ln">2</span>
+<span class="ln">3</span><span class="tk-kw">const</span><span class="tk-p"> peapod = </span><span class="tk-kw">new</span><span class="tk-fn"> Peapod</span><span class="tk-p">({ key: process.env.PEAPOD_KEY })</span>
+<span class="ln">4</span>
+<span class="ln">5</span><span class="tk-cm">// Top 10 stock traders this window</span>
+<span class="ln">6</span><span class="tk-kw">const</span><span class="tk-p"> top = </span><span class="tk-kw">await</span><span class="tk-p"> peapod.</span><span class="tk-fn">leaderboard</span><span class="tk-p">({</span>
+<span class="ln">7</span><span class="tk-p">  window: </span><span class="tk-str">'7d'</span><span class="tk-p">,</span>
+<span class="ln">8</span><span class="tk-p">  universe: </span><span class="tk-str">'stocks'</span><span class="tk-p">,</span>
+<span class="ln">9</span><span class="tk-p">  limit: </span><span class="tk-num">10</span><span class="tk-p">,</span>
+<span class="ln">10</span><span class="tk-p">})</span>
+<span class="ln">11</span>
+<span class="ln">12</span><span class="tk-cm">// Stream every trade from the #1 wallet</span>
+<span class="ln">13</span><span class="tk-p">peapod.</span><span class="tk-fn">wallet</span><span class="tk-p">(top[</span><span class="tk-num">0</span><span class="tk-p">].address).</span><span class="tk-fn">on</span><span class="tk-p">(</span><span class="tk-str">'trade'</span><span class="tk-p">, (t) =&gt; {</span>
+<span class="ln">14</span><span class="tk-p">  console.</span><span class="tk-fn">log</span><span class="tk-p">(t.side, t.symbol, t.value)</span>
+<span class="ln">15</span><span class="tk-p">})</span></code></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── faq ──────────────────────────────────────────────────────────────────────────── -->
+  <section id="faq" class="lp-section">
+    <div class="lp-faq-grid lp-reveal">
+      <div class="lp-faq-head">
+        <h2 class="lp-h2">Frequently <em>asked</em></h2>
+        <p class="lp-faq-p">Everything above comes straight from what the chain shows &mdash;
+          the leaderboard and every wallet on it are open to look through yourself.</p>
+      </div>
+      <div class="lp-faq-list">
+        <details class="lp-faq">
+          <summary><span class="mono lp-faq-n">01</span><span class="lp-faq-q">What is Peapod?</span><span class="lp-faq-icon" aria-hidden="true"></span></summary>
+          <p>An under-the-hood view of Robinhood Chain: every wallet, trade and token, ranked and
+            searchable, so you can see who is actually making money and copy them.</p>
+        </details>
+        <details class="lp-faq">
+          <summary><span class="mono lp-faq-n">02</span><span class="lp-faq-q">Do I need a wallet to use it?</span><span class="lp-faq-icon" aria-hidden="true"></span></summary>
+          <p>No. The leaderboard and every wallet profile are open to everyone. You&rsquo;d only
+            connect a wallet to copy or automate a strategy, and that step isn&rsquo;t live yet.</p>
+        </details>
+        <details class="lp-faq">
+          <summary><span class="mono lp-faq-n">03</span><span class="lp-faq-q">Does Peapod hold my funds?</span><span class="lp-faq-icon" aria-hidden="true"></span></summary>
+          <p>No custody model exists yet, because nothing here places, copies or simulates a
+            trade &mdash; the copy-setup screens show exactly what a request would look like and
+            say plainly which endpoint isn&rsquo;t built.</p>
+        </details>
+        <details class="lp-faq">
+          <summary><span class="mono lp-faq-n">04</span><span class="lp-faq-q">Which assets are covered?</span><span class="lp-faq-icon" aria-hidden="true"></span></summary>
+          <p>Tokenized equities and memecoins traded on Robinhood Chain, including tokens launched
+            on Pons. Spot only &mdash; no perps, no leverage, no funding, no liquidation.</p>
+        </details>
+        <details class="lp-faq">
+          <summary><span class="mono lp-faq-n">05</span><span class="lp-faq-q">What does it cost?</span><span class="lp-faq-icon" aria-hidden="true"></span></summary>
+          <p>Pricing hasn&rsquo;t launched. The leaderboard and every wallet profile are free to
+            browse today.</p>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── cta banner ───────────────────────────────────────────────────────────────────── -->
+  <section class="lp-cta lp-reveal">
+    <div class="lp-cta-grid" aria-hidden="true"></div>
+    <span class="lp-cta-pill"><i class="lp-dot lp-dot--accent" aria-hidden="true"></i>OPEN 24/7</span>
+    <h2 class="lp-cta-h">Markets never sleep.<br><em>Neither does Peapod.</em></h2>
+    <a class="lp-btn lp-btn-accent lp-btn-lg" href="/leaderboard.html">
+      Launch app
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
+    </a>
+  </section>
+
+</main>
+
+<!-- ── the frame's own footer: brand, product links, and the risk disclaimer. Separate from
+     the shared #foot bar below, which every page mounts the same way. ─────────────────── -->
+<footer class="lp-foot">
+  <div class="lp-foot-top">
+    <div class="lp-foot-brand">
+      <div class="lp-foot-brand-row">
+        <span class="lp-foot-mark" aria-hidden="true">
+          <svg width="26" height="26" viewBox="0 0 30 30"><rect x="2" y="9" width="26" height="12" rx="6"/><circle cx="9" cy="15" r="3"/><circle cx="15" cy="15" r="3"/><circle cx="21" cy="15" r="3"/></svg>
+        </span>
+        <span class="lp-foot-name">Peapod</span>
+      </div>
+      <span class="mono lp-foot-tag">UNDER THE HOOD OF ROBINHOOD CHAIN</span>
+    </div>
+    <div class="lp-foot-cols">
+      <div class="lp-foot-col">
+        <span class="mono lp-foot-col-title">PRODUCT</span>
+        <a href="/leaderboard.html">Leaderboard</a>
+        <a href="/copy-trade.html">Copy trade</a>
+        <a href="/asset.html?symbol=TSLA">Markets</a>
+        <a href="#build">Strategy builder</a>
+      </div>
+      <div class="lp-foot-col">
+        <span class="mono lp-foot-col-title">DEVELOPERS</span>
+        <a href="#api">API</a>
+      </div>
+    </div>
+  </div>
+  <p class="lp-foot-disclaimer">Peapod is an independent project and is not affiliated with or
+    endorsed by Robinhood Markets, Inc. Nothing on this site is investment advice. Trading
+    tokenized equities and memecoins involves risk, including the loss of principal. Past
+    performance of any wallet does not guarantee future results.</p>
+</footer>
+<footer id="foot"></footer>
+</body>
+</html>

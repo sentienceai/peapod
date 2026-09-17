@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Schibsted+Grotesk:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+  <style>
+    .pp { --surface: #FFFFFF; --surface-2: #FAFBF9; --sunken: #F7F8F6; --hover: #F5F7F3; --muted-bg: #F2F4F0; --muted-bg-2: #EEF1EC; --grid: #F0F2EE; --line-soft: #EEF0EC; --line: #E6E9E3; --up-line: #E1F2E6; --line-strong: #D6DAD2; --line-strong-2: #C9CEC5; --faint: #B7BCB2; --subtle: #8A9082; --placeholder: #6B7166; --muted: #5F6559; --fg: #11140F; --fg-strong: #000000; --up: #067A2F; --down: #C8360F; --warn: #8A6100; --meme: #6D4FE0; --up-bg: #EAF8EE; --up-bg-2: #F3FBF5; --up-track: #C9E9D2; --down-bg: #FDECE7; --meme-bg: #F1EDFF; --inv-bg: #11140F; --inv-fg: #FFFFFF; --inv-hover: #2A2E25; color-scheme: light; color: var(--fg); transition: background-color 250ms ease, color 250ms ease; }
+    .pp.theme-dark { --surface: #111310; --surface-2: #161914; --sunken: #0B0C0A; --hover: #1A1D17; --muted-bg: #1C1F19; --muted-bg-2: #20241D; --grid: #161914; --line-soft: #1E221B; --line: #272B23; --up-line: #1C3323; --line-strong: #394033; --line-strong-2: #4A5143; --faint: #596052; --subtle: #858C7E; --placeholder: #7D8476; --muted: #A3AA9B; --fg: #EEF1EA; --fg-strong: #FFFFFF; --up: #4BD17A; --down: #FF7A57; --warn: #F2C14E; --meme: #B4A2FF; --up-bg: #12281A; --up-bg-2: #0F1D13; --up-track: #1F3A27; --down-bg: #2E1710; --meme-bg: #231D3A; --inv-bg: #EEF1EA; --inv-fg: #0B0C0A; --inv-hover: #FFFFFF; color-scheme: dark; }
+    .pp.theme-dark .dark { box-shadow: inset 0 0 0 1px #22261E; }
+    .theme-toggle:hover { border-color: var(--line-strong) !important; }
+    body { margin: 0; background: var(--sunken); color: var(--fg); font-family: "Schibsted Grotesk", "Helvetica Neue", sans-serif; -webkit-font-smoothing: antialiased; }
+    a { color: inherit; text-decoration: none; } a:hover { color: var(--fg-strong); }
+    button { font-family: inherit; cursor: pointer; }
+    input { font-family: inherit; }
+    input::placeholder { color: var(--placeholder); }
+    .navlink:hover { color: var(--fg); }
+    .navsearch:hover { border-color: var(--line-strong) !important; color: var(--fg) !important; }
+    .chip:hover { background: var(--muted-bg-2); }
+    .tcard { transition: box-shadow 160ms ease, translate 160ms ease; }
+    .tcard:hover { translate: 0 -2px; box-shadow: 0 2px 4px rgba(17,20,15,0.06), 0 24px 48px -16px rgba(17,20,15,0.26) !important; }
+    .copybtn:hover { background: var(--inv-hover) !important; }
+    .lrow:hover { background: var(--surface-2); }
+  </style>
+</helmet>
+<div class="{{themeClass}}" style="width: 1440px; height: 1440px; box-sizing: border-box; background: var(--sunken); display: flex; flex-direction: column; position: relative; overflow: hidden;">
+
+  <header style="height: 72px; flex-shrink: 0; box-sizing: border-box; padding: 0 40px; border-bottom: 1px solid var(--line); background: var(--surface); display: flex; align-items: center; gap: 20px;">
+    <a href="Landing.dc.html" style="display: flex; align-items: center; gap: 10px;">
+      <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true"><rect style="fill: {{accent}};" x="2" y="9" width="26" height="12" rx="6"></rect><circle cx="9" cy="15" r="3" style="fill: var(--surface);"></circle><circle cx="15" cy="15" r="3" style="fill: var(--surface);"></circle><circle cx="21" cy="15" r="3" style="fill: var(--surface);"></circle></svg>
+      <span style="font-size: 21px; font-weight: 700; letter-spacing: -0.02em;">Peapod</span>
+    </a>
+    <nav style="display: flex; align-items: center; gap: 28px; font-size: 15px; font-weight: 500;">
+      <a class="navlink" href="Main.dc.html" style="color: var(--muted);">Leaderboard</a>
+      <a href="CopyTrade.dc.html" style="color: var(--fg); font-weight: 600;">Copy trade</a>
+      <a class="navlink" href="#" style="color: var(--muted);">Markets</a>
+    </nav>
+    <button class="navsearch" onClick="{{openSearch}}" aria-label="Search assets or addresses" style="width: 330px; height: 44px; flex-shrink: 0; box-sizing: border-box; padding: 0 8px 0 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); color: var(--muted); font-size: 14px; display: flex; align-items: center; gap: 10px; text-align: left;">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+      <span style="flex-grow: 1; white-space: nowrap;">Search assets, addresses or names</span>
+      <span style="height: 24px; min-width: 24px; box-sizing: border-box; padding: 0 6px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); display: flex; align-items: center; justify-content: center;">/</span>
+    </button>
+    <div style="flex-grow: 1;"></div>
+    <button class="theme-toggle" onClick="{{toggleTheme}}" aria-label="{{themeAria}}" title="{{themeAria}}" style="width: 84px; height: 44px; flex-shrink: 0; box-sizing: border-box; padding: 4px; border-radius: 12px; border: 1px solid var(--line); background: var(--muted-bg); display: flex; align-items: center; justify-content: space-between;">
+      <span style="{{sunStyle}}"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" style="fill: currentColor; stroke: currentColor;"><circle cx="12" cy="12" r="4.5" stroke="none"></circle><path d="M12 2.5v2.4M12 19.1v2.4M2.5 12h2.4M19.1 12h2.4M5.3 5.3l1.7 1.7M17 17l1.7 1.7M5.3 18.7L7 17M17 7l1.7-1.7" fill="none" stroke-width="2.2" stroke-linecap="round"></path></svg></span>
+      <span style="{{moonStyle}}"><svg width="19" height="19" viewBox="0 0 24 24" aria-hidden="true" style="fill: currentColor;"><path d="M20.6 14.3A8.6 8.6 0 1 1 9.7 3.4a7 7 0 0 0 10.9 10.9z"></path></svg></span>
+    </button>
+    <div style="height: 44px; box-sizing: border-box; padding: 0 16px; border-radius: 10px; background: var(--muted-bg); display: flex; align-items: center; gap: 8px; font-size: 14px;">
+      <span style="color: var(--muted);">Copying</span>
+      <span style="font-weight: 700;">{{copyCount}}</span>
+      <span style="width: 1px; height: 16px; background: var(--line-strong);"></span>
+      <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500; color: var(--up);">+$184.20</span>
+    </div>
+    <button style="height: 44px; padding: 0 24px; border-radius: 10px; border: 0; background: var(--inv-bg); color: var(--inv-fg); font-size: 15px; font-weight: 600;">0x4b1e…77a2</button>
+  </header>
+
+  <section style="height: 260px; flex-shrink: 0; box-sizing: border-box; padding: 0 40px; background: var(--surface); border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; position: relative; overflow: hidden;">
+    <div style="display: flex; flex-direction: column; gap: 14px; max-width: 640px; z-index: 1;">
+      <h1 style="margin: 0; font-family: 'Instrument Serif', Georgia, serif; font-weight: 400; font-size: 68px; line-height: 0.98; letter-spacing: -0.02em;">Your portfolio, <em style="color: {{accent}};">on autopilot.</em></h1>
+      <p style="margin: 0; font-size: 18px; line-height: 1.45; color: var(--muted);">Follow profitable Robinhood Chain traders. Every trade they make is copied to your wallet in real time, inside the limits you set.</p>
+    </div>
+    <div style="position: absolute; right: 0; top: 0; width: 640px; height: 260px; background-image: radial-gradient(rgba(17,20,15,0.08) 1px, transparent 1px); background-size: 20px 20px;">
+      <div style="position: absolute; left: 210px; top: 40px; width: 260px; height: 260px; border-radius: 130px; background: {{accent}}; opacity: 0.2; filter: blur(80px);"></div>
+      <sc-for list="{{fan}}" as="f" hint-placeholder-count="3">
+        <div style="{{f.wrapStyle}}">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="{{f.avatarStyle}}">{{f.initials}}</div>
+            <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 1px;">
+              <span style="font-size: 14px; font-weight: 700;">{{f.name}}</span>
+              <span style="font-size: 11px; color: var(--muted);">{{f.ago}}</span>
+            </div>
+          </div>
+          <div style="display: flex; align-items: flex-end; gap: 10px;">
+            <div style="display: flex; flex-direction: column; gap: 1px;">
+              <span style="font-family: 'JetBrains Mono', monospace; font-size: 17px; font-weight: 500; color: var(--up);">{{f.roi}}</span>
+              <span style="font-size: 11px; color: var(--muted);">ROI 30D</span>
+            </div>
+            <svg width="110" height="56" viewBox="0 0 110 56" aria-hidden="true"><path style="stroke: {{accent}};" d="{{f.line}}" fill="none" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></path></svg>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+
+  <section style="height: 60px; flex-shrink: 0; box-sizing: border-box; padding: 0 40px; background: var(--surface); border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+    <div style="display: flex; align-items: center; gap: 4px;">
+      <sc-for list="{{tabs}}" as="t" hint-placeholder-count="5">
+        <button onClick="{{t.pick}}" style="{{t.style}}">{{t.label}}</button>
+      </sc-for>
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <button class="chip" onClick="{{cycleSort}}" style="height: 38px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+        {{sortLabel}}
+        <svg style="stroke: var(--muted);" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4v16"></path><path d="M3 8l4-4 4 4"></path><path d="M17 20V4"></path><path d="M13 16l4 4 4-4"></path></svg>
+      </button>
+      <div style="display: flex; gap: 2px; padding: 3px; border-radius: 11px; background: var(--muted-bg);">
+        <sc-for list="{{units}}" as="u" hint-placeholder-count="2">
+          <button onClick="{{u.pick}}" aria-label="{{u.aria}}" style="{{u.style}}">{{u.label}}</button>
+        </sc-for>
+      </div>
+      <div style="width: 240px; height: 38px; box-sizing: border-box; padding: 0 14px; border-radius: 10px; border: 1px solid var(--line); display: flex; align-items: center; gap: 8px;">
+        <svg style="stroke: var(--muted);" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+        <input type="search" aria-label="Search traders" placeholder="Search trader or address" style="flex-grow: 1; min-width: 0; background: transparent; border: 0; outline: none; color: var(--fg); font-size: 14px;">
+      </div>
+      <div style="display: flex; gap: 2px; padding: 3px; border-radius: 11px; background: var(--muted-bg);">
+        <sc-for list="{{views}}" as="v" hint-placeholder-count="2">
+          <button onClick="{{v.pick}}" aria-label="{{v.aria}}" style="{{v.style}}">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{v.icon}}"></path></svg>
+          </button>
+        </sc-for>
+      </div>
+    </div>
+  </section>
+
+  <section style="height: 64px; flex-shrink: 0; box-sizing: border-box; padding: 0 40px; display: flex; align-items: center; gap: 8px;">
+    <sc-for list="{{chips}}" as="c" hint-placeholder-count="4">
+      <button class="chip" style="height: 36px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 8px;">
+        {{c.label}}
+        <svg style="stroke: var(--muted);" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
+      </button>
+    </sc-for>
+    <div style="flex-grow: 1;"></div>
+    <span style="font-size: 14px; color: var(--muted);">{{countLabel}}</span>
+  </section>
+
+  <main style="flex-grow: 1; min-height: 0; box-sizing: border-box; padding: 0 40px 24px;">
+    <sc-if value="{{isGrid}}" hint-placeholder-val="{{ true }}">
+      <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px;">
+        <sc-for list="{{cards}}" as="c" hint-placeholder-count="16">
+          <div class="tcard" style="height: 212px; border-radius: 20px; background: var(--surface); box-shadow: 0 1px 2px rgba(17,20,15,0.05), 0 12px 32px -14px rgba(17,20,15,0.18); display: flex; flex-direction: column; overflow: hidden;">
+            <button onClick="{{c.open}}" aria-label="{{c.aria}}" style="flex-grow: 1; padding: 0; border: 0; background: transparent; color: var(--fg); font: inherit; text-align: left; display: flex; flex-direction: column;">
+              <div style="height: 58px; width: 100%; box-sizing: border-box; padding: 0 16px; display: flex; align-items: center; gap: 10px;">
+                <div style="{{c.avatarStyle}}">{{c.initials}}</div>
+                <div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px;">
+                  <span style="font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{c.name}}</span>
+                  <div style="display: flex;">
+                    <sc-for list="{{c.assets}}" as="a" hint-placeholder-count="3">
+                      <div style="{{a.style}}">{{a.t}}</div>
+                    </sc-for>
+                  </div>
+                </div>
+                <span style="height: 22px; flex-shrink: 0; padding: 0 7px; border-radius: 11px; background: var(--muted-bg); font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--muted); display: flex; align-items: center; gap: 5px;">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
+                  {{c.ago}}
+                </span>
+              </div>
+              <div style="flex-grow: 1; width: 100%; box-sizing: border-box; padding: 0 16px 8px; display: flex; align-items: stretch; gap: 10px;">
+                <div style="width: 108px; flex-shrink: 0; display: flex; flex-direction: column; justify-content: center; gap: 8px;">
+                  <div style="display: flex; flex-direction: column; gap: 1px;">
+                    <span style="{{c.pnlStyle}}">{{c.pnl}}</span>
+                    <span style="font-size: 11px; color: var(--muted);">{{c.pnlLabel}}</span>
+                  </div>
+                  <div style="display: flex; flex-direction: column; gap: 1px;">
+                    <span style="font-family: 'JetBrains Mono', monospace; font-size: 14px; font-weight: 500;">{{c.value}}</span>
+                    <span style="font-size: 11px; color: var(--muted);">Portfolio</span>
+                  </div>
+                </div>
+                <svg width="100%" height="88" viewBox="0 0 200 88" preserveAspectRatio="none" style="flex-grow: 1; min-width: 0; display: block; align-self: center;" aria-hidden="true">
+                  <defs>
+                    <pattern id="{{c.hatchUp}}" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                      <line style="stroke: {{accent}};" x1="0" y1="0" x2="0" y2="5" stroke-width="1" stroke-opacity="0.25"></line>
+                    </pattern>
+                    <pattern id="{{c.hatchDn}}" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                      <line x1="0" y1="0" x2="0" y2="5" stroke="#E5532E" stroke-width="1" stroke-opacity="0.3"></line>
+                    </pattern>
+                    <clipPath id="{{c.clipUp}}"><rect x="0" y="0" width="200" height="{{c.zeroY}}"></rect></clipPath>
+                    <clipPath id="{{c.clipDn}}"><rect x="0" y="{{c.zeroY}}" width="200" height="88"></rect></clipPath>
+                  </defs>
+                  <path style="fill: {{c.fillUp}};" d="{{c.area}}" clip-path="{{c.clipUpUrl}}"></path>
+                  <path style="fill: {{c.fillDn}};" d="{{c.area}}" clip-path="{{c.clipDnUrl}}"></path>
+                  <path style="stroke: {{accent}};" d="{{c.line}}" fill="none" stroke-width="2" stroke-linejoin="round" clip-path="{{c.clipUpUrl}}" vector-effect="non-scaling-stroke"></path>
+                  <path d="{{c.line}}" fill="none" stroke="#E5532E" stroke-width="2" stroke-linejoin="round" clip-path="{{c.clipDnUrl}}" vector-effect="non-scaling-stroke"></path>
+                </svg>
+              </div>
+            </button>
+            <div style="height: 50px; flex-shrink: 0; box-sizing: border-box; padding: 0 8px 0 16px; background: var(--up-bg-2); border-top: 1px solid var(--up-line); display: flex; align-items: center; gap: 12px;">
+              <div style="display: flex; align-items: baseline; gap: 2px;">
+                <span style="font-size: 16px; font-weight: 700;">{{c.score}}</span>
+                <span style="font-size: 12px; color: var(--muted);">/100</span>
+              </div>
+              <div style="display: flex; gap: 2px;">
+                <sc-for list="{{c.bars}}" as="b" hint-placeholder-count="10">
+                  <div style="{{b.style}}"></div>
+                </sc-for>
+              </div>
+              <div style="flex-grow: 1;"></div>
+              <button class="copybtn" onClick="{{c.toggleCopy}}" style="{{c.copyStyle}}">{{c.copyLabel}}</button>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{isList}}" hint-placeholder-val="{{ false }}">
+      <div style="border-radius: 22px; background: var(--surface); box-shadow: 0 1px 2px rgba(17,20,15,0.05), 0 12px 32px -14px rgba(17,20,15,0.18); overflow: hidden;">
+        <div style="height: 44px; box-sizing: border-box; padding: 0 20px; border-bottom: 1px solid var(--line-soft); display: grid; grid-template-columns: minmax(0, 2fr) repeat(4, minmax(0, 1fr)) 140px 120px; column-gap: 16px; align-items: center; font-size: 12px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted);">
+          <div>Trader</div>
+          <div style="text-align: right;">{{pnlHead}}</div>
+          <div style="text-align: right;">Portfolio</div>
+          <div style="text-align: right;">Win rate</div>
+          <div style="text-align: right;">Last trade</div>
+          <div>Copy score</div>
+          <div></div>
+        </div>
+        <sc-for list="{{cards}}" as="c" hint-placeholder-count="12">
+          <div class="lrow" style="height: 64px; box-sizing: border-box; padding: 0 20px; border-bottom: 1px solid var(--muted-bg); display: grid; grid-template-columns: minmax(0, 2fr) repeat(4, minmax(0, 1fr)) 140px 120px; column-gap: 16px; align-items: center; font-size: 15px;">
+            <button onClick="{{c.open}}" style="padding: 0; border: 0; background: transparent; color: var(--fg); font: inherit; text-align: left; display: flex; align-items: center; gap: 12px;">
+              <div style="{{c.avatarStyle}}">{{c.initials}}</div>
+              <span style="font-weight: 700;">{{c.name}}</span>
+              <div style="display: flex;">
+                <sc-for list="{{c.assets}}" as="a" hint-placeholder-count="3">
+                  <div style="{{a.style}}">{{a.t}}</div>
+                </sc-for>
+              </div>
+            </button>
+            <div style="{{c.pnlCellStyle}}">{{c.pnl}}</div>
+            <div style="text-align: right; font-family: 'JetBrains Mono', monospace; font-size: 14px;">{{c.value}}</div>
+            <div style="text-align: right; font-family: 'JetBrains Mono', monospace; font-size: 14px;">{{c.win}}</div>
+            <div style="text-align: right; font-size: 14px; color: var(--muted);">{{c.ago}}</div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-weight: 700;">{{c.score}}</span>
+              <div style="display: flex; gap: 2px;">
+                <sc-for list="{{c.bars}}" as="b" hint-placeholder-count="10">
+                  <div style="{{b.style}}"></div>
+                </sc-for>
+              </div>
+            </div>
+            <div style="display: flex; justify-content: flex-end;">
+              <button class="copybtn" onClick="{{c.toggleCopy}}" style="{{c.copyStyle}}">{{c.copyLabel}}</button>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+  </main>
+
+  <footer style="height: 48px; flex-shrink: 0; box-sizing: border-box; padding: 0 40px; border-top: 1px solid var(--line); background: var(--surface); display: flex; align-items: center; gap: 20px; font-size: 13px;">
+    <div style="display: flex; align-items: center; gap: 8px; color: var(--up); font-weight: 600;">
+      <div style="width: 8px; height: 8px; border-radius: 4px; background: {{accent}};"></div>
+      Connected
+    </div>
+    <div style="width: 1px; height: 20px; background: var(--line);"></div>
+    <span style="color: var(--muted);">Copied trades execute from your wallet. You can stop any copy at any time.</span>
+    <div style="flex-grow: 1;"></div>
+    <a href="#" style="color: var(--muted); font-weight: 500;">Send feedback</a>
+  </footer>
+
+  <sc-if value="{{isOpen}}" hint-placeholder-val="{{ false }}">
+    <div style="position: absolute; z-index: 55; top: 0; right: 0; bottom: 0; left: 0; background: rgba(17, 20, 15, 0.32);">
+      <button aria-label="Close trader profile" onClick="{{close}}" style="position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; padding: 0; border: 0; background: transparent; cursor: default;"></button>
+      <div style="position: absolute; top: 30px; left: 20px;">
+        <dc-import name="TraderModal" trader="{{sel}}" on-close="{{close}}" theme="{{theme}}" on-toggle-theme="{{setTheme}}" accent="{{accent}}" hint-size="1400px,1380px"></dc-import>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{isWizard}}" hint-placeholder-val="{{ false }}">
+    <div style="position: absolute; z-index: 57; top: 0; right: 0; bottom: 0; left: 0; background: rgba(11, 12, 10, 0.45); backdrop-filter: blur(2px);">
+      <button aria-label="Close copy setup" onClick="{{closeWizard}}" style="position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; padding: 0; border: 0; background: transparent; cursor: default;"></button>
+      <div style="position: absolute; top: 60px; left: 400px;">
+        <dc-import name="CopyWizard" trader="{{wizTrader}}" on-close="{{closeWizard}}" on-start="{{startCopy}}" theme="{{theme}}" on-toggle-theme="{{setTheme}}" accent="{{accent}}" hint-size="640px,1000px"></dc-import>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{isAsset}}" hint-placeholder-val="{{ false }}">
+    <div style="position: absolute; z-index: 52; top: 0; right: 0; bottom: 0; left: 0; background: rgba(11, 12, 10, 0.45); backdrop-filter: blur(2px);">
+      <button aria-label="Close asset view" onClick="{{closeAsset}}" style="position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; padding: 0; border: 0; background: transparent; cursor: default;"></button>
+      <div style="position: absolute; top: 30px; left: 20px;">
+        <dc-import name="AssetHolders" asset="{{assetSel}}" on-close="{{closeAsset}}" on-open-trader="{{openTraderFromSearch}}" theme="{{theme}}" on-toggle-theme="{{setTheme}}" accent="{{accent}}" hint-size="1400px,1380px"></dc-import>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{isSearch}}" hint-placeholder-val="{{ false }}">
+    <div style="position: absolute; z-index: 60; top: 0; right: 0; bottom: 0; left: 0; background: rgba(11, 12, 10, 0.5); backdrop-filter: blur(3px);">
+      <button aria-label="Close search" onClick="{{closeSearch}}" style="position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; padding: 0; border: 0; background: transparent; cursor: default;"></button>
+      <div style="position: absolute; top: 96px; left: 290px;">
+        <dc-import name="SearchPalette" on-close="{{closeSearch}}" on-open-trader="{{openTraderFromSearch}}" on-open-asset="{{openAssetFromSearch}}" theme="{{theme}}" on-toggle-theme="{{setTheme}}" accent="{{accent}}" hint-size="860px,600px"></dc-import>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"defaultTheme":{"editor":"enum","options":["light","dark"],"default":"light"},"accent":{"editor":"color","default":"#00B843","options":["#00B843","#11140F","#2F6BFF","#E8A400"]},"$preview":{"width":1440,"height":1440}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { tab: 'top', sort: 'score', unit: 'usd', view: 'grid', open: null, wizard: null, copying: { pea_whale: true, delta0: true } };
+    let savedTheme = null;
+    try { savedTheme = window.localStorage.getItem('peapod-theme'); } catch (e) { savedTheme = null; }
+    this.state.theme = savedTheme === 'dark' || savedTheme === 'light' ? savedTheme : (props.defaultTheme === 'dark' ? 'dark' : 'light');
+  }
+  componentDidMount() {
+    this._onThemeStore = (e) => {
+      if (e.key === 'peapod-theme' && (e.newValue === 'dark' || e.newValue === 'light')) this.setState({ theme: e.newValue });
+    };
+    window.addEventListener('storage', this._onThemeStore);
+  }
+  componentWillUnmount() {
+    window.removeEventListener('storage', this._onThemeStore);
+  }
+  themeVals() {
+    const theme = this.props.theme === 'dark' || this.props.theme === 'light' ? this.props.theme : this.state.theme;
+    const isDark = theme === 'dark';
+    const toggleTheme = () => {
+      const next = isDark ? 'light' : 'dark';
+      try { window.localStorage.setItem('peapod-theme', next); } catch (e) { /* storage unavailable */ }
+      if (this.props.onToggleTheme) this.props.onToggleTheme(next);
+      else this.setState({ theme: next });
+    };
+    const slot = 'width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center; transition: background-color 200ms ease, color 200ms ease; ';
+    return {
+      theme, isDark, toggleTheme,
+      setTheme: (next) => this.setState({ theme: next }),
+      themeClass: isDark ? 'pp theme-dark' : 'pp',
+      themeAria: isDark ? 'Switch to day mode' : 'Switch to night mode',
+      sunStyle: slot + (isDark ? 'background: transparent; color: #6E7567;' : 'background: #F4EFE3; color: #1E4D2B; box-shadow: 0 1px 3px rgba(17,20,15,0.18);'),
+      moonStyle: slot + (isDark ? 'background: #0B0C0A; color: #EFE6C8; box-shadow: 0 0 0 1px #2E3329;' : 'background: transparent; color: #8A9082;')
+    };
+  }
+  searchVals() {
+    return {
+      isSearch: !!this.state.search, isAsset: !!this.state.asset, assetSel: this.state.asset,
+      openSearch: () => this.setState({ search: true }),
+      closeSearch: () => this.setState({ search: false }),
+      openAssetFromSearch: (a) => this.setState({ search: false, asset: a, open: null }),
+      closeAsset: () => this.setState({ asset: null }),
+      openTraderFromSearch: (t) => this.setState({ search: false, open: t })
+    };
+  }
+  renderVals() {
+    const accent = this.props.accent ?? '#00B843';
+    const up = 'var(--up)', dn = 'var(--down)';
+    const { tab, sort, unit, view, copying } = this.state;
+
+    const hex = (s, len) => { let x = s * 131 + 7, out = ''; for (let i = 0; i < len; i++) { x = (x * 9301 + 49297) % 233280; out += '0123456789abcdef'[Math.floor(x / 233280 * 16)]; } return out; };
+    const money = (v) => '$' + Math.round(Math.abs(v)).toLocaleString('en-US');
+
+    const traders = [
+      { name: 'pea_whale', pnl: 1284390, roi: 212.4, vol: 48204118, acct: 2410552, win: 64.2, trades: 412, assets: 'TNE', cat: 'stocks', seed: 11, score: 95, ago: '20H AGO' },
+      { name: '0x19bd…04af', pnl: 902115, roi: 88.1, vol: 31702440, acct: 1930871, win: 58.0, trades: 97, assets: 'EPW', cat: 'memes', seed: 23, score: 94, ago: '13D AGO' },
+      { name: 'thetaGang', pnl: 641208, roi: 140.9, vol: 22011930, acct: 1104280, win: 61.4, trades: 38, assets: 'NH', cat: 'stocks', seed: 37, score: 94, ago: '3MO AGO' },
+      { name: '0x5510…ad3c', pnl: 488760, roi: 47.3, vol: 40519002, acct: 1520330, win: 52.1, trades: 590, assets: 'TNEAB', cat: 'stocks', seed: 41, score: 93, ago: '2D AGO' },
+      { name: 'nvda_maxi', pnl: 402033, roi: 95.6, vol: 12803577, acct: 840112, win: 71.0, trades: 23, assets: 'N', cat: 'stocks', seed: 53, score: 93, ago: '11MO AGO' },
+      { name: '0x3c9a…e5d8', pnl: 311480, roi: 33.0, vol: 18904721, acct: 1250004, win: 47.7, trades: 44, assets: 'EBK', cat: 'memes', seed: 67, score: 93, ago: '5D AGO' },
+      { name: 'slowbid', pnl: 276912, roi: 61.2, vol: 9402286, acct: 431023, win: 72.7, trades: 11, assets: 'SG', cat: 'stocks', seed: 71, score: 93, ago: '1D AGO' },
+      { name: 'delta0', pnl: 198305, roi: 21.7, vol: 27109954, acct: 1110870, win: 49.3, trades: 259, assets: 'TNHA', cat: 'stocks', seed: 83, score: 92, ago: '2D AGO' },
+      { name: '0xf2a4…6e1b', pnl: 154870, roi: 44.8, vol: 6203318, acct: 500216, win: 66.0, trades: 9, assets: 'BW', cat: 'memes', seed: 97, score: 91, ago: '7D AGO' },
+      { name: 'ghostfill', pnl: 121044, roi: 18.2, vol: 14618775, acct: 790442, win: 69.5, trades: 59, assets: 'TEBS', cat: 'stocks', seed: 101, score: 90, ago: '7D AGO' },
+      { name: '0x0d6e…b3a9', pnl: 98740, roi: 12.9, vol: 8841002, acct: 612998, win: 55.0, trades: 20, assets: 'GS', cat: 'stocks', seed: 109, score: 89, ago: '26D AGO' },
+      { name: 'rh_degen', pnl: 87311, roi: 30.4, vol: 5120449, acct: 184390, win: 48.0, trades: 25, assets: 'EPWK', cat: 'memes', seed: 113, score: 88, ago: '28D AGO' },
+      { name: 'hoodlum', pnl: 79420, roi: 26.8, vol: 7310220, acct: 402118, win: 57.3, trades: 64, assets: 'HTA', cat: 'stocks', seed: 127, score: 88, ago: '3D AGO' },
+      { name: '0x7c21…9d0e', pnl: 71205, roi: 58.1, vol: 3902114, acct: 150930, win: 62.5, trades: 16, assets: 'KPE', cat: 'memes', seed: 131, score: 87, ago: '9H AGO' },
+      { name: 'gld_bug', pnl: 64880, roi: 9.4, vol: 11204338, acct: 921004, win: 74.1, trades: 27, assets: 'GS', cat: 'stocks', seed: 137, score: 87, ago: '14D AGO' },
+      { name: '0xa3e8…41c7', pnl: 58312, roi: 41.7, vol: 4418870, acct: 196222, win: 51.9, trades: 108, assets: 'NTWB', cat: 'stocks', seed: 149, score: 86, ago: '6H AGO' }
+    ];
+    traders.forEach((t) => {
+      t.addr = t.name.indexOf('0x') === 0 ? t.name.slice(0, 6) + hex(t.seed, 30) + t.name.slice(-4) : '0x' + hex(t.seed, 38);
+    });
+
+    const assetSyms = { T: 'TSLA', N: 'NVDA', H: 'HOOD', A: 'AAPL', S: 'SPY', G: 'GLD', E: 'ROBIN', B: 'SQUAWK', P: 'FEATHER', W: 'WORM', K: 'NEST' };
+    const assetColors = { T: '#D9E4FF', N: '#DDF5D6', H: '#D8F7E4', A: '#EEEEEE', S: '#FFE0DA', G: '#F7F0C9', E: '#EBE4FF', B: '#FFE1F1', P: '#E4DCFF', W: '#F3E8FF', K: '#FFF1CC' };
+    const dot = (k, i) => ({ t: assetSyms[k].charAt(0), style: 'width: 22px; height: 22px; box-sizing: border-box; border-radius: 11px; border: 2px solid var(--surface); margin-left: ' + (i ? '-6px' : '0') + '; background: ' + assetColors[k] + '; color: #0A0B09; font-size: 9px; font-weight: 700; display: flex; align-items: center; justify-content: center;' });
+
+    const tabDefs = [
+      ['top', 'Top 100', () => true],
+      ['stocks', 'Stocks focused', (t) => t.cat === 'stocks'],
+      ['memes', 'Memecoin focused', (t) => t.cat === 'memes'],
+      ['tsla', 'Top TSLA traders', (t) => t.assets.indexOf('T') >= 0],
+      ['nvda', 'Top NVDA traders', (t) => t.assets.indexOf('N') >= 0]
+    ];
+    const filterFn = tabDefs.find((d) => d[0] === tab)[2];
+    const sorts = { score: ['Highest copy score', (t) => t.score + t.pnl / 1e9], pnl: ['Highest PnL', (t) => t.pnl], acct: ['Largest portfolio', (t) => t.acct], win: ['Best win rate', (t) => t.win] };
+    const sortKeys = ['score', 'pnl', 'acct', 'win'];
+    const list = traders.filter(filterFn).sort((a, b) => sorts[sort][1](b) - sorts[sort][1](a));
+
+    const curve = (seed, w, h, top) => {
+      let x = seed * 17 + 3, v = 0;
+      const vol = 0.6 + (seed % 5) * 0.5;
+      const n = 48, vals = [];
+      const dip = seed % 3 === 0;
+      for (let i = 0; i < n; i++) {
+        x = (x * 9301 + 49297) % 233280;
+        const r = x / 233280;
+        let step;
+        if (i < 6) step = dip ? -r * 1.5 : (r - 0.5) * 0.6;
+        else if (i < 16) step = r * 7;
+        else step = (r - 0.45) * vol * 2;
+        v += step;
+        vals.push(v);
+      }
+      const min = Math.min(0, Math.min.apply(null, vals)), max = Math.max.apply(null, vals);
+      const Y = (y) => top + (max - y) / (max - min || 1) * (h - top - 4);
+      const pts = vals.map((y, i) => [(1 + i * (w - 6) / (n - 1)).toFixed(1), Y(y).toFixed(1)]);
+      const line = 'M' + pts.map((p) => p.join(',')).join(' L');
+      const zero = Y(0);
+      return { line, area: line + ' L' + pts[n - 1][0] + ',' + zero.toFixed(1) + ' L1,' + zero.toFixed(1) + ' Z', zero: zero.toFixed(1) };
+    };
+
+    const bars = (score) => {
+      const out = [];
+      for (let i = 0; i < 10; i++) out.push({ style: 'width: 3px; height: 16px; border-radius: 2px; background: ' + (i < Math.round(score / 10) ? accent : 'var(--up-track)') + ';' });
+      return out;
+    };
+
+    const avatar = (t, size) => 'width: ' + size + 'px; height: ' + size + 'px; flex-shrink: 0; box-sizing: border-box; border-radius: ' + Math.round(size * 0.3) + 'px; font-size: ' + Math.round(size * 0.32) + 'px; font-weight: 700; display: flex; align-items: center; justify-content: center; ' + (t.score >= 95 ? 'background: ' + accent + '; color: #0A0B09;' : 'background: var(--muted-bg); color: var(--fg); border: 1px solid var(--line);');
+    const initials = (t) => t.name.replace('0x', '').slice(0, 2).toUpperCase();
+
+    const cards = list.map((t, i) => {
+      const c = curve(t.seed, 200, 88, 5);
+      const on = !!copying[t.name];
+      const rank = traders.indexOf(t) + 1;
+      const pnlText = unit === 'pct' ? '+' + t.roi.toFixed(1) + '%' : '+' + money(t.pnl);
+      return {
+        name: t.name, ago: t.ago, score: String(t.score),
+        aria: 'Open profile for ' + t.name,
+        initials: initials(t), avatarStyle: avatar(t, 36),
+        assets: t.assets.split('').map(dot),
+        pnl: pnlText,
+        pnlLabel: unit === 'pct' ? 'ROI 30D' : 'PnL 30D',
+        pnlStyle: 'font-family: "JetBrains Mono", monospace; font-size: 17px; font-weight: 500; color: ' + up + ';',
+        pnlCellStyle: 'text-align: right; font-family: "JetBrains Mono", monospace; font-size: 14px; color: ' + up + ';',
+        value: money(t.acct),
+        win: t.win.toFixed(1) + '%',
+        hatchUp: 'ct-hu-' + i, hatchDn: 'ct-hd-' + i, clipUp: 'ct-cu-' + i, clipDn: 'ct-cd-' + i,
+        fillUp: 'url(#ct-hu-' + i + ')', fillDn: 'url(#ct-hd-' + i + ')',
+        clipUpUrl: 'url(#ct-cu-' + i + ')', clipDnUrl: 'url(#ct-cd-' + i + ')',
+        zeroY: c.zero, line: c.line, area: c.area,
+        bars: bars(t.score),
+        copyLabel: on ? 'Copying' : 'Copy',
+        copyStyle: 'height: 34px; min-width: 82px; padding: 0 14px; border-radius: 8px; font-size: 13px; font-weight: 700; ' + (on ? 'border: 1px solid ' + accent + '; background: var(--surface) !important; color: ' + up + ';' : 'border: 0; background: var(--inv-bg); color: var(--inv-fg);'),
+        toggleCopy: () => (on ? this.setState({ copying: Object.assign({}, copying, { [t.name]: false }) }) : this.setState({ wizard: Object.assign({}, t, { rank }) })),
+        open: () => this.setState({ open: Object.assign({}, t, { rank }) })
+      };
+    });
+
+    const fanPick = traders.slice(0, 3);
+    const fanPos = [
+      { left: 60, top: 70, rot: -8, z: 1 },
+      { left: 230, top: 40, rot: 0, z: 3 },
+      { left: 400, top: 76, rot: 7, z: 2 }
+    ];
+    const fan = fanPick.map((t, i) => {
+      const p = fanPos[i];
+      const c = curve(t.seed, 110, 56, 4);
+      return {
+        name: t.name, ago: 'Last trade ' + t.ago.toLowerCase(),
+        roi: '+' + t.roi.toFixed(1) + '%',
+        line: c.line,
+        initials: initials(t), avatarStyle: avatar(t, 34),
+        wrapStyle: 'position: absolute; left: ' + p.left + 'px; top: ' + p.top + 'px; z-index: ' + p.z + '; width: 220px; box-sizing: border-box; padding: 16px; border-radius: 20px; background: var(--surface); rotate: ' + p.rot + 'deg; box-shadow: 0 2px 4px rgba(17,20,15,0.05), 0 24px 48px -16px rgba(17,20,15,0.28); display: flex; flex-direction: column; gap: 14px;'
+      };
+    });
+
+    const tabs = tabDefs.map(([id, label]) => ({
+      label,
+      pick: () => this.setState({ tab: id }),
+      style: 'height: 36px; padding: 0 14px; border: 0; border-radius: 10px; font-size: 15px; font-weight: 600; ' + (id === tab ? 'background: var(--inv-bg); color: var(--inv-fg);' : 'background: transparent; color: var(--muted);')
+    }));
+    const seg = (on) => 'height: 32px; min-width: 32px; padding: 0 8px; border: 0; border-radius: 8px; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center; ' + (on ? 'background: var(--surface); color: var(--fg); box-shadow: 0 1px 2px rgba(17,20,15,0.12);' : 'background: transparent; color: var(--muted);');
+    const units = [['usd', '$', 'Show PnL in dollars'], ['pct', '%', 'Show ROI as percent']].map(([id, label, aria]) => ({ label, aria, pick: () => this.setState({ unit: id }), style: seg(id === unit) }));
+    const views = [
+      ['grid', 'Grid view', 'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z'],
+      ['list', 'List view', 'M3 6h18M3 12h18M3 18h18']
+    ].map(([id, aria, icon]) => ({ aria, icon, pick: () => this.setState({ view: id }), style: seg(id === view) }));
+
+    const chips = [{ label: 'Portfolio value' }, { label: 'PnL' }, { label: 'All styles' }, { label: 'Copy score' }];
+
+    return Object.assign(this.themeVals(), this.searchVals(), {
+      accent, fan, tabs, units, views, chips, cards,
+      sortLabel: sorts[sort][0],
+      cycleSort: () => this.setState({ sort: sortKeys[(sortKeys.indexOf(sort) + 1) % sortKeys.length] }),
+      countLabel: list.length + ' traders',
+      copyCount: (function (n) { return n + (n === 1 ? ' trader' : ' traders'); })(Object.keys(copying).filter((k) => copying[k]).length),
+      pnlHead: unit === 'pct' ? 'ROI 30D' : 'PnL 30D',
+      isGrid: view === 'grid', isList: view === 'list',
+      isOpen: !!this.state.open, sel: this.state.open,
+      close: () => this.setState({ open: null }),
+      isWizard: !!this.state.wizard, wizTrader: this.state.wizard,
+      closeWizard: () => this.setState({ wizard: null }),
+      startCopy: (info) => this.setState({ copying: Object.assign({}, this.state.copying, { [info.name]: true }) })
+    });
+  }
+}
+</script>
+</body>
+</html>

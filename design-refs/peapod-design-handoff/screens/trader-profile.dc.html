@@ -1,0 +1,573 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif&amp;family=Schibsted+Grotesk:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+  <style>
+    .pp { --surface: #FFFFFF; --surface-2: #FAFBF9; --sunken: #F7F8F6; --hover: #F5F7F3; --muted-bg: #F2F4F0; --muted-bg-2: #EEF1EC; --grid: #F0F2EE; --line-soft: #EEF0EC; --line: #E6E9E3; --up-line: #E1F2E6; --line-strong: #D6DAD2; --line-strong-2: #C9CEC5; --faint: #B7BCB2; --subtle: #8A9082; --placeholder: #6B7166; --muted: #5F6559; --fg: #11140F; --fg-strong: #000000; --up: #067A2F; --down: #C8360F; --warn: #8A6100; --meme: #6D4FE0; --up-bg: #EAF8EE; --up-bg-2: #F3FBF5; --up-track: #C9E9D2; --down-bg: #FDECE7; --meme-bg: #F1EDFF; --inv-bg: #11140F; --inv-fg: #FFFFFF; --inv-hover: #2A2E25; color-scheme: light; color: var(--fg); transition: background-color 250ms ease, color 250ms ease; }
+    .pp.theme-dark { --surface: #111310; --surface-2: #161914; --sunken: #0B0C0A; --hover: #1A1D17; --muted-bg: #1C1F19; --muted-bg-2: #20241D; --grid: #161914; --line-soft: #1E221B; --line: #272B23; --up-line: #1C3323; --line-strong: #394033; --line-strong-2: #4A5143; --faint: #596052; --subtle: #858C7E; --placeholder: #7D8476; --muted: #A3AA9B; --fg: #EEF1EA; --fg-strong: #FFFFFF; --up: #4BD17A; --down: #FF7A57; --warn: #F2C14E; --meme: #B4A2FF; --up-bg: #12281A; --up-bg-2: #0F1D13; --up-track: #1F3A27; --down-bg: #2E1710; --meme-bg: #231D3A; --inv-bg: #EEF1EA; --inv-fg: #0B0C0A; --inv-hover: #FFFFFF; color-scheme: dark; }
+    .pp.theme-dark .dark { box-shadow: inset 0 0 0 1px #22261E; }
+    .theme-toggle:hover { border-color: var(--line-strong) !important; }
+    body { margin: 0; background: var(--surface); color: var(--fg); font-family: "Schibsted Grotesk", "Helvetica Neue", sans-serif; -webkit-font-smoothing: antialiased; }
+    a { color: inherit; text-decoration: none; } a:hover { color: var(--fg-strong); }
+    button { font-family: inherit; cursor: pointer; }
+    .ghost:hover { background: var(--muted-bg); }
+    .prow:hover { background: var(--surface-2); }
+  </style>
+</helmet>
+<div class="{{themeClass}}" style="position: relative; width: 1400px; height: 1380px; box-sizing: border-box; border-radius: 20px; border: 1px solid var(--line); background: var(--surface); box-shadow: 0 24px 80px rgba(17,20,15,0.18); display: flex; flex-direction: column; overflow: hidden;">
+
+  <div style="height: 52px; flex-shrink: 0; box-sizing: border-box; padding: 0 10px 0 20px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 4px;">
+    <div style="flex-grow: 1; display: flex; align-items: center; gap: 6px; font-size: 16px;">
+      <span style="color: var(--muted);">Leaderboard</span>
+      <span style="color: var(--faint);">/</span>
+      <span style="font-weight: 600;">{{t.name}}</span>
+    </div>
+    <button class="theme-toggle" onClick="{{toggleTheme}}" aria-label="{{themeAria}}" title="{{themeAria}}" style="width: 84px; height: 44px; flex-shrink: 0; box-sizing: border-box; padding: 4px; border-radius: 12px; border: 1px solid var(--line); background: var(--muted-bg); display: flex; align-items: center; justify-content: space-between;">
+      <span style="{{sunStyle}}"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" style="fill: currentColor; stroke: currentColor;"><circle cx="12" cy="12" r="4.5" stroke="none"></circle><path d="M12 2.5v2.4M12 19.1v2.4M2.5 12h2.4M19.1 12h2.4M5.3 5.3l1.7 1.7M17 17l1.7 1.7M5.3 18.7L7 17M17 7l1.7-1.7" fill="none" stroke-width="2.2" stroke-linecap="round"></path></svg></span>
+      <span style="{{moonStyle}}"><svg width="19" height="19" viewBox="0 0 24 24" aria-hidden="true" style="fill: currentColor;"><path d="M20.6 14.3A8.6 8.6 0 1 1 9.7 3.4a7 7 0 0 0 10.9 10.9z"></path></svg></span>
+    </button>
+    <button class="ghost" aria-label="Activity" style="width: 40px; height: 40px; border: 0; border-radius: 10px; background: transparent; color: var(--fg); display: flex; align-items: center; justify-content: center;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l3-8 4 16 3-8h4"></path></svg>
+    </button>
+    <button class="ghost" aria-label="Open full page" style="width: 40px; height: 40px; border: 0; border-radius: 10px; background: transparent; color: var(--fg); display: flex; align-items: center; justify-content: center;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"></path><path d="M21 3l-7 7"></path><path d="M9 21H3v-6"></path><path d="M3 21l7-7"></path></svg>
+    </button>
+    <button class="ghost" aria-label="Close" onClick="{{close}}" style="width: 40px; height: 40px; border: 0; border-radius: 10px; background: transparent; color: var(--fg); display: flex; align-items: center; justify-content: center;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12"></path><path d="M18 6L6 18"></path></svg>
+    </button>
+  </div>
+
+  <div style="flex-grow: 1; min-height: 0; box-sizing: border-box; padding: 12px; display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 12px;">
+
+    <aside style="min-height: 0; overflow: auto; box-sizing: border-box; padding: 16px; border-radius: 14px; border: 1px solid var(--line); display: flex; flex-direction: column; gap: 12px;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <div style="{{avatarStyle}}">{{initials}}</div>
+        <div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px;">
+          <div style="font-size: 17px; font-weight: 700;">{{t.name}}</div>
+          <div style="display: flex; align-items: center; gap: 2px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--muted);">
+            {{shortAddr}}
+            <button class="ghost" aria-label="Copy address" style="width: 26px; height: 26px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); display: flex; align-items: center; justify-content: center;">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"></rect><path d="M5 15V5a2 2 0 0 1 2-2h10"></path></svg>
+            </button>
+          </div>
+        </div>
+        <button class="ghost" aria-label="Share profile" style="width: 36px; height: 36px; border: 0; border-radius: 10px; background: transparent; color: var(--muted); display: flex; align-items: center; justify-content: center;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><path d="M8.6 13.5l6.8 4"></path><path d="M15.4 6.5l-6.8 4"></path></svg>
+        </button>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px;">
+        <button class="ghost" style="height: 36px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); font-size: 14px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="3"></circle></svg>
+          Track
+        </button>
+        <button class="ghost" style="height: 36px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); font-size: 14px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.7 21a2 2 0 0 1-3.4 0"></path></svg>
+          Alerts
+        </button>
+        <button class="ghost" style="grid-column: span 2; height: 36px; border-radius: 10px; border: 1px solid var(--line); background: var(--sunken); color: var(--fg); font-size: 14px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="4"></circle><path d="M2 21c1-4 3.5-6 7-6 1.5 0 2.8.4 3.8 1"></path><path d="M16 19l2 2 4-4"></path></svg>
+          Is this you? Claim
+        </button>
+      </div>
+
+      <div style="padding: 14px; border-radius: 12px; background: var(--up-bg); display: flex; flex-direction: column; gap: 10px;">
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--up);">Copy score</div>
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+          <div style="display: flex; align-items: baseline; gap: 3px;">
+            <span style="font-size: 28px; font-weight: 700; letter-spacing: -0.02em;">{{score}}</span>
+            <span style="font-size: 13px; color: var(--muted);">/100</span>
+          </div>
+          <div style="display: flex; gap: 3px;">
+            <sc-for list="{{scoreBars}}" as="b" hint-placeholder-count="20">
+              <div style="{{b.style}}"></div>
+            </sc-for>
+          </div>
+        </div>
+        <button onClick="{{openCopy}}" style="height: 36px; border: 0; border-radius: 10px; background: {{accent}}; color: #0A0B09; font-size: 14px; font-weight: 700;">{{copyLabel}}</button>
+      </div>
+
+      <div style="padding-top: 12px; border-top: 1px solid var(--line-soft); display: flex; flex-direction: column; gap: 4px;">
+        <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase;">Portfolio value</div>
+        <div style="font-size: 26px; font-weight: 600; letter-spacing: -0.02em;">{{acctFull}}</div>
+      </div>
+
+      <sc-for list="{{sections}}" as="sec" hint-placeholder-count="4">
+        <div style="padding-top: 12px; border-top: 1px solid var(--line-soft); display: flex; flex-direction: column;">
+          <div style="margin-bottom: 4px; display: flex; align-items: center; gap: 4px; font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase;">
+            {{sec.title}}
+            <sc-if value="{{sec.hasPicker}}" hint-placeholder-val="{{ false }}">
+              <button onClick="{{sec.cycle}}" style="height: 24px; padding: 0 4px; border: 0; border-radius: 6px; background: transparent; color: var(--fg); font: inherit; display: flex; align-items: center; gap: 2px;">
+                {{sec.picker}}
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
+              </button>
+            </sc-if>
+          </div>
+          <sc-for list="{{sec.rows}}" as="r" hint-placeholder-count="4">
+            <div style="height: 30px; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+              <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted);">{{r.label}}</span>
+              <span style="{{r.style}}">
+                <sc-if value="{{r.crown}}" hint-placeholder-val="{{ false }}">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 7l4.5 4L12 5l4.5 6L21 7l-2 12H5z"></path></svg>
+                </sc-if>
+                <sc-if value="{{r.stack}}" hint-placeholder-val="{{ false }}">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="6" rx="8" ry="3"></ellipse><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6"></path><path d="M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"></path></svg>
+                </sc-if>
+                {{r.value}}
+              </span>
+            </div>
+          </sc-for>
+        </div>
+      </sc-for>
+    </aside>
+
+    <div style="min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 12px;">
+
+      <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px;">
+        <sc-for list="{{metrics}}" as="m" hint-placeholder-count="4">
+          <div style="border-radius: 14px; border: 1px solid var(--line); display: flex; flex-direction: column;">
+            <div style="height: 40px; box-sizing: border-box; padding: 0 14px; border-bottom: 1px solid var(--line-soft); display: flex; align-items: center; justify-content: space-between; font-size: 14px; font-weight: 600;">
+              {{m.title}}
+              <sc-if value="{{m.hasAside}}" hint-placeholder-val="{{ false }}">
+                <span style="display: flex; align-items: center; gap: 2px; font-size: 13px; font-weight: 500; color: var(--muted);">
+                  {{m.aside}}
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
+                </span>
+              </sc-if>
+            </div>
+            <div style="padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 10px;">
+              <div style="display: flex; align-items: baseline; gap: 6px;">
+                <span style="{{m.valueStyle}}">{{m.value}}</span>
+                <span style="font-size: 12px; font-weight: 500; color: var(--muted);">{{m.unit}}</span>
+              </div>
+              <sc-if value="{{m.isSquares}}" hint-placeholder-val="{{ false }}">
+                <div style="height: 8px; display: grid; grid-template-columns: repeat(28, minmax(0, 1fr)); gap: 3px;">
+                  <sc-for list="{{squares}}" as="q" hint-placeholder-count="28">
+                    <div style="{{q.style}}"></div>
+                  </sc-for>
+                </div>
+              </sc-if>
+              <sc-if value="{{m.isBar}}" hint-placeholder-val="{{ true }}">
+                <div style="{{m.trackStyle}}">
+                  <div style="{{m.fillStyle}}"></div>
+                </div>
+              </sc-if>
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 12px; white-space: nowrap;">
+                <span style="color: var(--muted);"><span style="{{m.leadStyle}}">{{m.lead}}</span> · {{m.rest}}</span>
+                <span style="color: var(--muted);">{{m.right}}</span>
+              </div>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="border-radius: 14px; border: 1px solid var(--line); display: flex; flex-direction: column;">
+        <div style="height: 44px; flex-shrink: 0; box-sizing: border-box; padding: 0 16px; border-bottom: 1px solid var(--line-soft); display: flex; align-items: center; justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 18px;">
+            <sc-for list="{{chartTabs}}" as="c" hint-placeholder-count="3">
+              <button onClick="{{c.pick}}" style="{{c.style}}">{{c.label}}</button>
+            </sc-for>
+          </div>
+          <div style="display: flex; align-items: center; gap: 2px;">
+            <sc-for list="{{metricsToggle}}" as="mt" hint-placeholder-count="2">
+              <button onClick="{{mt.pick}}" style="{{mt.style}}">{{mt.label}}</button>
+            </sc-for>
+            <div style="width: 1px; height: 16px; margin: 0 6px; background: var(--line);"></div>
+            <sc-for list="{{ranges}}" as="r" hint-placeholder-count="4">
+              <button onClick="{{r.pick}}" style="{{r.style}}">{{r.label}}</button>
+            </sc-for>
+          </div>
+        </div>
+        <div style="padding: 14px 16px 12px; display: flex; flex-direction: column; gap: 2px;">
+          <div style="display: flex; gap: 12px;">
+            <div style="flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px;">
+              <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase;">{{chartTitle}}</div>
+              <div style="{{chartValueStyle}}">{{chartValue}}</div>
+              <svg width="100%" height="340" viewBox="0 0 800 340" preserveAspectRatio="none" style="margin-top: 6px; display: block;" aria-label="PnL chart">
+                <defs>
+                  <pattern id="tm-hatch-up" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                    <rect style="fill: {{accent}};" width="6" height="6" fill-opacity="0.08"></rect>
+                    <line style="stroke: {{accent}};" x1="0" y1="0" x2="0" y2="6" stroke-width="1" stroke-opacity="0.3"></line>
+                  </pattern>
+                  <pattern id="tm-hatch-dn" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                    <rect width="6" height="6" fill="#E5532E" fill-opacity="0.1"></rect>
+                    <line x1="0" y1="0" x2="0" y2="6" stroke="#E5532E" stroke-width="1" stroke-opacity="0.35"></line>
+                  </pattern>
+                  <clipPath id="tm-clip-up"><rect x="0" y="0" width="800" height="{{zeroY}}"></rect></clipPath>
+                  <clipPath id="tm-clip-dn"><rect x="0" y="{{zeroY}}" width="800" height="340"></rect></clipPath>
+                </defs>
+                <sc-for list="{{gridLines}}" as="g" hint-placeholder-count="5">
+                  <line style="stroke: var(--line);" x1="0" y1="{{g.y}}" x2="800" y2="{{g.y}}" stroke-width="1" stroke-dasharray="2 5" vector-effect="non-scaling-stroke"></line>
+                </sc-for>
+                <path d="{{area}}" fill="url(#tm-hatch-up)" clip-path="url(#tm-clip-up)"></path>
+                <path d="{{area}}" fill="url(#tm-hatch-dn)" clip-path="url(#tm-clip-dn)"></path>
+                <path style="stroke: {{accent}};" d="{{line}}" fill="none" stroke-width="2" stroke-linejoin="round" clip-path="url(#tm-clip-up)" vector-effect="non-scaling-stroke"></path>
+                <path d="{{line}}" fill="none" stroke="#E5532E" stroke-width="2" stroke-linejoin="round" clip-path="url(#tm-clip-dn)" vector-effect="non-scaling-stroke"></path>
+              </svg>
+            </div>
+            <div style="width: 64px; flex-shrink: 0; padding-top: 4px; height: 402px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; text-align: right; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted);">
+              <sc-for list="{{ticks}}" as="k" hint-placeholder-count="6">
+                <div>{{k.label}}</div>
+              </sc-for>
+            </div>
+          </div>
+          <div style="margin: 6px 76px 0 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); font-size: 12px; color: var(--muted); text-align: center;">
+            <sc-for list="{{xLabels}}" as="xl" hint-placeholder-count="4">
+              <div>{{xl.label}}</div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+
+      <div style="flex-grow: 1; min-height: 0; border-radius: 14px; border: 1px solid var(--line); display: flex; flex-direction: column; overflow: hidden;">
+        <div style="height: 44px; flex-shrink: 0; box-sizing: border-box; padding: 0 16px; border-bottom: 1px solid var(--line-soft); display: flex; align-items: center; gap: 18px;">
+          <sc-for list="{{tabs}}" as="tb" hint-placeholder-count="9">
+            <sc-if value="{{tb.divider}}" hint-placeholder-val="{{ false }}">
+              <div style="width: 1px; height: 18px; background: var(--line);"></div>
+            </sc-if>
+            <button onClick="{{tb.pick}}" style="{{tb.style}}">
+              {{tb.label}}
+              <sc-if value="{{tb.hasCount}}" hint-placeholder-val="{{ false }}">
+                <span style="min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box; border-radius: 5px; background: var(--up-bg); color: var(--up); font-size: 11px; display: flex; align-items: center; justify-content: center;">{{tb.count}}</span>
+              </sc-if>
+            </button>
+          </sc-for>
+        </div>
+        <sc-if value="{{showHoldings}}" hint-placeholder-val="{{ true }}">
+          <div style="height: 34px; flex-shrink: 0; box-sizing: border-box; padding: 0 16px; border-bottom: 1px solid var(--line-soft); display: grid; grid-template-columns: minmax(0, 1.4fr) repeat(4, minmax(0, 1fr)) minmax(0, 1.8fr) repeat(3, minmax(0, 1fr)); column-gap: 12px; align-items: center; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted);">
+            <sc-for list="{{heads}}" as="h" hint-placeholder-count="9">
+              <div style="{{h.style}}">
+                {{h.label}}
+                <svg width="8" height="12" viewBox="0 0 10 14" aria-hidden="true"><path style="stroke: var(--faint);" d="M1.5 5L5 1.5 8.5 5" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path><path style="stroke: var(--faint);" d="M1.5 9L5 12.5 8.5 9" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+              </div>
+            </sc-for>
+          </div>
+          <sc-for list="{{holdings}}" as="p" hint-placeholder-count="10">
+            <div class="prow" style="height: 34px; flex-shrink: 0; box-sizing: border-box; padding: 0 16px; border-bottom: 1px solid var(--muted-bg); display: grid; grid-template-columns: minmax(0, 1.4fr) repeat(4, minmax(0, 1fr)) minmax(0, 1.8fr) repeat(3, minmax(0, 1fr)); column-gap: 12px; align-items: center; font-family: 'JetBrains Mono', monospace; font-size: 12px;">
+              <div style="display: flex; align-items: center; gap: 6px; font-family: 'Schibsted Grotesk', sans-serif; font-size: 13px; font-weight: 600;">
+                <div style="{{p.dotStyle}}">{{p.letter}}</div>
+                {{p.sym}}
+                <span style="{{p.tagStyle}}">{{p.tag}}</span>
+              </div>
+              <div style="text-align: right;">{{p.balance}}</div>
+              <div style="text-align: right;">{{p.value}}</div>
+              <div style="text-align: right;">{{p.cost}}</div>
+              <div style="text-align: right;">{{p.price}}</div>
+              <div style="{{p.unrealStyle}}">
+                {{p.unreal}}
+                <svg style="stroke: var(--subtle);" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><path d="M8.6 13.5l6.8 4"></path><path d="M15.4 6.5l-6.8 4"></path></svg>
+              </div>
+              <div style="{{p.realizedStyle}}">{{p.realized}}</div>
+              <div style="text-align: right;">{{p.weight}}</div>
+              <div style="{{p.changeStyle}}">{{p.change}}</div>
+            </div>
+          </sc-for>
+        </sc-if>
+        <sc-if value="{{showEmpty}}" hint-placeholder-val="{{ false }}">
+          <div style="flex-grow: 1; display: flex; align-items: center; justify-content: center; font-size: 14px; color: var(--muted);">{{emptyText}}</div>
+        </sc-if>
+      </div>
+    </div>
+  </div>
+  <sc-if value="{{copyOpen}}" hint-placeholder-val="{{ false }}">
+    <div style="position: absolute; z-index: 50; top: 0; right: 0; bottom: 0; left: 0; border-radius: 20px; background: rgba(11, 12, 10, 0.45); backdrop-filter: blur(2px);">
+      <button aria-label="Close copy setup" onClick="{{closeCopy}}" style="position: absolute; top: 0; right: 0; bottom: 0; left: 0; width: 100%; height: 100%; padding: 0; border: 0; background: transparent; cursor: default;"></button>
+      <div style="position: absolute; top: 70px; left: 380px;">
+        <dc-import name="CopyWizard" trader="{{t}}" on-close="{{closeCopy}}" on-start="{{startCopy}}" theme="{{theme}}" on-toggle-theme="{{setTheme}}" accent="{{accent}}" hint-size="640px,1000px"></dc-import>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"theme":{"editor":null},"onToggleTheme":{"editor":null},"onStart":{"editor":null},"defaultTheme":{"editor":"enum","options":["light","dark"],"default":"light"},"trader":{"editor":null},"onClose":{"editor":null},"accent":{"editor":"color","default":"#00B843","options":["#00B843","#11140F","#2F6BFF","#E8A400"]},"$preview":{"width":1400,"height":1380}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { chart: 'realized', metric: 'pnl', range: '30D', tab: 'holdings', perfSpan: '30D', copyOpen: false, copied: false };
+    let savedTheme = null;
+    try { savedTheme = window.localStorage.getItem('peapod-theme'); } catch (e) { savedTheme = null; }
+    this.state.theme = savedTheme === 'dark' || savedTheme === 'light' ? savedTheme : (props.defaultTheme === 'dark' ? 'dark' : 'light');
+  }
+  componentDidMount() {
+    this._onThemeStore = (e) => {
+      if (e.key === 'peapod-theme' && (e.newValue === 'dark' || e.newValue === 'light')) this.setState({ theme: e.newValue });
+    };
+    window.addEventListener('storage', this._onThemeStore);
+  }
+  componentWillUnmount() {
+    window.removeEventListener('storage', this._onThemeStore);
+  }
+  themeVals() {
+    const theme = this.props.theme === 'dark' || this.props.theme === 'light' ? this.props.theme : this.state.theme;
+    const isDark = theme === 'dark';
+    const toggleTheme = () => {
+      const next = isDark ? 'light' : 'dark';
+      try { window.localStorage.setItem('peapod-theme', next); } catch (e) { /* storage unavailable */ }
+      if (this.props.onToggleTheme) this.props.onToggleTheme(next);
+      else this.setState({ theme: next });
+    };
+    const slot = 'width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center; transition: background-color 200ms ease, color 200ms ease; ';
+    return {
+      theme, isDark, toggleTheme,
+      setTheme: (next) => this.setState({ theme: next }),
+      themeClass: isDark ? 'pp theme-dark' : 'pp',
+      themeAria: isDark ? 'Switch to day mode' : 'Switch to night mode',
+      sunStyle: slot + (isDark ? 'background: transparent; color: #6E7567;' : 'background: #F4EFE3; color: #1E4D2B; box-shadow: 0 1px 3px rgba(17,20,15,0.18);'),
+      moonStyle: slot + (isDark ? 'background: #0B0C0A; color: #EFE6C8; box-shadow: 0 0 0 1px #2E3329;' : 'background: transparent; color: #8A9082;')
+    };
+  }
+  renderVals() {
+    const accent = this.props.accent ?? '#00B843';
+    const up = 'var(--up)', dn = 'var(--down)', warn = 'var(--warn)', meme = 'var(--meme)';
+    const upFill = accent, dnFill = '#E5532E', memeFill = '#8B72F0';
+    const t = this.props.trader ?? { name: 'pea_whale', addr: '0x7a3f91d0e2b45c17a8e0d6f4b9c258f0c21e', pnl: 1284390.42, roi: 212.4, vol: 48204118, acct: 2410552, win: 64.2, trades: 412, assets: 'TNE', seed: 11, rank: 1 };
+    const { chart, metric, range, tab, perfSpan } = this.state;
+    const seed = t.seed;
+
+    let lc = seed * 7919 + 13;
+    const rnd = () => { lc = (lc * 9301 + 49297) % 233280; return lc / 233280; };
+
+    const cents = (v) => (v < 0 ? '-' : '') + '$' + Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const compact = (v) => {
+      const a = Math.abs(v), s = v < 0 ? '-' : '';
+      return s + '$' + (a >= 1e6 ? (a / 1e6).toFixed(1) + 'M' : a >= 1e3 ? (a / 1e3).toFixed(1) + 'K' : a.toFixed(0));
+    };
+    const signed = (v) => (v >= 0 ? '+' : '') + cents(v);
+    const signedCompact = (v) => (v >= 0 ? '+' : '') + compact(v);
+    const qty = (v) => v >= 1e9 ? (v / 1e9).toFixed(2) + 'B' : v >= 1e6 ? (v / 1e6).toFixed(2) + 'M' : v >= 1e3 ? (v / 1e3).toFixed(1) + 'K' : v.toFixed(2);
+    const price = (v) => v >= 100 ? '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : v >= 1 ? '$' + v.toFixed(3) : v >= 0.01 ? '$' + v.toFixed(4) : '$' + v.toPrecision(3);
+
+    const acct = t.acct;
+    const cash = acct * 0.05;
+    const invested = acct - cash;
+
+    // Holdings: tokenized stocks and Pons memecoins
+    const catalog = {
+      T: ['TSLA', 'stock', 342.18], N: ['NVDA', 'stock', 186.05], H: ['HOOD', 'stock', 118.37], A: ['AAPL', 'stock', 238.92],
+      S: ['SPY', 'stock', 662.10], G: ['GLD', 'stock', 311.40], Z: ['AMZN', 'stock', 231.44], F: ['META', 'stock', 758.10],
+      M: ['MSTR', 'stock', 342.77], C: ['COIN', 'stock', 318.52],
+      E: ['ROBIN', 'meme', 0.004182], B: ['SQUAWK', 'meme', 0.0000871], P: ['FEATHER', 'meme', 0.0312], W: ['WORM', 'meme', 0.00219], K: ['NEST', 'meme', 0.1874]
+    };
+    const dotColors = { stock: ['#D9E4FF', '#DDF5D6', '#D8F7E4', '#EEEEEE', '#FFE0DA', '#F7F0C9'], meme: ['#EBE4FF', '#FFE1F1', '#FFF1CC'] };
+    const order = (t.assets + 'TPNWHAKZBFSGMCE').split('').filter((k, i, a) => a.indexOf(k) === i && catalog[k]);
+    const count = acct > 0 ? 6 + (seed % 5) : 0;
+    const picked = order.slice(0, count);
+    const wsum = picked.reduce((s, k, i) => s + 1 / (i + 1.2), 0) || 1;
+    const rows = picked.map((k, i) => {
+      const [sym, kind, px] = catalog[k];
+      const isMeme = kind === 'meme';
+      const value = invested * (1 / (i + 1.2)) / wsum;
+      const bal = value / px;
+      const g = isMeme ? rnd() * 5 - 0.5 : rnd() * 0.6 - 0.12;
+      const cost = px / (1 + g);
+      const unreal = value - bal * cost;
+      const realized = (rnd() - 0.25) * value * 0.5;
+      const chg = (rnd() - 0.45) * (isMeme ? 40 : 6);
+      return { k, sym, isMeme, px, value, bal, cost, unreal, realized, chg, i };
+    });
+    const stockVal = rows.filter((r) => !r.isMeme).reduce((s, r) => s + r.value, 0);
+    const memeVal = rows.filter((r) => r.isMeme).reduce((s, r) => s + r.value, 0);
+    const unrealTotal = rows.reduce((s, r) => s + r.unreal, 0);
+    const holdings = rows.map((r) => ({
+      letter: r.sym.charAt(0), sym: r.sym,
+      dotStyle: 'width: 20px; height: 20px; flex-shrink: 0; border-radius: 10px; background: ' + (r.isMeme ? dotColors.meme[r.i % 3] : dotColors.stock[r.i % 6]) + '; color: #0A0B09; font-size: 9px; font-weight: 700; display: flex; align-items: center; justify-content: center;',
+      tag: r.isMeme ? 'Meme' : 'Stock',
+      tagStyle: 'height: 18px; padding: 0 5px; border-radius: 5px; font-size: 11px; font-weight: 600; display: flex; align-items: center; background: ' + (r.isMeme ? 'var(--meme-bg)' : 'var(--muted-bg)') + '; color: ' + (r.isMeme ? meme : 'var(--muted)') + ';',
+      balance: qty(r.bal),
+      value: cents(r.value),
+      cost: price(r.cost),
+      price: price(r.px),
+      unreal: signed(r.unreal) + ' (' + (r.unreal >= 0 ? '+' : '') + (r.unreal / (r.bal * r.cost) * 100).toFixed(2) + '%)',
+      unrealStyle: 'display: flex; align-items: center; justify-content: flex-end; gap: 6px; color: ' + (r.unreal >= 0 ? up : dn) + ';',
+      realized: signed(r.realized),
+      realizedStyle: 'text-align: right; color: ' + (r.realized >= 0 ? up : dn) + ';',
+      weight: (r.value / acct * 100).toFixed(1) + '%',
+      change: (r.chg >= 0 ? '+' : '') + r.chg.toFixed(2) + '%',
+      changeStyle: 'text-align: right; color: ' + (r.chg >= 0 ? up : dn) + ';'
+    }));
+
+    const initials = t.name.replace('0x', '').slice(0, 2).toUpperCase();
+    const shortAddr = t.addr.slice(0, 6) + '…' + t.addr.slice(-4);
+    const avatarStyle = 'width: 48px; height: 48px; flex-shrink: 0; box-sizing: border-box; border-radius: 12px; font-size: 16px; font-weight: 700; display: flex; align-items: center; justify-content: center; ' + (t.rank === 1 ? 'background: ' + accent + '; color: #0A0B09;' : 'background: var(--muted-bg); color: var(--fg); border: 1px solid var(--line);');
+
+    const score = 58 + (seed % 41);
+    const scoreBars = [];
+    for (let i = 0; i < 20; i++) {
+      scoreBars.push({ style: 'width: 3px; height: 22px; border-radius: 2px; background: ' + (i < Math.round(score / 5) ? upFill : 'var(--up-track)') + ';' });
+    }
+
+    const mono = (c) => 'font-family: "JetBrains Mono", monospace; font-size: 13px; display: flex; align-items: center; gap: 5px; color: ' + (c || 'var(--fg)') + ';';
+    const sans = (c) => 'font-size: 14px; font-weight: 500; display: flex; align-items: center; gap: 5px; color: ' + (c || 'var(--fg)') + ';';
+    const row = (label, value, style, extra) => Object.assign({ label, value, style, crown: false, stack: false }, extra || {});
+
+    const styles = ['Scalper', 'Day trader', 'Swing', 'Long-term holder'];
+    const pnlCohort = t.pnl > 1e6 ? 'Extremely profitable' : t.pnl > 4e5 ? 'Very profitable' : 'Profitable';
+    const sizeCohort = acct > 2e6 ? 'Whale' : acct > 1e6 ? 'Large' : acct > 3e5 ? 'Medium' : 'Small';
+    const spanMult = { '7D': 0.4, '30D': 1, 'All': 1.9 }[perfSpan];
+    const drawdown = ((seed * 3) % 22) * spanMult;
+    const winSpan = Math.min(100, t.win + (perfSpan === '7D' ? 6 : perfSpan === 'All' ? -4 : 0));
+    const sharpe = (1.1 + (seed % 9) * 0.45) / Math.sqrt(spanMult);
+    const spans = ['7D', '30D', 'All'];
+    const buyPct = 30 + ((seed * 7) % 66);
+
+    const sections = [
+      {
+        title: 'Holdings', hasPicker: false, picker: '', cycle: null,
+        rows: [row('Stocks', cents(stockVal), mono()), row('Memecoins', cents(memeVal), mono()), row('Cash (USDC)', cents(cash), mono())]
+      },
+      {
+        title: 'Overview', hasPicker: false, picker: '', cycle: null,
+        rows: [
+          row('Unrealized PnL', signedCompact(unrealTotal), mono(unrealTotal >= 0 ? up : dn)),
+          row('All-time realized', signedCompact(t.pnl * 2.8), mono(up)),
+          row('Assets held', String(rows.length), mono()),
+          row('Volume', cents(t.vol * 2.8), mono()),
+          row('First trade', ['Mar', 'May', 'Jul', 'Sep'][seed % 4] + ' 2025', mono())
+        ]
+      },
+      {
+        title: 'Analysis', hasPicker: false, picker: '', cycle: null,
+        rows: [
+          row('Longest win streak', (2 + seed % 9) + ' days', sans()),
+          row('Trading style', styles[seed % 4], sans() + ' text-decoration: underline dotted; text-underline-offset: 3px;'),
+          row('Avg hold time', (1 + seed % 40) + 'd ' + (seed % 24) + 'h', sans()),
+          row('Median hold time', (seed % 3) + 'd ' + (1 + seed % 12) + 'h', sans()),
+          row('Memecoin share', (memeVal / (acct || 1) * 100).toFixed(0) + '%', sans(meme)),
+          row('PnL cohort', pnlCohort, sans(), { crown: true }),
+          row('Size cohort', sizeCohort, sans(), { stack: true })
+        ]
+      },
+      {
+        title: 'Performance', hasPicker: true, picker: perfSpan,
+        cycle: () => this.setState({ perfSpan: spans[(spans.indexOf(perfSpan) + 1) % spans.length] }),
+        rows: [
+          row('Max drawdown', drawdown.toFixed(1) + '%', mono(drawdown > 10 ? dn : null)),
+          row('Win rate', winSpan.toFixed(0) + '%', mono(winSpan >= 50 ? up : dn)),
+          row('Sharpe', sharpe.toFixed(2), mono(warn))
+        ]
+      }
+    ];
+
+    const squares = [];
+    for (let i = 0; i < 28; i++) {
+      const w = rnd() * 100 < t.win;
+      squares.push({ style: 'height: 8px; border-radius: 2px; background: ' + (w ? upFill : dnFill) + ';' });
+    }
+
+    const big = (c) => 'font-size: 22px; font-weight: 600; letter-spacing: -0.02em; color: ' + c + ';';
+    const lead = (c) => 'font-weight: 600; color: ' + c + ';';
+    const splitTrack = (c) => 'height: 6px; border-radius: 3px; background: ' + c + '; overflow: hidden; display: flex;';
+    const stockPct = (stockVal + memeVal) ? stockVal / (stockVal + memeVal) * 100 : 0;
+    const top = rows[0];
+    const topPct = top ? top.value / acct * 100 : 0;
+    const bought = t.vol * buyPct / 100;
+    const sold = t.vol * (100 - buyPct) / 100;
+    const metrics = [
+      {
+        title: 'Performance', hasAside: true, aside: 'All', value: '+' + cents(t.pnl * 2.8), unit: 'realized', valueStyle: big(up),
+        isSquares: true, isBar: false, lead: t.win.toFixed(1) + '% win rate', leadStyle: lead(up), rest: t.trades + ' trades', right: ''
+      },
+      {
+        title: 'Portfolio mix', hasAside: false, aside: '', value: stockPct.toFixed(0) + '% stocks', unit: '', valueStyle: big('var(--fg)'),
+        isSquares: false, isBar: true, trackStyle: splitTrack(memeFill), fillStyle: 'width: ' + stockPct.toFixed(1) + '%; background: var(--fg);',
+        lead: compact(stockVal), leadStyle: lead('var(--fg)'), rest: 'stocks', right: compact(memeVal) + ' memecoins'
+      },
+      {
+        title: 'Buy / sell flow', hasAside: true, aside: '30D', value: buyPct >= 60 ? 'Net buyer ↗' : buyPct <= 40 ? 'Net seller ↘' : 'Balanced', unit: '', valueStyle: big(buyPct >= 60 ? up : buyPct <= 40 ? dn : 'var(--fg)'),
+        isSquares: false, isBar: true, trackStyle: splitTrack(dnFill), fillStyle: 'width: ' + buyPct + '%; background: ' + upFill + ';',
+        lead: buyPct + '% buys', leadStyle: lead(up), rest: compact(bought), right: compact(sold) + ' sells · ' + (100 - buyPct) + '%'
+      },
+      {
+        title: 'Concentration', hasAside: false, aside: '', value: topPct.toFixed(1) + '%', unit: top ? 'in ' + top.sym : '', valueStyle: big(topPct > 40 ? warn : 'var(--fg)'),
+        isSquares: false, isBar: true, trackStyle: splitTrack('var(--line-soft)'), fillStyle: 'width: ' + topPct.toFixed(1) + '%; background: ' + (topPct > 40 ? '#E8A400' : 'var(--fg)') + ';',
+        lead: 'Top holding', leadStyle: lead('var(--fg)'), rest: rows.length + ' assets', right: ''
+      }
+    ];
+
+    const mult = { '24H': 0.05, '7D': 0.31, '30D': 1, 'All': 2.8 }[range];
+    const target = metric === 'pnl' ? (chart === 'total' ? t.pnl * mult + unrealTotal * Math.min(mult, 1) : t.pnl * mult) : (acct || 50000);
+    let wl = seed * 31 + range.length * 97 + (chart === 'total' ? 5 : 0);
+    const r2 = () => { wl = (wl * 9301 + 49297) % 233280; return wl / 233280; };
+    const n = 90;
+    const w = [];
+    let v = 0;
+    for (let i = 0; i < n; i++) {
+      const r = r2();
+      let step;
+      if (i < n * 0.04) step = (r - 0.5) * 0.4;
+      else if (i < n * 0.28) step = r * 9;
+      else step = (r - 0.42) * (chart === 'total' ? 2.4 : 1.2);
+      v += step;
+      w.push(v);
+    }
+    const last = w[w.length - 1] || 1;
+    const vals = metric === 'pnl' ? w.map((x) => target * (x / last) - target * 0.08) : w.map((x) => target * (0.55 + 0.45 * x / last));
+    const hi = Math.max.apply(null, vals) * 1.12;
+    const lo = metric === 'pnl' ? Math.min(-Math.abs(target) * 0.1, Math.min.apply(null, vals)) * 1.1 : Math.min.apply(null, vals) * 0.9;
+    const Y = (x) => 8 + (hi - x) / (hi - lo || 1) * 324;
+    const pts = vals.map((x, i) => [(i * 796 / (n - 1)).toFixed(1), Y(x).toFixed(1)]);
+    const line = 'M' + pts.map((p) => p.join(',')).join(' L');
+    const zero = metric === 'pnl' ? Y(0) : 340;
+    const area = line + ' L796,' + zero.toFixed(1) + ' L0,' + zero.toFixed(1) + ' Z';
+    const ticks = [0, 1, 2, 3, 4, 5].map((i) => ({ label: compact(hi - (hi - lo) * i / 5) }));
+    const gridLines = [0, 1, 2, 3, 4].map((i) => ({ y: (8 + 324 * i / 4).toFixed(1) }));
+    const xLabelSets = {
+      '24H': ['00:00', '06:00', '12:00', '18:00'],
+      '7D': ['Sep 11', 'Sep 13', 'Sep 15', 'Sep 17'],
+      '30D': ['Aug 25', 'Sep 1', 'Sep 8', 'Sep 15'],
+      'All': ['Jul 2025', 'Nov 2025', 'Mar 2026', 'Jul 2026']
+    };
+    const xLabels = xLabelSets[range].map((label) => ({ label }));
+    const chartTitle = (range === 'All' ? 'All-time ' : range + ' ') + (metric === 'pnl' ? (chart === 'total' ? 'total PnL' : 'realized PnL') : 'portfolio value');
+    const chartValue = metric === 'pnl' ? signed(target) : cents(target);
+    const chartValueStyle = 'font-size: 26px; font-weight: 600; letter-spacing: -0.02em; color: ' + (metric === 'pnl' ? (target >= 0 ? up : dn) : 'var(--fg)') + ';';
+
+    const tabStyle = (on) => 'height: 44px; padding: 0; border: 0; background: transparent; font-family: "JetBrains Mono", monospace; font-size: 12px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; display: flex; align-items: center; gap: 6px; border-bottom: 2px solid ' + (on ? accent : 'transparent') + '; color: ' + (on ? 'var(--fg)' : 'var(--muted)') + ';';
+    const pill = (on) => 'height: 28px; padding: 0 7px; border: 0; border-radius: 6px; font-family: "JetBrains Mono", monospace; font-size: 11px; font-weight: 500; text-transform: uppercase; background: ' + (on ? 'var(--muted-bg)' : 'transparent') + '; color: ' + (on ? 'var(--fg)' : 'var(--muted)') + ';';
+    const chartTabs = [['realized', 'Realized'], ['total', 'Total'], ['calendar', 'Calendar']].map(([id, label]) => ({ label, pick: () => this.setState({ chart: id === 'calendar' ? chart : id }), style: tabStyle(id === chart) }));
+    const metricsToggle = [['pnl', 'PnL'], ['value', 'Value']].map(([id, label]) => ({ label, pick: () => this.setState({ metric: id }), style: pill(id === metric) }));
+    const ranges = ['24H', '7D', '30D', 'All'].map((label) => ({ label, pick: () => this.setState({ range: label }), style: pill(label === range) }));
+
+    const heads = ['Asset', 'Balance', 'Value', 'Avg cost', 'Price', 'Unrealized PnL', 'Realized PnL', '% of portfolio', '24H'].map((label, i) => ({
+      label, style: 'display: flex; align-items: center; gap: 4px; justify-content: ' + (i === 0 ? 'flex-start' : 'flex-end') + ';'
+    }));
+
+    const tabDefs = [
+      ['holdings', 'Holdings', holdings.length], ['trades', 'Trades', 0],
+      ['transfers', 'Transfers', 0], ['performance', 'Performance', 0]
+    ];
+    const tabs = tabDefs.map(([id, label, c]) => ({
+      label, count: String(c), hasCount: c > 0, divider: id === 'performance',
+      pick: () => this.setState({ tab: id }), style: tabStyle(id === tab)
+    }));
+    const showHoldings = tab === 'holdings' && holdings.length > 0;
+    const showEmpty = !showHoldings;
+    const emptyText = tab === 'holdings' ? 'No holdings' : '[' + tabDefs.find((d) => d[0] === tab)[1] + ' table]';
+
+    const close = () => { if (this.props.onClose) this.props.onClose(); };
+    const copyExtras = {
+      copyOpen: this.state.copyOpen,
+      openCopy: () => this.setState({ copyOpen: true }),
+      closeCopy: () => this.setState({ copyOpen: false }),
+      startCopy: (info) => { this.setState({ copied: true }); if (this.props.onStart) this.props.onStart(info); },
+      copyLabel: this.state.copied ? 'Copying this trader' : 'Copy this trader'
+    };
+
+    return Object.assign(this.themeVals(), copyExtras, {
+      accent, t, close, initials, shortAddr, avatarStyle, score, scoreBars,
+      acctFull: cents(acct), sections, metrics, squares,
+      chartTabs, metricsToggle, ranges, chartTitle, chartValue, chartValueStyle,
+      line, area, zeroY: zero.toFixed(1), ticks, gridLines, xLabels,
+      tabs, heads, holdings, showHoldings, showEmpty, emptyText
+    });
+  }
+}
+</script>
+</body>
+</html>

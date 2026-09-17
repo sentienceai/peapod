@@ -11,7 +11,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile, readdir } from 'node:fs/promises';
 
-import { evaluateKernel, histogram, netVsHodlPct, quantile } from '../web/lib/kernel.js';
+import { evaluateKernel, histogram, netVsHodlPct, quantile } from '../archive/lib/kernel.js';
 
 const dataUrl = (/** @type {string} */ p) => new URL(`../web/data/${p}`, import.meta.url);
 const index = JSON.parse(await readFile(dataUrl('windows.json'), 'utf8'));

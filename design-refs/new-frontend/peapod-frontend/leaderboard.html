@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Leaderboard · Peapod</title>
+<meta name="description" content="Every trader on Robinhood Chain, ranked by realized PnL on closed round-trips.">
+<link rel="icon" href="/favicon.svg">
+<script>(function(){try{var v=localStorage.getItem('peapod-theme');if(v!=='light'&&v!=='dark')v=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.setAttribute('data-theme',v);}catch(e){}})()</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital,wght@0,400;1,400&family=JetBrains+Mono:wght@400;500&family=Schibsted+Grotesk:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/styles/tokens.css">
+<link rel="stylesheet" href="/styles/base.css">
+<link rel="stylesheet" href="/styles/board.css">
+<link rel="stylesheet" href="/styles/search.css">
+<link rel="stylesheet" href="/styles/profile.css">
+<link rel="stylesheet" href="/styles/copy.css">
+<script type="module" src="/lib/board.js"></script>
+</head>
+<body class="page">
+<a class="skip" href="#board">Skip to the ranking</a>
+<header id="chrome"></header>
+
+<main class="board-main">
+  <section class="board-hero">
+    <h1>Traders leaderboard by <em>realized PnL</em></h1>
+    <p id="hero-sub">Every wallet on Robinhood Chain that closed a round-trip, ranked by what it actually took off the table.</p>
+  </section>
+
+  <section class="board-controls">
+    <div class="tabs" id="universes" role="group" aria-label="Universe"></div>
+    <div class="spacer"></div>
+    <div class="seg" id="windows" role="group" aria-label="Window"></div>
+    <div class="seg" id="units" role="group" aria-label="Show figures as dollars or percent"></div>
+    <label class="board-search">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+      <span class="sr-only">Search the ranking by address</span>
+      <input id="filter" type="search" placeholder="Filter by address" autocomplete="off" spellcheck="false">
+    </label>
+  </section>
+
+  <section class="board-filters" id="filters" aria-label="Filters"></section>
+
+  <section class="podium" id="podium" aria-label="The top three"></section>
+
+  <section class="tablewrap panel" id="board" aria-label="Ranking">
+    <div class="thead" id="thead" role="row"></div>
+    <div class="tbody" id="rows"></div>
+    <p class="board-empty" id="empty" hidden></p>
+  </section>
+
+  <div class="board-more"><button class="btn" type="button" id="more">Show more</button></div>
+  <p class="board-note" id="note"></p>
+</main>
+
+<footer id="foot"></footer>
+</body>
+</html>

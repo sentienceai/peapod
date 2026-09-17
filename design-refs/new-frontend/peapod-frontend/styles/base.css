@@ -1,0 +1,286 @@
+/* Peapod — the shared layer: reset, type, the top bar, and the primitives every frame uses.
+ *
+ * Every measurement here is the frame's own. Where a frame drew a value inline (a 72px bar,
+ * a 400px search button, a 44px row) it is repeated here once as a class, so the four pages
+ * cannot drift apart the way four copies of the same bar always do.
+ *
+ * THE RULES THE FRAMES ARE DRAWN ON, kept in one place because they are the difference
+ * between a design and a set of screens that resemble it:
+ *   - One accent. --accent is the copy action; --up is the positive sign; they are never
+ *     swapped, and no other green exists.
+ *   - A signed figure is the only coloured figure. A win rate, a share and a coverage bar
+ *     stay in the neutral channel, so colour means direction and only direction.
+ *   - Colour is never the only channel: a signed figure carries ▲/▼ and its own + or −,
+ *     a rank carries its numeral, a verdict carries its words.
+ *   - Rectangles. 8px on controls, 10px on buttons, 14px on panels, 20px on floating cards.
+ *     Circles are for things that are round by nature: avatars, asset tiles, dots, bubbles.
+ *   - Figures are mono and tabular; prose is not. This is a page of columns.
+ */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { color-scheme: light; }
+html[data-theme='dark'] { color-scheme: dark; }
+
+body {
+  margin: 0;
+  background: var(--surface);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  /* Prose is proportional. The mono columns turn tabular on themselves — set here, every
+     comma in a sentence would take a digit's width. */
+  font-variant-numeric: proportional-nums lining-nums;
+}
+
+a { color: inherit; text-decoration: none; }
+a:hover { color: var(--fg-strong); }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+input::placeholder { color: var(--placeholder); }
+:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap;
+}
+.spacer { flex-grow: 1; }
+
+/* ── the sign channel ───────────────────────────────────────────────────────────────── */
+.up { color: var(--up); }
+.down { color: var(--down); }
+.mark { font-size: 0.66em; margin-right: 3px; vertical-align: 0.08em; }
+.mono, .num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: 'tnum' 1, 'lnum' 1;
+}
+
+/* ── top bar ────────────────────────────────────────────────────────────────────────── */
+.topbar {
+  height: 72px; flex-shrink: 0; padding: 0 40px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  display: flex; align-items: center; gap: 40px;
+}
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand-name { font-size: 21px; font-weight: 700; letter-spacing: -0.02em; }
+.brand-mark rect { fill: var(--accent); }
+.brand-mark circle { fill: var(--surface); }
+.nav { display: flex; align-items: center; gap: 28px; font-size: 15px; font-weight: 500; }
+.nav a { color: var(--muted); }
+.nav a:hover { color: var(--fg); }
+.nav a[aria-current='page'] { color: var(--fg); font-weight: 600; }
+
+/* The search is a button, not a field: it opens the palette, and a field that looks typeable
+   but hands your keystrokes to a dialog is a field that ate the first two of them. */
+.navsearch {
+  width: 400px; height: 44px; flex-shrink: 0; padding: 0 8px 0 14px;
+  border-radius: var(--radius-button); border: 1px solid var(--line);
+  background: var(--surface-2); color: var(--muted);
+  font-size: 14px; display: flex; align-items: center; gap: 10px; text-align: left;
+  transition: border-color 200ms ease, color 200ms ease;
+}
+.navsearch:hover { border-color: var(--line-strong); color: var(--fg); }
+/* min-width: 0 as well as flex-grow: 1 — a flex child's default minimum is its content, so
+   without it the label pushes the button wider than its own width instead of ellipsising. */
+.navsearch span:first-of-type {
+  flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.keycap {
+  height: 24px; min-width: 24px; padding: 0 6px;
+  border-radius: 6px; border: 1px solid var(--line); background: var(--surface);
+  font-family: var(--font-mono); font-size: 11px; color: var(--muted);
+  display: inline-flex; align-items: center; justify-content: center;
+}
+
+.theme-toggle {
+  width: 84px; height: 44px; flex-shrink: 0; padding: 4px;
+  border-radius: 12px; border: 1px solid var(--line); background: var(--muted-bg);
+  display: flex; align-items: center; justify-content: space-between;
+  transition: border-color 200ms ease;
+}
+.theme-toggle:hover { border-color: var(--line-strong); }
+.theme-slot {
+  width: 34px; height: 34px; border-radius: var(--radius-control-sm);
+  display: grid; place-items: center; color: var(--muted);
+  transition: background-color 200ms ease, color 200ms ease;
+}
+.theme-slot.is-on { box-shadow: var(--shadow-segment); }
+.theme-slot--sun.is-on { background: var(--sun-face); color: var(--sun-ink); }
+.theme-slot--moon.is-on { background: var(--moon-face); color: var(--moon-ink); }
+
+/* ── buttons ────────────────────────────────────────────────────────────────────────── */
+.btn {
+  height: 44px; padding: 0 24px; border: 1px solid var(--line);
+  border-radius: var(--radius-button); background: var(--surface); color: var(--fg);
+  font-size: 15px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px;
+}
+.btn:hover { background: var(--muted-bg-2); }
+/* The primary action is the ink, not the accent: the accent is spent on copying. */
+.btn-primary { background: var(--inv-bg); color: var(--inv-fg); border-color: transparent; }
+.btn-primary:hover { background: var(--inv-hover); }
+.btn-primary:disabled { background: var(--muted-bg); color: var(--muted); cursor: not-allowed; }
+.btn-accent { background: var(--accent); color: var(--accent-ink); border-color: transparent; font-weight: 700; }
+.btn-accent:hover { background: var(--accent); filter: brightness(1.06); }
+.btn-sm { height: 34px; padding: 0 14px; font-size: 13px; border-radius: var(--radius-control-sm); }
+.btn-ghost {
+  width: 36px; height: 36px; padding: 0; justify-content: center;
+  border-radius: var(--radius-button);
+}
+
+/* ── controls: chips, segmented, tabs ───────────────────────────────────────────────── */
+.chip {
+  height: 38px; padding: 0 14px; border-radius: var(--radius-button);
+  border: 1px solid var(--line); background: var(--surface); color: var(--fg);
+  font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px;
+}
+.chip:hover { background: var(--muted-bg-2); }
+.chip svg { stroke: var(--muted); }
+
+.seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: 11px; background: var(--muted-bg); }
+.seg button {
+  height: 32px; min-width: 32px; padding: 0 10px; border: 0;
+  border-radius: var(--radius-control-sm); background: transparent; color: var(--muted);
+  font-size: 14px; font-weight: 700;
+}
+.seg button[aria-pressed='true'] { background: var(--surface); color: var(--fg); box-shadow: var(--shadow-segment); }
+
+.tabs { display: flex; gap: 4px; }
+.tabs button {
+  height: 36px; padding: 0 14px; border: 0; border-radius: var(--radius-button);
+  background: transparent; color: var(--muted); font-size: 15px; font-weight: 600;
+}
+.tabs button:hover { color: var(--fg); }
+.tabs button[aria-pressed='true'] { background: var(--inv-bg); color: var(--inv-fg); }
+
+/* ── identity: avatars, asset tiles, medals ─────────────────────────────────────────── */
+.avatar {
+  width: 36px; height: 36px; flex: none; border-radius: 11px;
+  display: grid; place-items: center; font-size: 12px; font-weight: 700;
+  background: var(--muted-bg); color: var(--fg); border: 1px solid var(--line);
+  font-family: var(--font-mono);
+}
+.asset-tile {
+  width: 22px; height: 22px; flex: none; border-radius: 11px;
+  display: grid; place-items: center;
+  font-size: 9px; font-weight: 700; font-family: var(--font-body);
+  /* Dark letters on every pastel, in both themes: the tiles are the one constant. */
+  color: #0A0B09; background: var(--muted-bg-2);
+}
+.asset-tile--stock { background: var(--asset-stock); }
+.asset-tile--etf { background: var(--asset-etf); }
+.asset-tile--crypto { background: var(--asset-crypto); }
+.asset-tile--stable { background: var(--asset-stable); }
+.asset-tile--meme { background: var(--asset-meme); }
+.asset-tile--lg { width: 52px; height: 52px; border-radius: 26px; font-size: 18px; }
+
+.token { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.token-ticker { font-family: var(--font-mono); font-size: 13px; }
+
+/* A medal is a chip with its numeral inside it, never a coloured numeral: three ranks in one
+   hue make the order something you read rather than see, and the numeral is the third
+   channel for a reader who has no colour at all. */
+.medal {
+  width: 24px; height: 24px; flex: none; border-radius: 12px;
+  display: grid; place-items: center;
+  font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+  background: var(--muted-bg); color: var(--muted);
+}
+.medal--1 { background: var(--medal-gold-bg); color: var(--medal-gold); }
+.medal--2 { background: var(--medal-silver-bg); color: var(--medal-silver); }
+.medal--3 { background: var(--medal-bronze-bg); color: var(--medal-bronze); }
+
+/* ── the copy button, which is the one place the accent is the subject ──────────────── */
+.btn-copy {
+  height: 34px; min-width: 82px; padding: 0 14px; border: 0;
+  border-radius: var(--radius-control-sm);
+  background: var(--accent); color: var(--accent-ink);
+  font-size: 13px; font-weight: 700; flex: none;
+}
+.btn-copy:hover { filter: brightness(1.06); }
+.btn-copy--lg { height: 42px; padding: 0 20px; font-size: 15px; border-radius: var(--radius-button); }
+
+/* ── cards and panels ───────────────────────────────────────────────────────────────── */
+.panel {
+  border-radius: var(--radius-panel); border: 1px solid var(--line);
+  background: var(--surface); display: flex; flex-direction: column; overflow: hidden;
+}
+.panel-head {
+  min-height: 64px; padding: 12px 18px; border-bottom: 1px solid var(--line-soft);
+  display: flex; flex-direction: column; justify-content: center; gap: 2px;
+}
+.panel-head h2 { margin: 0; font-size: 16px; font-weight: 700; }
+.panel-head p { margin: 0; font-size: 12px; color: var(--muted); }
+
+.card {
+  border-radius: var(--radius-card); background: var(--surface);
+  border: 1px solid var(--line); box-shadow: var(--shadow-card);
+  display: flex; flex-direction: column; overflow: hidden;
+  transition: box-shadow 200ms ease, translate 200ms ease, border-color 200ms ease;
+}
+.card:hover { translate: 0 -2px; box-shadow: var(--shadow-card-hover); border-color: var(--line-strong-2); }
+
+/* ── the evidence bar: a region and a mark on a neutral track, never a fill from the left,
+   because a fill from the left is a score and this is a test result. ─────────────────── */
+.ev { flex: 1; min-width: 0; display: grid; gap: 4px; }
+.ev-head { display: flex; align-items: baseline; gap: 6px; font-size: 13px; white-space: nowrap; }
+.ev-head b { font-family: var(--font-mono); font-weight: 500; }
+.ev-verdict { color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
+.ev-track { position: relative; height: 6px; border-radius: 3px; background: var(--muted-bg); }
+.ev-band {
+  position: absolute; top: 0; bottom: 0; background: var(--line-strong);
+  border-left: 1px solid var(--muted); border-right: 1px solid var(--muted);
+}
+.ev-null { position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--muted); }
+.ev-mark {
+  position: absolute; top: -3px; width: 2px; height: 12px; margin-left: -1px;
+  border-radius: 1px; background: var(--fg);
+}
+.ev-foot { font-family: var(--font-mono); font-size: 10px; color: var(--muted); }
+
+/* ── dialogs ────────────────────────────────────────────────────────────────────────── */
+.backdrop {
+  position: fixed; inset: 0; z-index: 60; background: var(--backdrop);
+  backdrop-filter: blur(2px);
+  display: flex; justify-content: center; align-items: flex-start;
+  padding: 48px 16px; overflow-y: auto;
+}
+.backdrop[hidden] { display: none; }
+
+/* ── page footer ────────────────────────────────────────────────────────────────────── */
+.foot {
+  min-height: 48px; padding: 12px 40px; border-top: 1px solid var(--line);
+  background: var(--surface);
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px;
+  font-size: 13px; color: var(--muted);
+}
+.foot code { font-family: var(--font-mono); color: var(--fg); }
+.foot-sep { width: 1px; height: 20px; background: var(--line); }
+
+/* ── responsive: the frames are drawn at 1440; below that the page keeps its gutters and
+   the grids lose a column at a time. ────────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .nav { display: none; }
+  /* 260px holds the icon, the label and the keycap only if the label may shorten — and the
+     keycap is a promise about a keyboard, which a 1024px tablet may not have. */
+  .navsearch { width: 260px; }
+  .navsearch span:first-of-type { overflow: hidden; text-overflow: ellipsis; }
+  .navsearch .keycap { display: none; }
+}
+@media (max-width: 768px) {
+  /* On a phone the bar carries a mark, a search, a theme switch and a wallet button, and
+     four fixed widths in a 390px row is 60px of horizontal scroll. The search takes a line
+     of its own instead — it is the widest thing and the one that benefits from the width. */
+  .topbar {
+    height: auto; min-height: 64px; padding: 10px 16px; gap: 8px; flex-wrap: wrap;
+    row-gap: 10px;
+  }
+  .foot { padding-left: 16px; padding-right: 16px; gap: 12px; }
+  .navsearch { order: 3; flex: 1 1 100%; width: auto; min-width: 0; height: 40px; }
+  .navsearch span:first-of-type { overflow: hidden; text-overflow: ellipsis; }
+  .theme-toggle { width: 72px; height: 38px; }
+  .theme-slot { width: 30px; height: 30px; }
+  .btn { height: 38px; padding: 0 14px; font-size: 14px; }
+}

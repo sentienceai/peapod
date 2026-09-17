@@ -70,7 +70,10 @@ test('the server comes up with an empty volume and stays up', async () => {
     assert.equal(lb.status, 503);
 
     // The pages still serve, so a visitor sees an empty state rather than a dead host.
-    for (const path of ['/traders', '/', '/styles/app.css']) {
+    // The site's own pages and one of its stylesheets: the shell has to serve before any
+    // data exists, because a container that 404s its own CSS on a fresh volume looks broken
+    // in a way that has nothing to do with the build not having run yet.
+    for (const path of ['/leaderboard', '/', '/styles/base.css']) {
       const r = await fetch(`http://127.0.0.1:${s.port}${path}`);
       assert.equal(r.status, 200, `${path} did not serve`);
     }

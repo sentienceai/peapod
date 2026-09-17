@@ -1,0 +1,136 @@
+/* Peapod design tokens. Light is the default. Dark applies with <html data-theme="dark">. */
+/* The three faces are loaded by each page's <link>, not by an @import here: an @import
+ * cannot start until this file has arrived, which costs a round trip on first paint. */
+
+:root {
+  --surface: #FFFFFF;
+  --surface-2: #FAFBF9;
+  --sunken: #F7F8F6;
+  --hover: #F5F7F3;
+  --muted-bg: #F2F4F0;
+  --muted-bg-2: #EEF1EC;
+  --grid: #F0F2EE;
+  --line-soft: #EEF0EC;
+  --line: #E6E9E3;
+  --up-line: #E1F2E6;
+  --line-strong: #D6DAD2;
+  --line-strong-2: #C9CEC5;
+  --faint: #B7BCB2;
+  --subtle: #8A9082;
+  --placeholder: #6B7166;
+  --muted: #5F6559;
+  --fg: #11140F;
+  --fg-strong: #000000;
+  --up: #067A2F;
+  --down: #C8360F;
+  --warn: #8A6100;
+  --meme: #6D4FE0;
+  --up-bg: #EAF8EE;
+  --up-bg-2: #F3FBF5;
+  --up-track: #C9E9D2;
+  --down-bg: #FDECE7;
+  --meme-bg: #F1EDFF;
+  --inv-bg: #11140F;
+  --inv-fg: #FFFFFF;
+  --inv-hover: #2A2E25;
+  color-scheme: light;
+  --accent: #00B843;
+  --accent-ink: #0A0B09;
+  /* THE ACCENT WHEN IT IS DRAWN RATHER THAN FILLED. #00B843 is 2.65:1 on white — a fine
+     surface and an illegible letter, and large display type still needs 3:1. So the accent
+     has a second value for the two places it is a foreground: the italic clause inside a
+     display headline, and a focus ring. It is deliberately not --up: a green ring around a
+     card of green figures reads as a gain. Nothing below 18px may use it. */
+  --accent-text: #0F9A45;
+  --loss-fill: #E5532E;
+  --warn-fill: #E8A400;
+  --meme-fill: #8B72F0;
+  --font-display: 'Instrument Serif', Georgia, serif;
+  --font-body: 'Schibsted Grotesk', 'Helvetica Neue', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --radius-button: 10px;
+  --radius-control-sm: 8px;
+  --radius-card: 20px;
+  --radius-panel: 14px;
+  --shadow-card: 0 1px 2px rgba(17,20,15,0.05), 0 12px 32px -14px rgba(17,20,15,0.18);
+  --shadow-float: 0 2px 4px rgba(17,20,15,0.05), 0 30px 60px -18px rgba(17,20,15,0.25);
+  --shadow-modal: 0 24px 80px rgba(17,20,15,0.18);
+}
+
+[data-theme="dark"] {
+  --surface: #111310;
+  --surface-2: #161914;
+  --sunken: #0B0C0A;
+  --hover: #1A1D17;
+  --muted-bg: #1C1F19;
+  --muted-bg-2: #20241D;
+  --grid: #161914;
+  --line-soft: #1E221B;
+  --line: #272B23;
+  --up-line: #1C3323;
+  --line-strong: #394033;
+  --line-strong-2: #4A5143;
+  --faint: #596052;
+  --subtle: #858C7E;
+  --placeholder: #7D8476;
+  --muted: #A3AA9B;
+  --fg: #EEF1EA;
+  --fg-strong: #FFFFFF;
+  --up: #4BD17A;
+  --down: #FF7A57;
+  --warn: #F2C14E;
+  --meme: #B4A2FF;
+  --up-bg: #12281A;
+  --up-bg-2: #0F1D13;
+  --up-track: #1F3A27;
+  --down-bg: #2E1710;
+  --meme-bg: #231D3A;
+  --inv-bg: #EEF1EA;
+  --inv-fg: #0B0C0A;
+  --inv-hover: #FFFFFF;
+  --accent-text: #00E05B;
+  color-scheme: dark;
+}
+
+/* Asset icon pastels (same in both themes, always dark letters) */
+:root {
+  --asset-stock: #D9E4FF;
+  --asset-etf: #FFE0DA;
+  --asset-crypto: #E7E1FF;
+  --asset-stable: #DDF0FF;
+  --asset-meme: #EBE4FF;
+  --medal-gold: #B98900; --medal-gold-bg: #FFF6D6;
+  --medal-silver: #7C848C; --medal-silver-bg: #F0F2F4;
+  --medal-bronze: #A35F2A; --medal-bronze-bg: #FBEBDD;
+}
+
+/* Added for the built frontend: values the frames drew inline, named here so no component
+   stylesheet holds a colour literal. --knob is white on every track in both themes, because
+   a handle that flips reads as a second state rather than as the same handle moved. */
+:root {
+  --backdrop: rgba(11, 12, 10, 0.45);
+  --knob: #FFFFFF;
+  --shadow-segment: 0 1px 2px rgba(17, 20, 15, 0.12);
+  --shadow-card-hover: 0 2px 4px rgba(17, 20, 15, 0.06), 0 24px 48px -16px rgba(17, 20, 15, 0.26);
+  --shadow-dialog: 0 30px 80px -20px rgba(17, 20, 15, 0.35);
+  --shadow-knob: 0 1px 2px rgba(0, 0, 0, 0.25);
+  /* The day/night switch keeps its two faces in both themes: the sun is the same cream at
+     midnight and the moon the same near-black at noon, so the control reads as two states. */
+  --sun-face: #F4EFE3;
+  --sun-ink: #1E4D2B;
+  --moon-face: #0B0C0A;
+  --moon-ink: #EFE6C8;
+}
+[data-theme="dark"] {
+  --backdrop: rgba(0, 0, 0, 0.62);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.5), 0 12px 32px -14px rgba(0, 0, 0, 0.7);
+  --shadow-float: 0 2px 4px rgba(0, 0, 0, 0.5), 0 30px 60px -18px rgba(0, 0, 0, 0.75);
+  --shadow-modal: 0 24px 80px rgba(0, 0, 0, 0.6);
+  --shadow-card-hover: 0 2px 4px rgba(0, 0, 0, 0.5), 0 24px 48px -16px rgba(0, 0, 0, 0.7);
+  --shadow-dialog: 0 30px 80px -20px rgba(0, 0, 0, 0.75);
+  --shadow-segment: 0 1px 2px rgba(0, 0, 0, 0.4);
+  /* The medals invert: a pale gold chip on a near-black page is the badge, not the ink. */
+  --medal-gold: #0B0C0A; --medal-gold-bg: #F0D68A;
+  --medal-silver: #0B0C0A; --medal-silver-bg: #C3CBD0;
+  --medal-bronze: #0B0C0A; --medal-bronze-bg: #D9A172;
+}

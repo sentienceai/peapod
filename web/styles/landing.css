@@ -1,0 +1,554 @@
+/* Landing (frame: landing.dc.html) — the one page that is mostly CSS. Every section below is
+ * the frame's own section, in the frame's own order; the numbers inside a handful of them
+ * (the hero's mini dashboard, "Built for signal", the markets grid) are filled by lib/landing.js
+ * from lib/data.js, and everything else is the static prose index.html already carries.
+ *
+ * TWO KINDS OF "DARK" ON THIS PAGE, and they use different tokens on purpose:
+ *   1. Sections the frame drew as a literal, theme-invariant #11140F/#FFFFFF panel (the CTA
+ *      banner, the API section, the phone bezels, the rule-builder card) are built here on
+ *      var(--inv-bg)/var(--inv-fg)/var(--inv-hover) — the one pair of tokens in tokens.css that
+ *      FLIPS: near-black on white text in light mode, near-white on dark text in dark mode.
+ *      That is what "deliberate in both themes" means for a frame section drawn as pure black —
+ *      it becomes "the page's own inverse", not a colour literal that stays black regardless
+ *      of which theme is showing.
+ *   2. Sections the frame drew as --sunken / --surface-2 (the "build" section's background,
+ *      the feature cards) use those tokens directly, because those ALREADY flip through
+ *      tokens.css's own [data-theme='dark'] block and drawing them any other way would be
+ *      adding a colour literal this file has no license to add.
+ *
+ * NO NEW SYNTAX-HIGHLIGHT COLOURS for the API code sample. The frame picks a different hex for
+ * keywords, strings, function names and numbers; every one of those hexes would be a colour
+ * literal this page cannot add (tokens.css is off limits — see CONTRACT.md), and reusing
+ * --up/--down/--meme for decoration would spend tokens rule 1 and rule 2 reserve for a signed
+ * figure and a direction on a code sample that has neither. The code block differentiates by
+ * WEIGHT, and a muted line dims to var(--inv-fg) at partial opacity instead.
+ *
+ * "MUTED, ON THE INVERSE SURFACE" IS ALWAYS var(--inv-fg) AT PARTIAL OPACITY, NEVER A NEW
+ * TOKEN. tokens.css has --muted and --subtle for text on --surface, calibrated for whichever
+ * tone --surface already is in the current theme — put on var(--inv-bg), which is the OPPOSITE
+ * tone from --surface by definition, they read backwards (a light-theme --muted, a dark grey
+ * meant for a pale page, would sit on light mode's near-black inv-bg with the contrast the
+ * frame's literal muted-on-black was trying to avoid). var(--inv-fg) is already the one colour
+ * proven to contrast against var(--inv-bg) in both themes; dimming its own opacity keeps that
+ * guarantee instead of trading it for a mismatched pair.
+ */
+
+/* ── shared page rhythm ─────────────────────────────────────────────────────────────────── */
+#landing-main { overflow-x: hidden; }
+
+.lp-h1 {
+  margin: 0; max-width: 62rem; font-family: var(--font-display); font-weight: 400;
+  font-size: 88px; line-height: 0.96; letter-spacing: -0.03em; text-align: center;
+}
+.lp-h2 {
+  margin: 0; font-family: var(--font-display); font-weight: 400;
+  font-size: 52px; line-height: 1.02; letter-spacing: -0.025em;
+}
+.lp-h2--wide { max-width: 44rem; }
+.lp-h2--inv { color: var(--inv-fg); }
+.lp-h3 {
+  margin: 0; font-family: var(--font-display); font-weight: 400;
+  font-size: 34px; line-height: 1.05; letter-spacing: -0.02em;
+}
+.lp-h1 em, .lp-h2 em, .lp-h3 em, .lp-cta-h em {
+  /* --accent-text, not --accent: --accent is a FILL (2.65:1 on white, fine behind
+     --accent-ink or as the pod mark's rect) and large display type still needs 3:1 as text.
+     --accent-text is the darker/brighter pair tokens.css keeps for exactly this. */
+  font-family: var(--font-display); font-style: italic; font-weight: 400; color: var(--accent-text);
+}
+.lp-eyebrow {
+  font-family: var(--font-mono); font-size: 13px; letter-spacing: 0.06em; color: var(--muted);
+}
+/* --subtle and --faint are fills/rules only (never text — see tokens.css); every step-number
+   and secondary label on this page that read from --subtle now reads from --muted instead. */
+.lp-eyebrow--step { color: var(--muted); }
+.lp-eyebrow--dark { color: var(--inv-fg); opacity: 0.66; }
+
+.lp-section { padding: 88px 60px; display: flex; flex-direction: column; gap: 40px; }
+.lp-section--sunken { background: var(--sunken); border-top: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft); }
+.lp-section--dark { background: var(--inv-bg); color: var(--inv-fg); }
+.lp-section-head { display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; }
+
+.lp-btn {
+  height: 48px; padding: 0 22px; border-radius: var(--radius-button); border: 1px solid var(--line);
+  background: var(--surface); color: var(--fg); font-size: 15px; font-weight: 600;
+  display: inline-flex; align-items: center; gap: 8px; transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+.lp-btn:hover { background: var(--muted-bg-2); }
+.lp-btn-lg { height: 54px; padding: 0 26px; font-size: 16px; border-radius: var(--radius-button); }
+.lp-btn-dark { background: var(--inv-bg); color: var(--inv-fg); border-color: transparent; }
+.lp-btn-dark:hover { background: var(--inv-hover); }
+.lp-btn-line { border-color: var(--line-strong); }
+.lp-btn-accent { background: var(--accent); color: var(--accent-ink); border-color: transparent; font-weight: 700; }
+.lp-btn-accent:hover { filter: brightness(1.06); }
+.lp-btn-disabled { opacity: 0.55; cursor: not-allowed; }
+.lp-btn-disabled:hover { background: var(--inv-bg); }
+
+.lp-dot { width: 7px; height: 7px; border-radius: 4px; background: var(--accent); display: inline-block; flex-shrink: 0; }
+.lp-dot--accent { background: var(--accent); }
+.lp-dot--warn { background: var(--warn-fill); }
+.lp-dot--faint { background: var(--faint); }
+
+/* ── hero ────────────────────────────────────────────────────────────────────────────────── */
+.lp-hero {
+  position: relative; padding: 96px 40px 0; display: flex; flex-direction: column;
+  align-items: center; gap: 26px; overflow: hidden;
+}
+.lp-hero-grid {
+  position: absolute; inset: 0;
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 72px 72px; background-position: center -1px;
+  -webkit-mask-image: radial-gradient(ellipse 60% 55% at 50% 20%, transparent 0%, black 78%);
+  mask-image: radial-gradient(ellipse 60% 55% at 50% 20%, transparent 0%, black 78%);
+}
+.lp-pill {
+  position: relative; height: 34px; padding: 0 6px 0 6px; border-radius: 8px; border: 1px solid var(--line);
+  background: var(--surface); font-size: 14px; display: inline-flex; align-items: center; gap: 10px; color: var(--fg);
+}
+.lp-pill-tag {
+  height: 24px; padding: 0 9px; border-radius: 6px; background: var(--inv-bg); color: var(--inv-fg);
+  font-size: 13px; font-weight: 600; display: inline-flex; align-items: center;
+}
+.lp-hero-sub { position: relative; margin: 0; max-width: 38rem; text-align: center; font-size: 19px; line-height: 1.5; color: var(--muted); }
+.lp-hero-ctas { position: relative; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: center; }
+
+.lp-window {
+  position: relative; margin-top: 20px; width: min(1120px, 100%); box-sizing: border-box;
+  border-radius: 22px; border: 1px solid var(--line); background: var(--surface);
+  box-shadow: var(--shadow-float); overflow: hidden; display: flex; flex-direction: column;
+}
+.lp-window-bar {
+  height: 46px; flex-shrink: 0; box-sizing: border-box; padding: 0 18px; border-bottom: 1px solid var(--line-soft);
+  background: var(--surface-2); display: flex; align-items: center; gap: 16px;
+}
+.lp-window-dots { display: flex; gap: 7px; }
+.lp-window-dots i { width: 10px; height: 10px; border-radius: 5px; background: var(--line-strong); display: block; }
+.lp-window-path {
+  margin: 0 auto; height: 26px; padding: 0 14px; border-radius: 8px; background: var(--muted-bg);
+  font-family: var(--font-mono); font-size: 13px; color: var(--muted); display: flex; align-items: center;
+}
+.lp-window-body { box-sizing: border-box; padding: 22px; display: flex; flex-direction: column; gap: 14px; background: var(--surface-2); }
+.lp-window-fade { display: none; }
+
+.lp-hstat-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.lp-hstat {
+  min-height: 76px; box-sizing: border-box; padding: 14px 16px; border-radius: 14px; border: 1px solid var(--line-soft);
+  background: var(--surface); display: flex; flex-direction: column; justify-content: space-between; gap: 8px;
+}
+.lp-hstat-label { font-size: 13px; letter-spacing: 0.02em; color: var(--muted); }
+.lp-hstat-value { font-family: var(--font-mono); font-size: 21px; font-weight: 500; letter-spacing: -0.01em; }
+
+.lp-podium-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.lp-podium-card {
+  min-height: 168px; box-sizing: border-box; padding: 16px 18px; border-radius: var(--radius-panel); border: 1px solid var(--line-soft);
+  background: var(--surface); display: flex; flex-direction: column; gap: 10px;
+}
+.lp-podium-top { display: flex; align-items: center; gap: 10px; }
+.lp-podium-name {
+  flex-grow: 1; min-width: 0; font-size: 15px; font-weight: 700; font-family: var(--font-mono);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.lp-podium-bottom { flex-grow: 1; display: flex; align-items: flex-end; gap: 12px; }
+.lp-podium-fig { display: flex; flex-direction: column; gap: 1px; flex-shrink: 0; }
+.lp-podium-fig .lp-podium-pnl { font-family: var(--font-mono); font-size: 16px; }
+.lp-podium-fig-label { font-size: 13px; color: var(--muted); }
+.lp-podium-bottom svg { flex-grow: 1; min-width: 0; height: 72px; display: block; }
+
+.lp-htable { border-radius: var(--radius-panel); border: 1px solid var(--line-soft); background: var(--surface); overflow: hidden; }
+.lp-hrow {
+  min-height: 44px; box-sizing: border-box; padding: 8px 18px; border-bottom: 1px solid var(--muted-bg);
+  display: grid; grid-template-columns: 44px minmax(0, 2fr) repeat(3, minmax(0, 1fr)); column-gap: 12px;
+  align-items: center; font-size: 14px;
+}
+.lp-hrow:last-child { border-bottom: 0; }
+.lp-hrow--head {
+  min-height: 38px; border-bottom: 1px solid var(--line-soft); font-size: 13px; font-weight: 600;
+  letter-spacing: 0.03em; text-transform: uppercase; color: var(--muted); background: transparent;
+}
+.lp-num-head, .lp-hrow-num { text-align: right; }
+.lp-hrow > * {
+  /* Grid items default to min-width: auto (their own min-content) — without this, a long
+     unbroken address can force the 44px/1fr tracks wider than the row and the whole row wider
+     than the viewport at 390px, which is exactly the horizontal scroll this build must not have. */
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.lp-hrow-name { font-weight: 600; font-family: var(--font-mono); }
+.lp-hrow-num { font-family: var(--font-mono); font-size: 13px; }
+
+/* ── product feature cards ──────────────────────────────────────────────────────────────── */
+.lp-feature-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.lp-feature-card {
+  box-sizing: border-box; padding: 32px; border-radius: var(--radius-card); border: 1px solid var(--line);
+  background: var(--sunken); display: flex; flex-direction: column; gap: 12px;
+}
+.lp-feature-p { margin: 0; max-width: 30rem; font-size: 16px; line-height: 1.5; color: var(--muted); }
+.lp-feature-visual {
+  position: relative; flex-grow: 1; min-height: 260px; margin-top: 12px; border-radius: 18px;
+  overflow: hidden; background-color: var(--muted-bg-2);
+  background-image: radial-gradient(var(--line-strong) 1px, transparent 1px); background-size: 18px 18px;
+  display: flex; align-items: flex-start;
+}
+.lp-mock-panel {
+  position: relative; margin: 24px; width: min(360px, calc(100% - 48px)); box-sizing: border-box; padding: 16px;
+  border-radius: var(--radius-panel); background: var(--surface); box-shadow: var(--shadow-float);
+  display: flex; flex-direction: column; gap: 12px;
+}
+.lp-mock-row { display: flex; align-items: center; gap: 10px; }
+.lp-mock-id { flex-grow: 1; min-width: 0; display: flex; flex-direction: column; }
+.lp-mock-name {
+  font-size: 14px; font-weight: 700; font-family: var(--font-mono);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.lp-mock-sub { font-size: 13px; color: var(--muted); }
+.lp-mock-row .lp-mock-pnl, .lp-mock-row strong { font-size: 17px; }
+.lp-token-row { display: flex; flex-wrap: wrap; gap: 10px; }
+.lp-float-badge {
+  position: absolute; right: 24px; bottom: 24px; box-sizing: border-box; padding: 12px 16px;
+  border-radius: 16px; background: var(--inv-bg); color: var(--inv-fg); box-shadow: var(--shadow-float);
+  display: flex; flex-direction: column; gap: 2px;
+}
+.lp-float-label { font-size: 13px; color: var(--inv-fg); opacity: 0.66; }
+.lp-float-value { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; font-family: var(--font-mono); }
+
+.lp-copy-mock { flex-direction: column; align-items: stretch; padding: 24px; gap: 14px; }
+.lp-copy-mock .lp-mock-panel { margin: 0; width: 100%; }
+.lp-preset-group { display: flex; gap: 6px; }
+.lp-preset-input { position: absolute; opacity: 0; pointer-events: none; }
+.lp-preset-label {
+  flex-grow: 1; height: 34px; border-radius: 9px; background: var(--muted-bg); color: var(--muted);
+  font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.lp-preset-input:checked + .lp-preset-label { background: var(--inv-bg); color: var(--inv-fg); }
+.lp-preset-input:focus-visible + .lp-preset-label { outline: 2px solid var(--fg); outline-offset: 2px; }
+.lp-toggle-row { height: 32px; display: flex; align-items: center; justify-content: space-between; font-size: 14px; font-weight: 500; cursor: pointer; }
+.lp-switch-input { position: absolute; opacity: 0; pointer-events: none; }
+.lp-switch {
+  width: 40px; height: 24px; box-sizing: border-box; padding: 3px; border-radius: 12px; background: var(--line-strong);
+  display: flex; align-items: center; justify-content: flex-start; transition: background-color 160ms ease;
+}
+.lp-switch::before { content: ''; width: 18px; height: 18px; border-radius: 9px; background: var(--knob); box-shadow: var(--shadow-knob); display: block; transition: translate 160ms ease; }
+.lp-switch-input:checked + .lp-switch { background: var(--accent); }
+.lp-switch-input:checked + .lp-switch::before { translate: 16px 0; }
+.lp-switch-input:focus-visible + .lp-switch { outline: 2px solid var(--fg); outline-offset: 2px; }
+.lp-copy-note { margin: 0; font-size: 14px; line-height: 1.5; color: var(--muted); }
+
+/* ── stats strip ─────────────────────────────────────────────────────────────────────────── */
+.lp-strip { padding: 64px 60px; border-top: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft); gap: 36px; }
+.lp-strip-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 32px; flex-wrap: wrap; }
+.lp-strip-p { margin: 0; max-width: 26rem; font-size: 16px; line-height: 1.5; color: var(--muted); }
+.lp-strip-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.lp-strip-cell { padding: 0 20px; display: flex; flex-direction: column; gap: 10px; }
+.lp-strip-cell:first-child { padding-left: 0; }
+.lp-strip-cell--rule { border-left: 1px solid var(--line); }
+.lp-strip-value { font-family: var(--font-display); font-size: 46px; line-height: 1; letter-spacing: -0.02em; }
+.lp-strip-label { font-size: 13px; letter-spacing: 0.04em; color: var(--muted); }
+
+/* ── markets grid ────────────────────────────────────────────────────────────────────────── */
+.lp-markets-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+.lp-markets { display: flex; flex-direction: column; gap: 16px; }
+.lp-tab-input { position: absolute; opacity: 0; pointer-events: none; }
+.lp-tabs { display: flex; gap: 6px; border-bottom: 1px solid var(--line-soft); }
+.lp-tab {
+  height: 46px; padding: 0 14px; display: flex; align-items: center; gap: 8px; cursor: pointer;
+  font-size: 15px; font-weight: 600; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+.lp-tab-idx { opacity: 0.7; }
+#lp-mtab-stocks:checked ~ .lp-tabs label[for="lp-mtab-stocks"],
+#lp-mtab-memes:checked ~ .lp-tabs label[for="lp-mtab-memes"],
+#lp-mtab-wallets:checked ~ .lp-tabs label[for="lp-mtab-wallets"] { color: var(--fg); border-bottom-color: var(--fg); }
+#lp-mtab-stocks:focus-visible ~ .lp-tabs label[for="lp-mtab-stocks"],
+#lp-mtab-memes:focus-visible ~ .lp-tabs label[for="lp-mtab-memes"],
+#lp-mtab-wallets:focus-visible ~ .lp-tabs label[for="lp-mtab-wallets"] { outline: 2px solid var(--fg); outline-offset: 2px; }
+.lp-market-panels { display: block; }
+.lp-market-panel { display: none; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; }
+#lp-mtab-stocks:checked ~ .lp-market-panels #panel-stocks,
+#lp-mtab-memes:checked ~ .lp-market-panels #panel-memes,
+#lp-mtab-wallets:checked ~ .lp-market-panels #panel-wallets { display: grid; }
+
+.lp-mtile {
+  min-height: 220px; box-sizing: border-box; padding: 18px; border-radius: 20px; border: 1px solid var(--line);
+  background: var(--surface); display: flex; flex-direction: column; gap: 6px;
+  transition: translate 180ms ease, box-shadow 180ms ease;
+}
+.lp-mtile:hover { translate: 0 -3px; box-shadow: var(--shadow-card-hover); }
+.lp-mtile-top { display: flex; align-items: center; justify-content: space-between; }
+.lp-mtile-idx { color: var(--muted); font-size: 13px; }
+.lp-mtile-title {
+  margin-top: 8px; font-size: 17px; font-weight: 700;
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.lp-mtile-sub {
+  font-size: 13px; color: var(--muted);
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.lp-mtile-bottom { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: auto; }
+.lp-mtile-price { font-size: 16px; font-weight: 500; }
+.lp-mtile-pill {
+  height: 24px; padding: 0 8px; border-radius: 8px; font-size: 13px; font-weight: 600;
+  background: var(--muted-bg); color: var(--muted); display: inline-flex; align-items: center;
+}
+.lp-mtile-foot { font-size: 13px; color: var(--muted); }
+
+/* ── two-column split sections (build / mobile / api) ───────────────────────────────────── */
+.lp-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 56px; align-items: center; }
+.lp-split--reverse { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); }
+.lp-split--reverse .lp-split-copy { order: 2; }
+.lp-split--reverse .lp-phones { order: 1; }
+.lp-split-copy { display: flex; flex-direction: column; gap: 18px; }
+.lp-split-p { margin: 0; font-size: 17px; line-height: 1.5; color: var(--muted); }
+.lp-split-p--dark { color: var(--inv-fg); opacity: 0.68; }
+.lp-split-visual { position: relative; min-height: 460px; }
+
+.lp-points { margin: 6px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+.lp-points li { padding: 14px 0; border-top: 1px solid var(--line); display: flex; align-items: center; gap: 14px; }
+.lp-points-n { color: var(--muted); }
+.lp-points-t { flex-grow: 1; font-size: 16px; font-weight: 600; }
+.lp-points-note { font-size: 13px; color: var(--muted); }
+
+.lp-rule-card {
+  position: relative; width: min(420px, 100%); box-sizing: border-box; padding: 20px; border-radius: var(--radius-card);
+  background: var(--inv-bg); color: var(--inv-fg); box-shadow: var(--shadow-float);
+  display: flex; flex-direction: column; margin-bottom: 24px;
+}
+.lp-rule-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; font-size: 16px; font-weight: 600; }
+.lp-rule-deploy { height: 28px; padding: 0 12px; border-radius: 8px; background: var(--accent); color: var(--accent-ink); font-size: 13px; font-weight: 700; display: flex; align-items: center; }
+.lp-rule-row {
+  padding: 12px; border-radius: 14px; background: var(--inv-hover); display: flex; align-items: flex-start; gap: 10px;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--inv-fg) 6%, transparent) inset;
+}
+.lp-rule-kw {
+  width: 48px; height: 26px; flex-shrink: 0; border-radius: 8px; font-family: var(--font-mono); font-size: 13px;
+  font-weight: 600; display: flex; align-items: center; justify-content: center; background: var(--inv-fg); color: var(--inv-bg);
+}
+.lp-rule-kw--then { background: var(--accent); color: var(--accent-ink); }
+.lp-rule-parts { flex-grow: 1; font-size: 15px; padding-top: 3px; opacity: 0.92; }
+.lp-rule-parts b { font-weight: 700; }
+.lp-rule-connector { height: 10px; margin-left: 23px; border-left: 2px dashed var(--inv-hover); }
+
+.lp-activity-card {
+  position: absolute; right: 0; bottom: 0; width: min(340px, 100%); box-sizing: border-box; padding: 18px;
+  border-radius: var(--radius-card); background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-float);
+  display: flex; flex-direction: column; gap: 10px;
+}
+.lp-activity-head { display: flex; align-items: center; justify-content: space-between; font-size: 15px; font-weight: 700; }
+.lp-activity-badge {
+  /* A page-furniture badge, not a figure: neutral, so the positive colour keeps meaning
+     "this number went up" everywhere it appears. */
+  height: 24px; padding: 0 9px; border-radius: 12px; background: var(--muted-bg); color: var(--muted); font-size: 13px;
+  font-weight: 600; display: flex; align-items: center; gap: 6px;
+}
+.lp-activity-row { padding-top: 10px; border-top: 1px solid var(--muted-bg); display: flex; align-items: center; gap: 10px; font-size: 14px; }
+.lp-activity-row:first-of-type { padding-top: 0; border-top: 0; }
+
+/* ── mobile phones ───────────────────────────────────────────────────────────────────────── */
+.lp-phones { position: relative; min-height: 440px; }
+.lp-phone {
+  position: absolute; top: 0; width: 200px; height: 420px; box-sizing: border-box; padding: 8px;
+  border-radius: 34px; background: var(--inv-bg); box-shadow: var(--shadow-float);
+}
+.lp-phone--a { left: 0; rotate: -5deg; z-index: 1; }
+.lp-phone--b { left: 150px; top: 20px; rotate: 4deg; z-index: 2; }
+.lp-phone-screen {
+  width: 100%; height: 100%; box-sizing: border-box; padding: 24px 14px 0; border-radius: 28px;
+  background: var(--surface); color: var(--fg); display: flex; flex-direction: column; gap: 8px; overflow: hidden;
+}
+.lp-phone-screen--muted { background: var(--muted-bg); gap: 10px; }
+.lp-phone-label, .lp-phone-title { font-size: 13px; color: var(--muted); }
+.lp-phone-title { font-size: 15px; font-weight: 700; color: var(--fg); }
+.lp-phone-spark { width: 100%; height: 64px; display: block; stroke: var(--accent); margin: 4px 0; }
+.lp-phone-sub { margin-top: 6px; font-size: 13px; font-weight: 700; }
+.lp-phone-copy-row { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
+.lp-phone-alert { padding: 10px; border-radius: 12px; background: var(--surface); display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.lp-phone-alert span { font-weight: 600; }
+.lp-phone-alert small { color: var(--muted); }
+
+.lp-chip-note {
+  align-self: flex-start; height: 28px; padding: 0 12px; border-radius: var(--radius-panel); background: var(--muted-bg);
+  font-family: var(--font-mono); font-size: 13px; color: var(--muted); display: flex; align-items: center;
+}
+.lp-check-grid { margin: 4px 0 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.lp-check-grid li { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 500; }
+.lp-check-icon {
+  /* A tick beside a feature is not a gain. */
+  width: 24px; height: 24px; flex-shrink: 0; border-radius: 12px; background: var(--muted-bg); color: var(--fg);
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* ── api ─────────────────────────────────────────────────────────────────────────────────── */
+#api {
+  /* The frame's faint grid, on var(--inv-fg) rather than a literal white so it dims WITH the
+     section's own ink instead of vanishing (or worse, staying a stray white) once --inv-bg/
+     --inv-fg swap in dark mode. */
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--inv-fg) 4%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--inv-fg) 4%, transparent) 1px, transparent 1px);
+  background-size: 72px 72px;
+}
+.lp-code-card {
+  border-radius: var(--radius-card); background: var(--inv-hover); overflow: hidden;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--inv-fg) 8%, transparent);
+}
+.lp-code-tabs {
+  height: 46px; box-sizing: border-box; padding: 0 18px;
+  border-bottom: 1px solid color-mix(in srgb, var(--inv-fg) 10%, transparent);
+  display: flex; align-items: center; gap: 18px; font-family: var(--font-mono); font-size: 13px;
+  color: var(--inv-fg);
+}
+/* 0.66, not lower: on var(--inv-hover) (white, in dark mode) an inv-fg text opacity under
+   ~0.53 drops below 4.5:1 — measured against the worst case of the two themes, with margin. */
+.lp-code-tab { opacity: 0.66; }
+.lp-code-tab--active { opacity: 1; border-bottom: 2px solid var(--accent); padding: 13px 0; }
+.lp-code-body {
+  margin: 0; padding: 20px 0; box-sizing: border-box; font-family: var(--font-mono); font-size: 14px;
+  line-height: 1.7; color: var(--inv-fg); overflow-x: auto;
+}
+.lp-code-body .ln { display: inline-block; width: 34px; padding-right: 14px; text-align: right; color: var(--inv-fg); opacity: 0.66; user-select: none; }
+.lp-code-body .tk-kw, .lp-code-body .tk-fn { font-weight: 600; }
+.lp-code-body .tk-str, .lp-code-body .tk-num, .lp-code-body .tk-cm { opacity: 0.7; }
+.lp-code-body .tk-cm { font-style: italic; }
+
+/* ── faq ─────────────────────────────────────────────────────────────────────────────────── */
+.lp-faq-grid { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr); gap: 56px; align-items: flex-start; }
+.lp-faq-head { display: flex; flex-direction: column; gap: 16px; }
+.lp-faq-p { margin: 0; font-size: 16px; line-height: 1.5; color: var(--muted); }
+.lp-faq-list { border-top: 1px solid var(--line); display: flex; flex-direction: column; }
+.lp-faq { border-bottom: 1px solid var(--line); }
+.lp-faq summary {
+  min-height: 68px; padding: 0 8px; display: flex; align-items: center; gap: 16px; cursor: pointer;
+  list-style: none; font-size: 16px; -webkit-tap-highlight-color: transparent;
+}
+.lp-faq summary::-webkit-details-marker { display: none; }
+.lp-faq:hover summary { background: var(--surface-2); }
+.lp-faq-n { color: var(--muted); }
+.lp-faq-q { flex-grow: 1; font-size: 18px; font-weight: 600; letter-spacing: -0.005em; }
+.lp-faq-icon {
+  width: 34px; height: 34px; flex-shrink: 0; border-radius: 10px; background: var(--muted-bg);
+  display: flex; align-items: center; justify-content: center; transition: transform 180ms ease, background-color 180ms ease, color 180ms ease;
+}
+.lp-faq-icon::before, .lp-faq-icon::after {
+  content: ''; position: absolute; width: 10px; height: 2px; background: currentColor; border-radius: 1px;
+}
+.lp-faq-icon::after { transform: rotate(90deg); }
+.lp-faq-icon { position: relative; }
+.lp-faq[open] summary .lp-faq-icon { background: var(--inv-bg); color: var(--inv-fg); transform: rotate(45deg); }
+.lp-faq p { margin: 0; padding: 0 56px 24px 44px; font-size: 15px; line-height: 1.55; color: var(--muted); }
+
+/* ── cta banner ──────────────────────────────────────────────────────────────────────────── */
+.lp-cta {
+  position: relative; margin: 0 40px; border-radius: 36px; background: var(--inv-bg); color: var(--inv-fg);
+  padding: 96px 40px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 26px; text-align: center; overflow: hidden;
+}
+.lp-cta-grid {
+  position: absolute; inset: 0;
+  background-image: radial-gradient(color-mix(in srgb, var(--inv-fg) 9%, transparent) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+.lp-cta-pill {
+  position: relative; height: 30px; padding: 0 12px; border-radius: 15px; border: 1px solid var(--inv-hover);
+  font-family: var(--font-mono); font-size: 13px; color: var(--inv-fg); opacity: 0.66;
+  display: flex; align-items: center; gap: 8px;
+}
+.lp-cta-h {
+  position: relative; margin: 0; font-family: var(--font-display); font-weight: 400; font-size: 72px;
+  line-height: 0.98; letter-spacing: -0.03em;
+}
+.lp-cta .lp-btn { position: relative; }
+
+/* ── the marketing footer (static; the shared #foot bar sits under it) ─────────────────────── */
+.lp-foot { box-sizing: border-box; padding: 56px 60px 32px; display: flex; flex-direction: column; gap: 32px; }
+.lp-foot-top { display: flex; justify-content: space-between; gap: 40px; flex-wrap: wrap; }
+.lp-foot-brand { display: flex; flex-direction: column; gap: 10px; }
+.lp-foot-brand-row { display: flex; align-items: center; gap: 10px; }
+.lp-foot-mark { display: inline-flex; }
+.lp-foot-mark svg rect { fill: var(--accent); }
+.lp-foot-mark svg circle { fill: var(--surface); }
+.lp-foot-name { font-size: 18px; font-weight: 700; }
+.lp-foot-tag { font-size: 13px; color: var(--muted); }
+.lp-foot-cols { display: flex; gap: 56px; flex-wrap: wrap; }
+.lp-foot-col { display: flex; flex-direction: column; gap: 10px; min-width: 120px; }
+.lp-foot-col-title { font-size: 13px; color: var(--muted); }
+.lp-foot-col a { font-size: 15px; color: var(--fg); }
+.lp-foot-col a:hover { color: var(--fg-strong); text-decoration: underline; }
+.lp-foot-disclaimer { margin: 0; max-width: 60rem; font-size: 13px; line-height: 1.6; color: var(--muted); }
+
+/* ── scroll reveal: strictly additive ───────────────────────────────────────────────────────
+ * `.lp-reveal` on its own (no ancestor class) sets nothing — every section is fully visible
+ * with no JS at all, in a full-page render, and for a reader who lands mid-page from an
+ * anchor. The hide-then-animate rule below only exists under `html.js-reveal`, a class
+ * lib/landing.js adds ONLY after it has already reconciled which sections are on screen (so
+ * turning it on never causes a flash of invisible content) and ONLY when motion is welcome —
+ * see initReveal()'s prefers-reduced-motion check, which skips adding the class entirely. */
+html.js-reveal .lp-reveal { opacity: 0; translate: 0 18px; transition: opacity 560ms ease, translate 560ms ease; }
+html.js-reveal .lp-reveal.is-visible { opacity: 1; translate: 0 0; }
+
+/* ── responsive: 1440 is the frame's own canvas; below 1280 a grid loses a column, below 1024
+   another, below 768 the page is one column throughout, and the 16px gutter never drops. ──── */
+@media (max-width: 1280px) {
+  .lp-h1 { font-size: 72px; max-width: 46rem; }
+  .lp-cta-h { font-size: 58px; }
+  .lp-market-panel { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .lp-section { padding: 72px 40px; }
+}
+@media (max-width: 1024px) {
+  .lp-h1 { font-size: 58px; }
+  .lp-h2 { font-size: 42px; }
+  .lp-cta-h { font-size: 48px; }
+  .lp-hstat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .lp-podium-grid { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+  .lp-hrow, .lp-hrow--head { grid-template-columns: 36px minmax(0, 1.6fr) repeat(3, minmax(0, 1fr)); }
+  /* minmax(0, 1fr), never bare `1fr`: a plain `1fr` track's automatic minimum is `auto` (its
+     item's min-content), not 0 — so a single-column grid can still be forced wider than its
+     container by whatever's inside, which is exactly how .lp-feature-grid ended up 43px wider
+     than the viewport at 390px. minmax(0, …) is the one thing that actually clamps it. */
+  .lp-feature-grid { grid-template-columns: minmax(0, 1fr); }
+  .lp-strip-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 24px; }
+  .lp-strip-cell--rule:nth-child(3) { border-left: none; }
+  .lp-market-panel { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .lp-split, .lp-split--reverse { grid-template-columns: minmax(0, 1fr); }
+  .lp-split--reverse .lp-split-copy, .lp-split--reverse .lp-phones { order: initial; }
+  /* The rule-builder and activity cards overlap by DESIGN at the two-column width (one card
+     floats over the other's corner). One column is too narrow for that overlap to read as
+     anything but a collision, so below 1024 the activity card returns to normal flow instead
+     of floating over whatever the rule card ends up being tall enough to hide. */
+  .lp-split-visual { min-height: 0; }
+  .lp-activity-card { position: static; width: 100%; margin-top: 16px; }
+  .lp-faq-grid { grid-template-columns: minmax(0, 1fr); }
+  .lp-section { padding: 64px 28px; }
+  .lp-strip { padding: 56px 28px; }
+  .lp-cta { margin: 0 20px; padding: 72px 28px; }
+}
+@media (max-width: 768px) {
+  .lp-hero { padding: 72px 16px 0; }
+  .lp-h1 { font-size: 40px; letter-spacing: -0.02em; }
+  .lp-hero-sub { font-size: 17px; }
+  .lp-h2 { font-size: 32px; }
+  .lp-h3 { font-size: 26px; }
+  .lp-cta-h { font-size: 34px; }
+  .lp-window-body { padding: 14px; gap: 10px; }
+  .lp-hstat-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .lp-hrow, .lp-hrow--head { grid-template-columns: 30px minmax(0, 1.4fr) repeat(3, minmax(0, 0.9fr)); column-gap: 6px; padding: 8px 12px; font-size: 13px; }
+  .lp-hrow-num { font-size: 13px; }
+  .lp-strip-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .lp-strip-cell--rule { border-left: none; padding-left: 0; }
+  .lp-market-panel { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .lp-markets-head { flex-direction: column; align-items: flex-start; }
+  .lp-check-grid { grid-template-columns: minmax(0, 1fr); }
+  .lp-phones { min-height: 380px; }
+  .lp-phone { width: 168px; height: 356px; }
+  .lp-phone--b { left: 120px; }
+  .lp-section, .lp-strip { padding: 48px 16px; }
+  .lp-cta { margin: 0 12px; padding: 56px 16px; }
+  .lp-foot { padding: 40px 16px 24px; }
+  .lp-foot-top { flex-direction: column; gap: 28px; }
+}
+@media (max-width: 480px) {
+  .lp-hstat-grid, .lp-strip-grid, .lp-market-panel, .lp-check-grid { grid-template-columns: minmax(0, 1fr); }
+  /* Phone width: drop Volume and Win rate rather than shrink the figures further. Rank, trader
+     and PnL are the point of this table; the other two columns had no room left to show a
+     full number without truncating it, and a clipped figure is a wrong figure. */
+  .lp-hrow, .lp-hrow--head { grid-template-columns: 26px minmax(0, 1fr) minmax(0, 1fr); }
+  .lp-hrow > :nth-child(4), .lp-hrow > :nth-child(5) { display: none; }
+  .lp-preset-group { flex-wrap: wrap; }
+  .lp-h1 { font-size: 34px; }
+}

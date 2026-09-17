@@ -21,7 +21,7 @@ import {
   subPixel,
   subPixelNote,
   subsidyNote,
-} from '../web/lib/findings.js';
+} from '../archive/lib/findings.js';
 
 const depth = JSON.parse(
   await readFile(new URL('../web/data/depth.json', import.meta.url), 'utf8'),

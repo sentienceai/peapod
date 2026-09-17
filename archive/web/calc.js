@@ -12,9 +12,9 @@
  * the kernel in lib/kernel.js.
  */
 
-import { histogram, netVsHodlPct, quantile } from '../../web/lib/kernel.js';
-import { compact, money, pct, shortAddress, stamp } from '../../web/lib/format.js';
-import { subsidyNote } from '../../web/lib/findings.js';
+import { histogram, netVsHodlPct, quantile } from '../lib/kernel.js';
+import { compact, money, pct, shortAddress, stamp } from '../lib/format.js';
+import { subsidyNote } from '../lib/findings.js';
 
 /** @param {string} id */
 const el = (id) => /** @type {HTMLElement} */ (document.getElementById(id));

@@ -1,0 +1,146 @@
+/* The search palette (frame: search.dc.html).
+ *
+ * Measurements are the frame's own: 860 panel width, 64px field row, 46px tab row, 44px
+ * result rows, 44px footer. The frame also draws a sub-filter row and a column-header row
+ * that belong to a different data model (copy score, portfolio value) than lib/data.js
+ * returns here, so this build keeps the frame's chrome heights and drops those two rows.
+ *
+ * Uses .backdrop and .spacer from base.css and --radius-panel / --shadow-modal from
+ * tokens.css rather than the frame's literal 16px radius: a modal is exactly the "panel"
+ * this build already has a token for, and one more near-identical radius is not worth adding.
+ */
+
+.search-panel {
+  /* .backdrop already reserves 16px on each side and 48px top and bottom; sizing against
+     that box (not the viewport) keeps this in step if that padding ever changes. */
+  width: min(860px, 100%);
+  height: min(600px, calc(100vh - 96px));
+  min-width: 0;
+  box-sizing: border-box;
+  border-radius: var(--radius-panel);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--fg);
+  box-shadow: var(--shadow-modal);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── field row ──────────────────────────────────────────────────────────────────────── */
+.search-field {
+  height: 64px; flex: 0 0 auto; min-width: 0;
+  box-sizing: border-box; padding: 0 16px 0 20px;
+  border-bottom: 1px solid var(--line-soft);
+  display: flex; align-items: center; gap: 12px;
+}
+.search-field > svg { flex-shrink: 0; color: var(--muted); }
+.search-field input {
+  flex: 1 1 auto; min-width: 0; border: 0; outline: none; background: transparent;
+  color: var(--fg); font-size: 18px;
+}
+.search-esc {
+  height: 28px; flex-shrink: 0; padding: 0 8px;
+  border-radius: var(--radius-control-sm); border: 1px solid var(--line);
+  background: var(--surface-2); color: var(--muted);
+  font-family: var(--font-mono); font-size: 11px;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: border-color 150ms ease, color 150ms ease;
+}
+.search-esc:hover { border-color: var(--line-strong); color: var(--fg); }
+
+/* ── tabs ───────────────────────────────────────────────────────────────────────────── */
+.search-tabs {
+  height: 46px; flex: 0 0 auto; min-width: 0;
+  box-sizing: border-box; padding: 0 20px;
+  border-bottom: 1px solid var(--line-soft);
+  display: flex; align-items: stretch; gap: 22px;
+}
+.search-tab {
+  padding: 0; border: 0; border-bottom: 2px solid transparent; background: transparent;
+  font-family: var(--font-mono); font-size: 12px; font-weight: 500;
+  letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--muted); display: flex; align-items: center; gap: 6px;
+  transition: color 150ms ease, border-color 150ms ease;
+}
+.search-tab:hover { color: var(--fg); }
+.search-tab.is-active { color: var(--fg); border-bottom-color: var(--accent); }
+.search-tab-count { font-size: 11px; color: var(--muted); }
+
+/* ── result list ────────────────────────────────────────────────────────────────────── */
+.search-list {
+  flex: 1 1 auto; min-height: 0; min-width: 0;
+  overflow-y: auto; display: flex; flex-direction: column;
+}
+.search-list[hidden] { display: none; }
+
+.search-row {
+  width: 100%; height: 44px; flex: 0 0 44px; min-width: 0;
+  box-sizing: border-box; padding: 0 20px;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  color: var(--fg); cursor: pointer;
+}
+.search-row:hover { background: var(--hover); }
+.search-row.is-active { background: var(--muted-bg); }
+
+.search-row-main { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1 1 auto; overflow: hidden; }
+.search-row-sym { font-size: 14px; font-weight: 700; flex-shrink: 0; }
+.search-row-name {
+  font-size: 13px; color: var(--muted); min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.search-row-figs { display: flex; align-items: center; gap: 16px; flex-shrink: 0; }
+.search-row-price { font-size: 13px; }
+.search-row-chg { min-width: 64px; font-size: 13px; text-align: right; }
+
+/* Traders read the same rhythm as assets: a bold identifier, then a muted phrase after it. */
+.search-row-addr { font-size: 14px; font-weight: 700; flex-shrink: 0; }
+.search-row-ctx {
+  font-size: 13px; color: var(--muted); min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.search-row-realized { min-width: 88px; font-size: 13px; text-align: right; flex-shrink: 0; }
+
+.avatar.avatar--sm { width: 26px; height: 26px; border-radius: var(--radius-control-sm); font-size: 10px; }
+
+/* A typed address complete enough to be an address, but not on the board. */
+.search-row-tag {
+  height: 20px; flex-shrink: 0; padding: 0 7px; border-radius: 5px;
+  background: var(--muted-bg); color: var(--muted); font-size: 11px; font-weight: 600;
+  display: inline-flex; align-items: center;
+}
+.search-row-hint { font-size: 12px; color: var(--muted); flex-shrink: 0; }
+
+.search-empty {
+  flex: 1 1 auto; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 6px; text-align: center; padding: 24px;
+}
+.search-empty[hidden] { display: none; }
+.search-empty-title { font-size: 15px; font-weight: 600; }
+.search-empty-hint { font-size: 13px; color: var(--muted); }
+
+/* ── footer hints ───────────────────────────────────────────────────────────────────── */
+.search-foot {
+  height: 44px; flex: 0 0 auto; min-width: 0;
+  box-sizing: border-box; padding: 0 16px;
+  border-top: 1px solid var(--line-soft); background: var(--surface-2);
+  display: flex; align-items: center; gap: 16px;
+  font-size: 12px; color: var(--muted);
+}
+.search-hint { display: flex; align-items: center; gap: 6px; }
+.search-key {
+  height: 20px; min-width: 20px; box-sizing: border-box; padding: 0 5px;
+  border-radius: 4px; border: 1px solid var(--line); background: var(--surface);
+  font-family: var(--font-mono); font-size: 10px; color: var(--fg);
+  display: flex; align-items: center; justify-content: center;
+}
+.search-mark rect { fill: var(--accent); }
+.search-mark circle { fill: var(--surface-2); }
+
+/* ── responsive: the frame is drawn at 860 wide; below that .backdrop's own 16px gutters
+   already shrink the panel via width: min(860px, 100%), so only the inner padding needs to
+   follow the site's 16px-gutter rule once the panel itself is that narrow. ────────────── */
+@media (max-width: 480px) {
+  .search-field, .search-tabs, .search-row, .search-foot { padding-left: 16px; padding-right: 16px; }
+  .search-row-figs { gap: 10px; }
+}

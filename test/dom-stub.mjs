@@ -191,7 +191,10 @@ class Node {
     if (globalThis.document && path[path.length - 1] !== globalThis.document) {
       path.push(globalThis.document);
     }
-    const e = { ...event, target: this };
+    // The same event shape the document path builds: handlers call preventDefault() and
+    // stopPropagation() on the way past, and one that throws inside a listener reads as
+    // "the handler did nothing", which is a confusing way to watch a dialog fail to close.
+    const e = { preventDefault() {}, stopPropagation() {}, ...event, target: this };
     for (const n of path.slice(1).reverse()) {
       for (const l of n.listeners ?? []) if (l.capture && l.type === event.type) l.fn(e);
     }
@@ -233,10 +236,26 @@ class Node {
             || n.dataset[attr[2].replace(/^data-/, '').replace(/-(\w)/g,
               (_, c) => c.toUpperCase())] !== undefined);
       }
+      // A class selector: the pages use these to find a decoration they drew themselves.
+      if (part.startsWith('.')) {
+        return String(n.className).split(' ').includes(part.slice(1));
+      }
       return /^[\w-]+$/.test(part) && n.tag === part;
     };
     const parts = sel.split(',').map((x) => x.trim()).filter(Boolean);
     return this.descendants().filter((n) => parts.some((part) => matches(n, part)));
+  }
+
+  /** The first match, or null — the DOM's own contract, which pages rely on. @param {string} sel */
+  querySelector(sel) {
+    return this.querySelectorAll(sel)[0] ?? null;
+  }
+
+  /** Whether a node is this one or inside it — what a focus trap asks. @param {any} other */
+  contains(other) {
+    if (!other) return false;
+    if (other === this) return true;
+    return this.descendants().includes(other);
   }
 
   /** Focus, as the browser tracks it, so focus return can be asserted. */
@@ -344,8 +363,23 @@ export async function install(htmlUrl) {
     activeElement: null,
     /** @param {{type: string}} event */
     dispatchEvent(event) {
-      for (const l of document.listeners) if (l.type === event.type) l.fn({ ...event });
+      // A real event, not a bag of properties: handlers call preventDefault() and
+      // stopPropagation() on the way past, and an event without them throws inside the
+      // listener — which reads as "the handler did nothing" and is a very confusing way to
+      // watch a dialog fail to close.
+      const e = { preventDefault() {}, stopPropagation() {}, target: document, ...event };
+      for (const l of document.listeners) if (l.type === event.type) l.fn(e);
       return true;
+    },
+    /**
+     * Whether a node is still in the document — what a dialog asks before handing focus
+     * back to whatever opened it. Walking up to a root without a parent is the same answer
+     * the browser gives, and without it the restore is silently skipped.
+     * @param {any} node
+     */
+    contains(node) {
+      for (let n = node; n; n = n.parent) if (!n.parent) return true;
+      return false;
     },
     /** @type {any[]} */
     listeners: [],
