@@ -17,7 +17,7 @@
   "test/profile.test.mjs": 9,
   "test/readme.test.mjs": 5,
   "test/render.test.mjs": 13,
-  "test/site.test.mjs": 8,
+  "test/site.test.mjs": 9,
   "test/tick-math-sweep.test.mjs": 6,
   "test/wait-for-pid.test.mjs": 7,
   "export/test_assets.py": 16,

@@ -202,6 +202,27 @@ test('the sample mark is per figure, not per page', async () => {
   }
 });
 
+test('a store older than the asset endpoints does not take the leaderboard down with it', async () => {
+  /*
+   * THE DEPLOY THIS COMES FROM. The asset tables are written by the cycle, so for a cycle
+   * or two after a deploy — and on any rollback — /api/assets answers 404 over a store whose
+   * rankings are sitting right there. assets() threw, board.js awaited it before painting,
+   * and the live leaderboard rendered zero rows. A page missing its tile colours is a much
+   * smaller loss than a page.
+   */
+  const { assets } = await import('../web/lib/data.js');
+  const original = globalThis.fetch;
+  globalThis.fetch = /** @type {any} */ (async (/** @type {string} */ path) => (
+    path.startsWith('/api/assets')
+      ? { ok: false, status: 404, json: async () => ({ error: 'no assets in this build' }) }
+      : original(path)));
+  try {
+    assert.deepEqual(await assets(), [], 'a build without the asset tables should answer with none');
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
 test('the footer names the build every page is showing', () => {
   // A proxied session, a stale container and a fresh deploy look identical otherwise, and a
   // bug report has to be able to say which build it saw.

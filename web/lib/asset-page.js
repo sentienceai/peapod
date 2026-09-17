@@ -343,7 +343,23 @@ function buildTradesPanel(d) {
 /** Rebuilds the whole main from the current state — cheap enough at this data size, and it
     means a symbol switch never has stale panels left over from the previous asset. */
 function render() {
-  if (!mainEl || !state.detail) return;
+  if (!mainEl) return;
+  // No detail and no list: the build has no asset data yet, which happens for a cycle or
+  // two after a deploy. Say that, rather than leaving the page blank — a blank page reads
+  // as broken, and this is a state with a known end.
+  if (!state.detail) {
+    mainEl.replaceChildren();
+    const box = node('section', 'as-head panel');
+    const inner = node('div', 'as-head-left');
+    inner.append(node('h1', 'as-head-sym', 'No asset data in this build'));
+    inner.append(node('p', 'as-head-name',
+      'The asset list and the per-asset tape are written by the build cycle, which runs '
+      + 'every fifteen minutes. This store predates them; the next cycle fills it in. The '
+      + 'leaderboard and every address page work in the meantime.'));
+    box.append(inner);
+    mainEl.append(box);
+    return;
+  }
   const d = state.detail;
   mainEl.replaceChildren();
   mainEl.append(buildCrumb(d));

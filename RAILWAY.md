@@ -15,12 +15,20 @@ empty state, and the first cycle fills it. Nothing has to be seeded for it to st
 **2. A volume mounted at `/data`.** Settings → Volumes → New Volume → mount path `/data`.
 Size it **20 GB**. Today's footprint is about 1.1 GB (814 MB tape, 256 MB database).
 
-**3. Two variables.**
+**3. Three variables.**
 
 | Variable | Value |
 |---|---|
 | `GOLDSKY_EDGE_URL` | the full Edge endpoint URL from your `.env` |
 | `PEAPOD_CYCLE_MINUTES` | `15` |
+| `PORT` | `3000` |
+
+**`PORT` is not optional, and its absence looks like a broken app.** Railway's runtime
+injects a `PORT` of its own — 8080 on this service — while the public domain keeps pointing
+at whatever port it was created with. The container then comes up healthy, logs `peapod on
+http://0.0.0.0:8080`, and every request through the domain answers 502. Pinning `PORT` to
+the port the domain targets makes both sides say the same number. If you move the domain to
+another port, move this with it.
 
 The URL contains the key, so there is no separate token. Set it as a Railway variable;
 `.env` is gitignored and must stay that way.

@@ -260,7 +260,20 @@ function tokenKind(symbol) {
  */
 export async function assets() {
   if (mode() === 'mock') return mock.ASSETS;
-  const list = await get('/api/assets');
+  /*
+   * AN EMPTY LIST IS A REAL ANSWER HERE, and it is the one a deploy actually hits.
+   *
+   * The asset tables are written by the cycle, so a store built before these endpoints
+   * existed — a volume mid-upgrade, a rollback, the first fifteen minutes after a deploy —
+   * answers 404 until the next cycle commits. Throwing took the leaderboard down with it:
+   * the board awaits this list for its asset tiles and rendered nothing at all, over a
+   * store whose rankings were sitting right there. A page missing its tile colours is a
+   * smaller loss than a page.
+   */
+  const res = await fetch('/api/assets', { headers: { accept: 'application/json' } });
+  if (res.status === 404) return [];
+  if (!res.ok) throw new Error(`/api/assets answered ${res.status}`);
+  const list = await res.json();
   for (const a of list) KINDS.set(String(a.symbol).toUpperCase(), a.kind);
   return list;
 }
