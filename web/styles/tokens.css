@@ -68,9 +68,11 @@
      only 400) or hue, so it is depth of the same ink: prose recedes to 66% and the
      figures stay at full. 5.91 and 16.39, both clear of AA. */
   --brand-ink-soft: #516005;
-  --accent: #ccff00;
-  --accent-ink: #110e08;
-  --accent-soft: #cdf460;
+  /* --accent, --accent-ink and --accent-soft are gone. --accent-soft was #cdf460, the
+     same value as --up, so for one pass every hover border and active underline on the
+     site was drawn in the positive sign colour under a name that did not say so. Two
+     names for one colour is the root cause, not the symptom: the test below refuses any
+     token that resolves to a sign colour, so this cannot be reintroduced quietly. */
 
   /* Chart fills: a wash of the sign colour over the ground, not a second hue. Matched in
      luminance to each other (1.50 and 1.50 on black) so a losing sparkline is not quietly

@@ -267,23 +267,40 @@ test('the two sign colours are NOT distinguishable without colour, which is the 
     + 'glyph is still required — revisit this note, do not delete the glyph.');
 });
 
+test('no other token carries a sign colour\'s value', () => {
+  /*
+   * THE ROOT CAUSE, not the symptom. --accent-soft was #cdf460 — the same value as --up —
+   * so every hover border, active underline, keycap and inline link on the site was the
+   * positive sign colour under a name that did not say so. The allowlist below existed
+   * precisely to catch that and could not: it matched on the token NAME, and this was a
+   * second name for the same colour.
+   *
+   * Two names for one colour is the thing to forbid. A page cannot spend a hue on one
+   * meaning while a synonym spends it on another.
+   */
+  const signs = new Set([T.up.toLowerCase(), T.down.toLowerCase()]);
+  const twins = Object.entries(T)
+    .filter(([name, hex]) => name !== 'up' && name !== 'down' && signs.has(hex.toLowerCase()))
+    .map(([name, hex]) => `--${name} is ${hex}`);
+  assert.deepEqual(twins, [],
+    `these are a sign colour under another name:\n  ${twins.join('\n  ')}`);
+});
+
 test('the sign colours are spent only on things that have a sign', () => {
   /*
-   * THE GENERAL FORM OF THE WIN-RATE DECISION, so it cannot be undone one rule at a time.
+   * MATCHED ON RESOLVED VALUE, NOT ON TOKEN NAME. The first version of this read the
+   * stylesheet for the literal strings var(--up) and var(--down), which is a check that
+   * only works while nobody has introduced a synonym — and somebody had. Every declaration
+   * is now resolved through the token table first, so an alias, a raw hex, or a value
+   * reached through two hops of var() all arrive at the same place.
    *
-   * On this palette the positive colour IS the brand lime, which means every lime thing on
-   * the page competes with the one figure that needs it. Three separate places had taken
-   * it for quantities that carry no sign — the win-rate column, the card's bottom bar, and
-   * the matched-flow meter in the detail view, which was the widest lime object on the page
-   * and reported a share of volume.
+   * The line the allowlist draws: a SIGNED QUANTITY may take a sign colour. A rate, a
+   * share, a verdict or an ordinal may not — those use the neutral ladder. A transient
+   * status indicator is not a quantity at all and is exempt, listed so the exemption is
+   * deliberate rather than an oversight.
    *
-   * The line is: a SIGNED QUANTITY may take a sign colour. A rate, a share, a verdict or an
-   * ordinal may not — those use the neutral ladder. A transient status indicator (a copy
-   * confirmation, a wallet error, the serving dot) is not a quantity at all and is left
-   * alone; it is listed below so that the exemption is deliberate rather than an oversight.
-   *
-   * Adding a selector here is allowed. Doing it without reading the paragraph above is what
-   * this is trying to prevent.
+   * Adding a selector here is allowed. Doing it without reading the paragraph above is
+   * what this is trying to prevent.
    */
   const allowed = new Map([
     ['.up', 'the sign class itself'],
@@ -295,21 +312,75 @@ test('the sign colours are spent only on things that have a sign', () => {
     ['.wallet-note.is-fail', 'status: a wallet refused. Not a quantity'],
     ['.status-dot', 'status: a build is being served. Not a quantity'],
   ]);
+
+  /**
+   * Resolve var() chains against the token table, so --alias and #cdf460 and
+   * var(--up) all come out as the same string.
+   * @param {string} value
+   */
+  const resolve = (value) => {
+    let out = value;
+    for (let hop = 0; hop < 6 && out.includes('var(--'); hop += 1) {
+      out = out.replace(/var\(\s*--([\w-]+)\s*(?:,[^)]*)?\)/g,
+        (whole, name) => T[name] ?? whole);
+    }
+    return out.toLowerCase();
+  };
+  const signs = [T.up.toLowerCase(), T.down.toLowerCase()];
+
   const stripped = app.replace(/\/\*[\s\S]*?\*\//g, '');
   /** @type {string[]} */
   const offenders = [];
   for (const m of stripped.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
-    if (!/var\(--(up|down)\)/.test(m[2])) continue;
+    const body = resolve(m[2]);
+    if (!signs.some((hex) => body.includes(hex))) continue;
     for (const sel of m[1].split(',').map((x) => x.trim())) {
       if (!sel || sel.startsWith('@') || allowed.has(sel)) continue;
       offenders.push(`${sel} { ${m[2].trim()} }`);
     }
   }
   assert.deepEqual(offenders, [],
-    'these take a sign colour and are not in the allowlist — read the note above this test '
-    + `before adding them:\n  ${offenders.join('\n  ')}`);
+    'these resolve to a sign colour and are not in the allowlist — read the note above '
+    + `this test before adding them:\n  ${offenders.join('\n  ')}`);
 
-  // Not vacuous: the sign classes must still be here and still be the sign colours.
+  // Not vacuous, and specifically not vacuous through the resolver: the sign classes must
+  // still be here, and resolving them must still reach the sign colours.
   assert.match(stripped, /\.up \{ color: var\(--up\); \}/);
   assert.match(stripped, /\.down \{ color: var\(--down\); \}/);
+  assert.equal(resolve('var(--up)'), signs[0]);
+  assert.equal(resolve('var(--down)'), signs[1]);
+});
+
+test('the amber is the one colour outside the spec, and it is deliberate', () => {
+  /*
+   * NOT DRIFT. Robinhood's system is binary by design — lime or dark, no neutral secondary
+   * palette — and that binary has nowhere to put "measured, but here is how much of this
+   * is not". On a site whose central argument is its coverage caveat, that is not a detail
+   * worth losing to a palette rule.
+   *
+   * The exception is bounded to CAUTION, and the list below is what bounds it. I described
+   * it as one meter when I added the note and this test found two more the same day — all
+   * three saying the same kind of thing, which is the test doing its job rather than the
+   * claim being wrong by much:
+   *
+   *   .bar i.warn            how much of an address's flow has no round-trip behind it
+   *   .warn-note             the caveat's line about RWA's profit rate being small in size
+   *   .status-dot.is-empty   no build is being served yet
+   *
+   * Each is paired with words carrying the same message, so colour is never the only
+   * channel. Anything else that reaches for the amber is drift and fails here.
+   */
+  assert.ok(T.warn, '--warn is gone; if the amber was removed, remove this test with it');
+  for (const sign of ['up', 'down', 'brand']) {
+    assert.notEqual(T.warn.toLowerCase(), T[sign].toLowerCase(),
+      `--warn collapsed into --${sign}`);
+  }
+  assert.ok(contrast(T.warn, T.bg) >= 4.5,
+    `--warn on the ground is ${contrast(T.warn, T.bg).toFixed(2)}`);
+
+  const stripped = app.replace(/\/\*[\s\S]*?\*\//g, '');
+  const users = [...stripped.matchAll(/([^{}]+)\{([^{}]*var\(--warn\)[^{}]*)\}/g)]
+    .flatMap((m) => m[1].split(',').map((x) => x.trim()));
+  assert.deepEqual(users.sort(), ['.bar i.warn', '.status-dot.is-empty', '.warn-note'],
+    `the amber spread beyond caution: ${users.join(', ')}`);
 });

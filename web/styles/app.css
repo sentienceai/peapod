@@ -463,9 +463,17 @@ table.mini td:first-child { text-align: left; }
    instead of the window's. */
 .heroband { background: var(--brand); color: var(--brand-ink); margin-bottom: var(--s-7); }
 .hero { position: relative; min-height: 116px; padding: var(--s-7) 360px var(--s-7) 0; }
+/* THE HEADING STEP, NOT THE DISPLAY STEP, and the reason is in the spec rather than in
+   taste. Display is for "hero headlines and brand moments"; heading is for section titles.
+   The other page's headline is a title of 22 characters and sets on one line. This is a
+   sentence of 52 in two clauses, and at 72px it wrapped to two lines and pushed first
+   content to 455px on an 846px viewport — 53.8%, against the reference's measured 291px
+   and 34.4%. A two-line 72px serif band is a marketing gesture on a page that is a table.
+   At the heading step, with the sub-line moved out onto the black, both pages open at the
+   same place. */
 .hero h1 {
   font-family: var(--display);
-  font-size: var(--t-display); letter-spacing: var(--ls-display); line-height: var(--lh-display);
+  font-size: var(--t-head); letter-spacing: var(--ls-head); line-height: var(--lh-head);
   font-weight: var(--w-regular); color: var(--brand-ink); margin: 0;
 }
 /* The accented clause is gone. On the band there is one usable ink and the spec allows one
@@ -473,18 +481,16 @@ table.mini td:first-child { text-align: left; }
    a headline is a tell rather than a device. The sentence does the work; it is two flat
    statements and the second one lands on its own. */
 .hero h1 em { font-style: normal; color: inherit; }
-.hero-sub { margin: var(--s-3) 0 0; color: var(--brand-ink-soft);
+.hero-sub { margin: 0 0 var(--s-5); max-width: 72ch; color: var(--text-muted);
   font-size: var(--t-body); letter-spacing: var(--ls-body); line-height: var(--lh-body); }
-:where(.hero-sub) b { color: var(--brand-ink); font-weight: var(--w-regular); }
+:where(.hero-sub) b { color: var(--text); font-weight: var(--w-regular); }
 .hero .caveat { margin: 6px 0 0; max-width: 84ch; color: var(--brand-ink-soft);
   font-size: var(--t-small); letter-spacing: var(--ls-small); line-height: 1.45; }
 /* The one link on the band. Colour is not available to mark it, so it is marked. */
 .hero .sub-link { color: var(--brand-ink); border-bottom-color: currentColor; }
 .hero .sub-link:hover { color: var(--brand-ink); border-bottom-width: 2px; }
 
-@media (max-width: 1024px) { .hero h1 { font-size: 56px; } }
-@media (max-width: 768px)  { .hero h1 { font-size: 40px; letter-spacing: var(--ls-head); } }
-@media (max-width: 485px)  { .hero h1 { font-size: 32px; } }
+@media (max-width: 768px) { .hero h1 { font-size: 32px; } }
 
 /* The deck is the page's only decoration: three real cards from the ranking, overlapped
    the way the reference stacks them. Short enough that it cannot drive the hero's height. */
