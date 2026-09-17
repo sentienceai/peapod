@@ -169,7 +169,21 @@ export function route(api, url) {
     return { status: 200, body, type: 'application/json', gzip: true };
   }
   if (parts[0] === 'asset') {
-    const body = api.asset(String(parts[1] || ''));
+    /*
+     * PERCENT-DECODED FIRST. A symbol is data from the chain, and three tokens on this tape
+     * are named in emoji or Chinese — so the path segment arrives encoded and the stored
+     * symbol is the decoded one. Looking up the raw segment answers 404 for exactly the
+     * symbols the widened alphabet was meant to let through, which is a bug that hides as
+     * "not in this tape". decodeURIComponent throws on a malformed sequence; that is a
+     * symbol no URL could have carried, so it is the same 404 as any other unknown one.
+     */
+    let symbol = '';
+    try {
+      symbol = decodeURIComponent(String(parts[1] || ''));
+    } catch {
+      symbol = '';
+    }
+    const body = api.asset(symbol);
     // Same answer for a symbol this build never carried and for one that is not a symbol
     // at all: the caller learns the route holds nothing for it, and nothing else.
     if (!body) return json({ error: 'not in this tape' }, 404);

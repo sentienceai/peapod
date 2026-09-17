@@ -98,6 +98,30 @@ test('the API is the contract, and it is read-only', async () => {
       assert.equal(/** @type {any} */ (route(api, new URL(`http://x/api/asset/${encodeURIComponent(bad)}`)))?.status,
         404, bad);
     }
+    // A symbol that is not ASCII arrives percent-encoded and must be decoded before the
+    // lookup: three Pons tokens are named in emoji or Chinese, and answering 404 for exactly
+    // those is the failure the widened alphabet exists to prevent — hiding as "not in this
+    // tape". Checked against whatever the build actually shipped, so it stays true on a
+    // store whose tape has not reached those tokens yet.
+    const { gunzipSync } = await import('node:zlib');
+    const listOut = /** @type {any} */ (route(api, new URL('http://x/api/assets')));
+    if (listOut.status === 200) {
+      const list = JSON.parse(gunzipSync(Buffer.from(listOut.body)).toString('utf8'));
+      const odd = list.filter((/** @type {any} */ a) => ![...a.symbol].every((/** @type {string} */ c) => c.charCodeAt(0) < 128));
+      for (const a of odd.slice(0, 3)) {
+        const res = /** @type {any} */ (route(api, new URL(`http://x/api/asset/${encodeURIComponent(a.symbol)}`)));
+        assert.equal(res.status, 200, `${a.symbol} is listed but cannot be opened`);
+      }
+      // Deterministic on any store, including one whose tape holds no such token yet:
+      // TS%4CA is "TSLA" with one letter percent-encoded, so it resolves only if the route
+      // decodes before it looks up.
+      if (list.some((/** @type {any} */ a) => a.symbol === 'TSLA')) {
+        assert.equal(/** @type {any} */ (route(api, new URL('http://x/api/asset/TS%4CA'))).status, 200,
+          'the route is not percent-decoding the symbol');
+      }
+      // A malformed escape is an unknown symbol, not a crash.
+      assert.equal(/** @type {any} */ (route(api, new URL('http://x/api/asset/%E0%A4%A'))).status, 404);
+    }
     const ok = /** @type {any} */ (route(api, new URL('http://x/api/assets')));
     assert.equal(ok.status, 200);
     assert.equal(ok.gzip, true, 'payloads must go out compressed, as stored');
