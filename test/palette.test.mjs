@@ -15,6 +15,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 const css = await readFile(new URL('../web/styles/tokens.css', import.meta.url), 'utf8');
+const app = await readFile(new URL('../web/styles/app.css', import.meta.url), 'utf8');
 /** @type {Record<string, string>} */
 const T = Object.fromEntries(
   [...css.matchAll(/--([\w-]+):\s*(#[0-9a-f]{6})/g)].map((m) => [m[1], m[2]]),
@@ -33,34 +34,38 @@ function contrast(a, b) {
   return (hi + 0.05) / (lo + 0.05);
 }
 
-test('the five source swatches are all present, each doing one job', () => {
-  const swatches = {
-    '#0e3b2e': 'up-fill', '#1f5d4a': 'accent', '#a8c6b8': 'accent-soft',
-    '#e9f1ee': 'text', '#2b2f33': 'surface',
-  };
-  for (const [hex, token] of Object.entries(swatches)) {
-    assert.equal(T[token], hex, `--${token} is no longer the ${hex} swatch`);
+test('the spec\'s own tokens are all present, each doing one job', () => {
+  // The four colours the design system names, and the values measured off the product
+  // screenshot for the roles it does not carry. A derived value is only defensible while
+  // its source is still on the page.
+  const spec = { '#ccff00': 'brand', '#110e08': 'brand-ink', '#000000': 'bg', '#ffffff': 'text' };
+  for (const [hex, name] of Object.entries(spec)) {
+    assert.equal(T[name], hex, `--${name} is no longer the ${hex} the spec measures`);
   }
-  // The two light greens can never be the ground on a dark layout.
-  for (const ground of ['bg', 'surface', 'raised']) {
-    assert.ok(luminance(T[ground]) < 0.1,
-      `--${ground} is ${T[ground]}, too light to sit under this layout`);
+  const measured = { '#cdf460': 'up', '#ec6688': 'down', '#949fa5': 'text-muted',
+    '#1f2124': 'line', '#31363a': 'line-soft' };
+  for (const [hex, name] of Object.entries(measured)) {
+    assert.equal(T[name], hex, `--${name} drifted from the ${hex} measured off the product`);
   }
+  // The divider inside a table is LIGHTER than the border around a card. One grey for
+  // both is what made a table read as a single block.
+  assert.ok(luminance(T['line-soft']) > luminance(T.line),
+    'the row divider is no longer lighter than the card border');
 });
 
 test('every foreground the interface renders clears WCAG AA on its ground', () => {
   /** @type {[string, string][]} */
   const pairs = [
-    ['text', 'surface'], ['text-body', 'surface'], ['text-muted', 'surface'],
-    ['up', 'surface'], ['down', 'surface'], ['warn', 'surface'],
     ['text', 'bg'], ['text-body', 'bg'], ['text-muted', 'bg'], ['up', 'bg'], ['down', 'bg'],
-    // The filter pills carry the smallest labels on the page, on the lightest surface.
+    // The one lift on the page, carrying the smallest labels.
     ['text-muted', 'raised'], ['text-body', 'raised'],
     // Figures sit on their own chart fills.
     ['up', 'up-fill'], ['down', 'down-fill'],
-    // The accent is a fill, so what matters is the ink on it.
-    ['accent-ink', 'accent'],
-    ['accent-soft', 'bg'], ['accent-soft', 'surface'], ['focus', 'surface'], ['focus', 'bg'],
+    // The brand band has exactly one ink, and the muted step inside it.
+    ['brand-ink', 'brand'], ['brand-ink-soft', 'brand'],
+    // The label grey also sits against the row divider it runs beside.
+    ['text-muted', 'line-soft'],
+    ['focus', 'bg'], ['rank-3', 'bg'],
   ];
   /** @type {string[]} */
   const failures = [];
@@ -71,49 +76,49 @@ test('every foreground the interface renders clears WCAG AA on its ground', () =
   assert.deepEqual(failures, [], `below AA:\n  ${failures.join('\n  ')}`);
 });
 
-test('the moss swatch is used as a fill, never as a foreground', () => {
-  // At 1.3 against the ground it is invisible as text or as a hairline. The rule is in
-  // the token comment; this is what makes it true of the stylesheet.
-  const app = css + '\n';
-  assert.ok(contrast(T.accent, T.bg) < 2,
-    'the accent got light enough to be a foreground — revisit this rule, do not delete it');
-  void app;
+test('no signed figure is ever rendered on the brand surface', () => {
+  // THE WHOLE LIME QUESTION, AS AN ASSERTION. The spec lists #ccff00 as `background`, and
+  // on a marketing page it is one. Behind this table both sign colours die at once:
+  //   up on lime 1.07, down on lime 2.62, and white on lime 1.21.
+  // So the resolution is not "pick the readable sign colour", it is that the lime surface
+  // carries no signed figure at all. These numbers are the reason, kept here so that a
+  // later attempt to put a number in the band fails with the arithmetic attached.
+  for (const sign of ['up', 'down', 'text']) {
+    assert.ok(contrast(T[sign], T.brand) < 3,
+      `--${sign} now reads on the lime; if that is real, revisit the rule rather than the test`);
+  }
+  // The one ink the band can use, and it clears AAA.
+  assert.ok(contrast(T['brand-ink'], T.brand) > 7,
+    `the band's only usable ink fell to ${contrast(T['brand-ink'], T.brand).toFixed(2)}`);
+  // And the band must hold nothing but the headline. .page-head sets the brand background;
+  // anything else in it would be styled here.
+  assert.match(app, /\.page-head \{[^}]*background: var\(--brand\)/,
+    'the brand band is no longer the page head');
 });
 
-test('the podium medals are ordinal, distinguishable, and readable', () => {
-  // Three ranks in one colour make the order something you read rather than see.
-  const [g, s2, b] = [T['rank-1'], T['rank-2'], T['rank-3']];
-  assert.ok(g && s2 && b, 'the medals are not defined');
-  // Separated by HUE, not luminance: three medals at the same brightness is the point —
-  // they are peers. Luminance contrast is the wrong measure here, and rank is carried by
-  // the numeral in the badge as well, so colour is never the only channel.
-  const hue = (/** @type {string} */ h) => {
-    const [r, g2, b2] = rgb(h); const hi = Math.max(r, g2, b2); const lo = Math.min(r, g2, b2);
-    if (hi === lo) return 0;
-    const d = hi - lo;
-    const t = hi === r ? ((g2 - b2) / d + 6) % 6 : hi === g2 ? (b2 - r) / d + 2 : (r - g2) / d + 4;
-    return t * 60;
-  };
-  const apart = (/** @type {number} */ a, /** @type {number} */ x) => {
-    const d = Math.abs(a - x) % 360; return d > 180 ? 360 - d : d;
-  };
-  for (const [a, x] of [[g, s2], [s2, b], [g, b]]) {
-    assert.ok(apart(hue(a), hue(x)) > 20,
-      `medals ${a} and ${x} are ${apart(hue(a), hue(x)).toFixed(0)} degrees apart`);
+test('the podium medals are ordinal, distinguishable, and never the sign colour', () => {
+  const ladder = [T['rank-1'], T['rank-2'], T['rank-3']];
+  assert.ok(ladder.every(Boolean), 'the medals are not defined');
+  // Separated by BRIGHTNESS, not hue. The spec has no neutral secondary palette and forces
+  // a binary, so three hues would be three inventions; a ladder is inside the system.
+  const L = ladder.map(luminance);
+  assert.ok(L[0] > L[1] && L[1] > L[2], `the medals are not ordered: ${ladder.join(' ')}`);
+  for (const [a, b] of [[0, 1], [1, 2]]) {
+    const r = (L[a] + 0.05) / (L[b] + 0.05);
+    assert.ok(r > 1.4, `ranks ${a + 1} and ${b + 2 - 1} are ${r.toFixed(2)} apart — not seen, read`);
   }
-  // They sit on the card and on the raised surface, so both have to clear AA.
-  for (const m of [g, s2, b]) {
-    for (const ground of ['surface', 'raised']) {
+  // Never lime: rank one is the obvious place for the brand colour and the worst place
+  // for it, because the card it badges already carries a lime figure.
+  for (const m of ladder) {
+    assert.notEqual(m.toLowerCase(), T.brand.toLowerCase(), 'a medal is the sign colour');
+    assert.notEqual(m.toLowerCase(), T.up.toLowerCase(), 'a medal is the sign colour');
+  }
+  for (const m of ladder) {
+    for (const ground of ['bg', 'raised']) {
       const r = contrast(m, T[ground]);
       assert.ok(r >= 4.5, `${m} on --${ground} is ${r.toFixed(2)}`);
     }
   }
-  // Muted, not metallic: a saturated gold on a dark ground tips this into a casino.
-  const sat = (/** @type {string} */ h) => {
-    const [r, g2, b2] = rgb(h); const hi = Math.max(r, g2, b2); const lo = Math.min(r, g2, b2);
-    return hi === 0 ? 0 : (hi - lo) / hi;
-  };
-  for (const m of [g, s2, b]) assert.ok(sat(m) < 0.62, `${m} is too saturated for this palette`);
 });
 
 test('the negative is still a rose, and still distinguishable from the positive', () => {
@@ -126,7 +131,10 @@ test('the negative is still a rose, and still distinguishable from the positive'
 
 test('the stylesheet does not smuggle in colours the palette does not define', async () => {
   const app = await readFile(new URL('../web/styles/app.css', import.meta.url), 'utf8');
-  const literals = [...app.matchAll(/#[0-9a-fA-F]{3,8}\b/g)].map((m) => m[0]);
+  // Comments stripped first: the measured values are written down beside the rules that
+  // use them, and a hex in a comment is documentation, not a colour on the page.
+  const code = app.replace(/\/\*[\s\S]*?\*\//g, '');
+  const literals = [...code.matchAll(/#[0-9a-fA-F]{3,8}\b/g)].map((m) => m[0]);
   // One exception, and it is a shade of black used as a scrim, not a palette colour.
   const unexpected = literals.filter((h) => h.toLowerCase() !== '#000000cc');
   assert.deepEqual(unexpected, [],
