@@ -45,7 +45,7 @@ export function mountWallet(host, deps = {}) {
   const look = deps.lookup ?? tradedHere;
   const open = deps.open ?? ((/** @type {string} */ a) => openProfile(a));
 
-  host.className = 'wallet';
+  host.className = 'wallet-host';
   /** @param {string} text @param {string} [cls] */
   const button = (text, cls) => {
     const b = node('button', cls ?? 'btn btn-primary wallet-btn', text);
