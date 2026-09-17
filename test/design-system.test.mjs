@@ -24,10 +24,10 @@ const web = new URL('../web/', import.meta.url);
 const read = (/** @type {string} */ p) => readFile(new URL(p, web), 'utf8');
 
 const tokens = await read('styles/tokens.css');
-const PAGES = ['index.html', 'leaderboard.html', 'copy-trade.html', 'asset.html'];
+const PAGES = ['index.html', 'leaderboard.html', 'copy-trade.html', 'asset.html', 'markets.html'];
 /** @type {Record<string, string>} */
 const html = Object.fromEntries(await Promise.all(PAGES.map(async (p) => [p, await read(p)])));
-const STYLES = ['tokens', 'base', 'board', 'copy', 'asset', 'landing', 'profile', 'search'];
+const STYLES = ['tokens', 'base', 'board', 'copy', 'asset', 'landing', 'profile', 'search', 'markets'];
 /** @type {Record<string, string>} */
 const css = Object.fromEntries(await Promise.all(STYLES.map(async (n) => [n, await read(`styles/${n}.css`)])));
 const ALL_CSS = STYLES.filter((n) => n !== 'tokens').map((n) => css[n]).join('\n');
@@ -164,6 +164,7 @@ test('every page links the stylesheets its own module needs, and no others', () 
     'leaderboard.html': ['tokens', 'base', 'board', 'search', 'profile', 'copy'],
     'copy-trade.html': ['tokens', 'base', 'copy', 'profile', 'search'],
     'asset.html': ['tokens', 'base', 'asset', 'profile', 'search'],
+    'markets.html': ['tokens', 'base', 'board', 'markets', 'search', 'profile'],
   };
   for (const [page, want] of Object.entries(expected)) {
     const links = [...html[page].matchAll(/href="\/styles\/([\w-]+)\.css"/g)].map((m) => m[1]);

@@ -1,0 +1,34 @@
+/* Markets: the same table furniture as the board, with a token where the board puts an
+   address. Everything shared — .row, .thead, .th, .row-cell — comes from board.css, which
+   this page loads first; only the columns and the token cell are here. */
+
+.mk-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) repeat(6, minmax(0, 1fr));
+  align-items: center; column-gap: 16px;
+  color: inherit;
+}
+.mk-row .row-who { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.mk-sym { font-family: var(--font-mono); font-size: 14px; font-weight: 500; }
+.mk-kind {
+  font-size: 11px; color: var(--muted); padding: 1px 7px; border-radius: var(--radius-control-sm);
+  background: var(--muted-bg); white-space: nowrap;
+}
+/* A missing figure is a dash in the muted channel — never a zero, which would read as flat. */
+.mk-none { color: var(--muted); }
+
+#thead {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) repeat(6, minmax(0, 1fr));
+  column-gap: 16px;
+}
+
+@media (max-width: 1024px) {
+  .mk-row, #thead { grid-template-columns: minmax(0, 1.4fr) repeat(3, minmax(0, 1fr)); }
+  .mk-row > :nth-child(n + 5), #thead > :nth-child(n + 5) { display: none; }
+}
+@media (max-width: 768px) {
+  .mk-row, #thead { grid-template-columns: minmax(0, 1.2fr) repeat(2, minmax(0, 1fr)); }
+  .mk-row > :nth-child(n + 4), #thead > :nth-child(n + 4) { display: none; }
+  .mk-kind { display: none; }
+}

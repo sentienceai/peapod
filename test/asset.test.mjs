@@ -107,3 +107,23 @@ test('a symbol the build does not carry is said, not faked', async () => {
     .readFile(new URL('../web/lib/asset-page.js', import.meta.url), 'utf8') };
   assert.match(src, /isn't a symbol this build tracks/);
 });
+
+test('the tokens carry their logos, not just their initials', () => {
+  /*
+   * THE FAILURE THIS CATCHES. 433 logo files are vendored and the map covers almost every
+   * token any page displays, and for a while every tile on the site drew two letters anyway:
+   * the map was loaded by one page, and two pages built their tiles by hand instead of
+   * calling the helper that adds the image. Initials are the FALLBACK for a token with no
+   * file; a page where every tile is initials means the map never arrived.
+   */
+  const tiles = byClass(main(), 'asset-tile');
+  const imgs = main().descendants().filter((/** @type {any} */ n) => n.tag === 'img');
+  assert.ok(tiles.length > 0, 'no asset tiles rendered at all');
+  assert.ok(imgs.length / tiles.length > 0.9,
+    `only ${imgs.length} of ${tiles.length} tiles carry a logo`);
+  for (const img of imgs.slice(0, 8)) {
+    // Only a filename this build produced ever reaches a URL.
+    assert.match(img.attributes.src, /^\/token-logos\/0x[0-9a-f]{40}\.(png|jpg|jpeg|webp)$/);
+    assert.equal(img.attributes.alt, '', 'the ticker is already text; the logo is decorative');
+  }
+});

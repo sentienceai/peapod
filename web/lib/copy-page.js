@@ -243,12 +243,14 @@ function buildCard(row) {
   // The copy score the frame put here has no definition and no data — see the file header.
   // The slot stays, because the feature is coming and the gap should be visible, and it says
   // what it needs rather than showing a number.
-  foot.append(unwired('copyScore', { compact: true }));
+  const act = node('div', 'ct-card-foot-act');
+  act.append(unwired('copyScore', { compact: true }));
   const copyBtn = /** @type {HTMLButtonElement} */ (node('button', 'btn-copy', 'Set up copy'));
   copyBtn.type = 'button';
   copyBtn.setAttribute('aria-label', `Set up copying ${shortAddr(row.address)}`);
   copyBtn.onclick = () => openSetup(row.address);
-  foot.append(copyBtn);
+  act.append(copyBtn);
+  foot.append(act);
   card.append(foot);
 
   return card;

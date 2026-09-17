@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Markets · Peapod</title>
+<meta name="description" content="Every token traded on Robinhood Chain, by 24-hour volume, from the swap tape.">
+<link rel="icon" href="/favicon.svg">
+<script>(function(){try{var v=localStorage.getItem('peapod-theme');if(v!=='light'&&v!=='dark')v=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.setAttribute('data-theme',v);}catch(e){}})()</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital,wght@0,400;1,400&family=JetBrains+Mono:wght@400;500&family=Schibsted+Grotesk:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/styles/tokens.css">
+<link rel="stylesheet" href="/styles/base.css">
+<link rel="stylesheet" href="/styles/board.css">
+<link rel="stylesheet" href="/styles/markets.css">
+<link rel="stylesheet" href="/styles/search.css">
+<link rel="stylesheet" href="/styles/profile.css">
+<script type="module" src="/lib/markets-page.js"></script>
+</head>
+<body class="page">
+<a class="skip" href="#markets">Skip to the markets</a>
+<header id="chrome"></header>
+
+<main class="board-main">
+  <section class="board-hero">
+    <h1>Every token on <em>Robinhood Chain</em></h1>
+    <p id="hero-sub">Tokenized equities and Pons memecoins, by the volume that actually traded in the window.</p>
+  </section>
+
+  <section class="board-controls">
+    <div class="tabs" id="kinds" role="group" aria-label="Kind"></div>
+    <div class="spacer"></div>
+    <label class="board-search">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+      <span class="sr-only">Search markets by symbol</span>
+      <input id="filter" type="search" placeholder="Filter by symbol" autocomplete="off" spellcheck="false">
+    </label>
+  </section>
+
+  <section class="tablewrap panel" id="markets" aria-label="Markets">
+    <div class="thead" id="thead" role="row"></div>
+    <div class="tbody" id="rows"></div>
+    <p class="board-empty" id="empty" hidden></p>
+  </section>
+
+  <div class="board-more"><button class="btn" type="button" id="more">Show more</button></div>
+  <p class="board-note" id="note"></p>
+</main>
+
+<footer id="foot"></footer>
+</body>
+</html>

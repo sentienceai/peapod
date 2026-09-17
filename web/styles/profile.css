@@ -156,7 +156,13 @@
 .profile-card-square { border-radius: 2px; }
 .profile-card-square.up { background: var(--up); }
 .profile-card-square.down { background: var(--down); }
-.profile-card-foot { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Wraps to two lines rather than ellipsing. A card's foot is the sentence that says what the
+   figure above it is made of, and half of that sentence is worse than a smaller one: "$2.3M
+   matched · $0.00 sold …" leaves the reader with the part that never mattered. */
+.profile-card-foot {
+  font-size: 12px; color: var(--muted); line-height: 1.35;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+}
 
 /* The win-rate card body needs no extra padding of its own — .ev already spaces itself. */
 .profile-card-body > .ev { gap: 6px; }
@@ -178,8 +184,15 @@
    its own content, and the rail's rows then sit at the top the way `flex-direction: column`
    already means them to. */
 .profile-card-body > .ev, .profile-rail > .ev { flex: none; width: 100%; min-width: 0; }
-.profile-card-body .ev-foot, .profile-rail .ev-foot {
+.profile-rail .ev-foot {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* In a card the footnote is narrower than the rail's and carries the same sentence — how many
+   closes, and the band chance would have to beat. It wraps to a second line instead of ending
+   at "chanc…", which is the half that says nothing. */
+.profile-card-body .ev-foot {
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+  line-height: 1.35;
 }
 
 .profile-chart-panel {

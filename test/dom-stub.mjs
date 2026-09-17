@@ -14,6 +14,29 @@ import { readFile } from 'node:fs/promises';
 import { gunzipSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 
+/**
+ * Whether a node matches a selector: attribute selectors, tag names, class selectors, and
+ * comma-separated lists of any of those. Lives out here because both a node's own query and
+ * the document-wide one below run it.
+ * @param {Node} n @param {string} sel
+ */
+function matchesSelector(n, sel) {
+  /** @param {string} part */
+  const one = (part) => {
+    const attr = part.match(/^([\w-]*)\[([\w-]+)\]$/);
+    if (attr) {
+      return (!attr[1] || n.tag === attr[1])
+        && (n.attributes[attr[2]] !== undefined
+          || n.dataset[attr[2].replace(/^data-/, '').replace(/-(\w)/g,
+            (_, c) => c.toUpperCase())] !== undefined);
+    }
+    // A class selector: the pages use these to find a decoration they drew themselves.
+    if (part.startsWith('.')) return String(n.className).split(' ').includes(part.slice(1));
+    return /^[\w-]+$/.test(part) && n.tag === part;
+  };
+  return sel.split(',').map((x) => x.trim()).filter(Boolean).some(one);
+}
+
 class Node {
   /** @param {string} tag */
   constructor(tag) {
@@ -227,23 +250,7 @@ class Node {
    * @param {string} sel
    */
   querySelectorAll(sel) {
-    /** @param {Node} n @param {string} part */
-    const matches = (n, part) => {
-      const attr = part.match(/^([\w-]*)\[([\w-]+)\]$/);
-      if (attr) {
-        return (!attr[1] || n.tag === attr[1])
-          && (n.attributes[attr[2]] !== undefined
-            || n.dataset[attr[2].replace(/^data-/, '').replace(/-(\w)/g,
-              (_, c) => c.toUpperCase())] !== undefined);
-      }
-      // A class selector: the pages use these to find a decoration they drew themselves.
-      if (part.startsWith('.')) {
-        return String(n.className).split(' ').includes(part.slice(1));
-      }
-      return /^[\w-]+$/.test(part) && n.tag === part;
-    };
-    const parts = sel.split(',').map((x) => x.trim()).filter(Boolean);
-    return this.descendants().filter((n) => parts.some((part) => matches(n, part)));
+    return this.descendants().filter((n) => matchesSelector(n, sel));
   }
 
   /** The first match, or null — the DOM's own contract, which pages rely on. @param {string} sel */
@@ -356,6 +363,29 @@ export async function install(htmlUrl) {
   globalThis.document = /** @type {any} */ ({});
   const document = {
     getElementById: (/** @type {string} */ id) => byId.get(id) ?? null,
+    /**
+     * A document-wide query, over the nodes this stub knows: the elements the markup gave an
+     * id, and everything the pages appended under them. A selector that only an id-less piece
+     * of static markup would match comes back empty — the honest answer, since that node was
+     * never built here. Without this a page that decorates itself (landing.js's reveal pass)
+     * throws instead of finding nothing.
+     * @param {string} sel
+     */
+    querySelectorAll(sel) {
+      const seen = new Set();
+      /** @type {Node[]} */
+      const out = [];
+      for (const root of byId.values()) {
+        for (const n of [root, ...root.descendants()]) {
+          if (seen.has(n) || !matchesSelector(n, sel)) continue;
+          seen.add(n);
+          out.push(n);
+        }
+      }
+      return out;
+    },
+    /** @param {string} sel */
+    querySelector(sel) { return document.querySelectorAll(sel)[0] ?? null; },
     createElement: (/** @type {string} */ tag) => new Node(tag),
     createTextNode: (/** @type {unknown} */ text) => String(text),
     createElementNS: (/** @type {string} */ _ns, /** @type {string} */ tag) => new Node(tag),

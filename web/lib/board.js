@@ -15,15 +15,14 @@
  * the table says so rather than letting the ranking imply it is the whole picture.
  */
 
-import { board, meta, assets as allAssets, tokenLogos } from './data.js';
+import { board, meta, assets as allAssets } from './data.js';
 import { mountChrome, mountFoot } from './chrome.js';
 import { openProfile } from './profile.js';
-import { setTokenLogos } from './token.js';
 import { markSample } from './sample.js';
 import { subsidyNote } from './findings.js';
 import { sparkline } from './spark.js';
 import {
-  ago, compact, copyButton, el, icon, node, pct, shortAddr, signed, signedPct,
+  ago, assetTile, compact, copyButton, el, icon, node, pct, shortAddr, signed, signedPct,
 } from './format.js';
 
 const PAGE = 12;
@@ -101,7 +100,9 @@ function assetChips(r) {
   const shown = r.tokens.slice(0, 3);
   shown.forEach((/** @type {string} */ symbol, /** @type {number} */ i) => {
     const a = state.assets.find((x) => x.symbol === symbol);
-    const chip = node('span', `asset-tile asset-tile--${a?.kind ?? 'stock'}`, symbol.slice(0, 2));
+    // assetTile(), not a hand-rolled span: the logo lives in that helper, and a tile built
+    // here is a tile that silently never gets one.
+    const chip = assetTile(symbol, a?.kind ?? 'stock');
     chip.style.zIndex = String(shown.length - i);
     chip.title = a ? `${a.symbol} — ${a.name}` : symbol;
     wrap.append(chip);
@@ -371,7 +372,6 @@ state.meta = await meta();
 // empty ranking over a store with data in it.
 state.window = state.meta.window ?? state.window;
 state.assets = await allAssets();
-setTokenLogos(await tokenLogos());
 
 mountChrome(el('chrome'), {
   current: 'leaderboard',

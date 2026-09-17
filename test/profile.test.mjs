@@ -156,3 +156,25 @@ test('the dialog traps focus, closes three ways, and hands focus back', async ()
   assert.match(src, /aria-modal/);
   closeProfile();
 });
+
+test('a caption under a figure produces that figure', async () => {
+  /*
+   * The "Volume matched" card carries coverage — the share of this address's SELLING that had
+   * an on-chain buy behind it — over a caption that read "$2.3M matched of $2.5M total". That
+   * is a different ratio: matched against everything the address traded, open positions
+   * included. It came out at 92.9% under a figure reading 100.0%, so a reader who checked the
+   * arithmetic was right and the page was wrong. The two parts named underneath a figure have
+   * to be the two parts it is made of.
+   */
+  const p = await open(qualified.address);
+  const card = byClass(p, 'profile-card')
+    .find((/** @type {any} */ c) => c.textContent.startsWith('Volume matched'));
+  assert.ok(card, 'the volume card is gone');
+  const value = byClass(card, 'profile-card-value')[0].textContent;
+  const foot = byClass(card, 'profile-card-foot')[0].textContent;
+  assert.match(foot, /matched/);
+  assert.match(foot, /no on-chain buy/, 'the caption does not name what is unmatched');
+  assert.ok(!/of \$[\d.]+[MBk]? total/.test(foot),
+    `the caption is a ratio against total volume, which is not the figure above it: ${value} / ${foot}`);
+  closeProfile();
+});

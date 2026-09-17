@@ -10,14 +10,14 @@
  */
 
 import { mountTheme } from './theme.js';
-import { unwired } from './needs.js';
+import { mountWallet } from './wallet-ui.js';
 import { icon, ICONS, node } from './format.js';
 import { openSearch } from './search.js';
 
 const NAV = [
   { id: 'leaderboard', label: 'Leaderboard', href: '/leaderboard' },
   { id: 'copy', label: 'Copy trade', href: '/copy-trade' },
-  { id: 'markets', label: 'Markets', href: '/asset?symbol=TSLA' },
+  { id: 'markets', label: 'Markets', href: '/markets' },
 ];
 
 /** The pea-pod mark: three peas in a pod, the one place the accent is decoration. */
@@ -71,15 +71,10 @@ export function mountChrome(host, opts = {}) {
   host.append(themeHost);
   mountTheme(themeHost);
 
-  /*
-   * NOT A CONNECT BUTTON. There is no wallet flow — no provider call anywhere in this
-   * frontend — and a button labelled "Connect wallet" that answers "Wallets land with
-   * execution" when pressed is an advertisement for something that does not exist, dressed
-   * as a control. The slot says what it is waiting for and cannot be pressed, which is the
-   * same thing without the false affordance.
-   */
-  const wallet = unwired('walletConnect', { compact: true });
-  wallet.className = `${wallet.className} topbar-unwired`;
+  // Connect only — see lib/wallet-ui.js. The control asks a wallet for its addresses and
+  // nothing else, and what it buys is one thing: a way into your own address's profile.
+  const wallet = node('div', 'wallet-host');
+  mountWallet(wallet);
   host.append(wallet);
 
   // "/" opens search from anywhere, as the keycap in the bar promises.

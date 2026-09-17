@@ -320,10 +320,18 @@ function metricsRow(d) {
   }));
 
   grid.append(metricCard('Volume matched', (body) => {
+    /*
+     * THE FOOT HAS TO PRODUCE THE FIGURE ABOVE IT. This card's number is coverage — how much
+     * of this address's SELLING had an on-chain buy behind it — and it read "$2.3M matched of
+     * $2.5M total" underneath, which is a different ratio (92.9%, matched against everything
+     * the address traded, open positions included). A reader who divides the caption and does
+     * not get the number is right, and the page is wrong. The caption now names coverage's own
+     * two parts; the share of total volume keeps its own labelled row in the rail.
+     */
     body.append(node('span', 'profile-card-value', pct(d.coveragePct, 1)));
     body.append(shareBar(d.coveragePct));
     body.append(node('div', 'profile-card-foot',
-      `${compact(d.matchedVolume)} matched of ${compact(d.totalVolume)} total`));
+      `${compact(d.matchedVolume)} matched · ${compact(d.outOfScopeVolume)} sold with no on-chain buy`));
   }));
 
   grid.append(metricCard('Win rate', (body) => {

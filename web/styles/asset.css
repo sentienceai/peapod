@@ -105,6 +105,7 @@
 
 .as-cluster-stage {
   position: relative; flex-grow: 1; min-height: 380px; margin: 8px;
+  display: grid; place-items: center;
   border-radius: var(--radius-control-sm); overflow: hidden;
   background-color: var(--surface-2);
   background-image: radial-gradient(var(--line) 1px, transparent 1px);
@@ -271,3 +272,8 @@
 /* The price caveat sits under the figure, not beside it: a price and the sentence that
    qualifies it should never be read as two separate facts. */
 .as-head-price-note { font-size: 11px; color: var(--muted); text-align: right; display: block; }
+
+/* With no holders to draw, the stage is 380px of dotted nothing above a one-line slot. It
+   keeps its shape — this is where the cluster goes — at a height that reads as a waiting
+   panel rather than as a rendering failure. */
+.as-cluster-stage:has(> .unwired) { min-height: 200px; }

@@ -26,17 +26,17 @@
  *     personal balance has no real number behind it at any window; the mockups keep the shapes
  *     (a chart, an activity feed) and drop the invented amounts.
  *
- * THE LABELS ARE PART OF THE FIGURE. A true number under a label that overstates it is still a
- * false sentence, so the stat labels here name their own scope: the hero's two sums cover the
- * rows the board ships (the build caps them) and say so, and the strip's last cell prints the
- * window the board is ranked over instead of the "24/7" it used to type. index.html's prose
- * had the same pass for the same reason — see the comments beside each claim there.
+ * THE LABELS ARE PART OF THE FIGURE. A true number under a label that reads wider than it is
+ * still says something false, so each label here names what its number counts: the window's
+ * matched volume comes from the build's own coverage block rather than a sum over the ranked
+ * rows, the round-trip sum says how many rows it added up, and the strip's last cell prints the
+ * window the board is ranked over instead of the frame's "24/7".
  */
 
 import { board, meta, assets } from './data.js';
 import { mountChrome, mountFoot } from './chrome.js';
 import {
-  node, el, compact, pct, signed, signedPct, shortAddr, token,
+  node, el, compact, pct, signed, signedPct, shortAddr, token, assetTile,
 } from './format.js';
 import { sparkline } from './spark.js';
 
@@ -56,8 +56,8 @@ function fmtPrice(n) {
 
 /**
  * The fields the callbacks below read off one assets() row. lib/data.js hands that list back
- * untyped while SOURCE is 'mock', so the shape is named here rather than inferred — and it
- * names only what is read, so it stays true whatever else the live endpoint carries.
+ * untyped — the live endpoint's rows arrive as JSON — so the shape is named here rather than
+ * inferred, and it names only what is read, so it stays true whatever else that row carries.
  * @typedef {{symbol: string, kind: string}} AssetRow
  */
 
@@ -74,19 +74,33 @@ const initials = (/** @type {string} */ addr) => addr.slice(2, 4).toUpperCase();
  */
 function renderHeroStats(host, boardData, metaData, assetList) {
   if (!host) return;
-  let matchedVolume = 0;
+  let rowVolume = 0;
   let roundTrips = 0;
-  for (const r of boardData.rows) { matchedVolume += r.matchedVolume; roundTrips += r.roundTrips; }
-  // The two sums are over the rows the board actually ships, which the build caps — so the
-  // labels used to read as chain-wide totals ("MATCHED VOLUME · 7D", "ROUND-TRIPS CLOSED")
-  // for figures that only cover the ranked rows. The row count is stated rather than assumed,
-  // so the label stays true if the cap moves. "WALLETS QUALIFYING" said what qualifying meant
-  // nowhere; the criterion is one closed round-trip, so the label says that instead.
+  for (const r of boardData.rows) { rowVolume += r.matchedVolume; roundTrips += r.roundTrips; }
+  /*
+   * "MATCHED VOLUME · 7D" is a claim about the window, and the window's matched volume is a
+   * figure the build already publishes — so it is read from the coverage block rather than
+   * summed off the rows, which the build caps at a thousand. A payload without coverage (the
+   * mock, an older store) has only the rows, and there the label says how many it added up.
+   */
   const ranked = boardData.rows.length.toLocaleString('en-US');
+  const windowVolume = Number(boardData.coverage?.matched_volume_usd);
+  const volume = Number.isFinite(windowVolume) && windowVolume > 0
+    ? { label: `MATCHED VOLUME · ${boardData.window.toUpperCase()}`, value: compact(windowVolume) }
+    : { label: `MATCHED VOLUME · TOP ${ranked}`, value: compact(rowVolume) };
   const items = [
-    { label: `MATCHED VOLUME · TOP ${ranked} · ${boardData.window.toUpperCase()}`, value: compact(matchedVolume) },
-    { label: 'ADDRESSES THAT CLOSED ONE', value: Number(metaData.addressesQualifying).toLocaleString('en-US') },
+    volume,
+    // From the SAME coverage block as the volume above it and as the leaderboard's own
+    // caveat. The manifest's count is every address with a detail record, which is a wider
+    // set than the window being ranked — two true numbers that read as one disagreeing with
+    // itself when they sit in the same strip. Falls back to the manifest when a store
+    // predating the coverage block answers.
+    { label: 'WALLETS QUALIFYING',
+      value: Number(boardData.coverage?.addresses_qualifying ?? metaData.addressesQualifying)
+        .toLocaleString('en-US') },
     { label: 'TOKENS TRACKED', value: String(assetList.length) },
+    // Summed off the rows, and there is no window-wide count of closes to read instead, so
+    // this one says how many rows it covers rather than reading as every close in the window.
     { label: `ROUND-TRIPS · TOP ${ranked}`, value: roundTrips.toLocaleString('en-US') },
   ];
   host.replaceChildren(...items.map((s) => {
@@ -176,7 +190,7 @@ function renderExplore(host, row, assetList) {
 function tileForAsset(a) {
   const tile = node('div', 'lp-mtile');
   const top = node('div', 'lp-mtile-top');
-  top.append(node('span', `asset-tile asset-tile--${a.kind} asset-tile--lg`, a.symbol.slice(0, 2)));
+  top.append(assetTile(a.symbol, a.kind, 'asset-tile--lg'));
   top.append(node('span', 'mono lp-mtile-idx', `#${a.rank}`));
   tile.append(top);
   tile.append(node('span', 'lp-mtile-title', a.name));
@@ -225,25 +239,26 @@ function renderMarkets(assetList, boardRows) {
 }
 
 /**
- * "Built for signal": addresses seen, addresses that qualified, tokens tracked. The fourth
- * frame stat ("24/7 markets covered") needs no figure at all and stays static markup in
- * index.html instead of being duplicated here.
- *
- * SINCE: that fourth cell was rendered here after all, as a literal "24/7 / MARKETS COVERED".
- * It claimed a service that never stops over a build that folds one window and refreshes in
- * batches, so it now prints the window the board is ranked over, which the manifest knows.
- * @param {HTMLElement | null} host @param {Awaited<ReturnType<typeof meta>>} metaData
+ * "Built for signal": addresses seen, addresses that qualified, tokens tracked, and the window
+ * the board is ranked over. The frame's four cells are "[X]M+ wallets indexed", "[X]M+ trades
+ * tracked", "<[X]s data freshness" and "24/7 markets covered" — three unresolved placeholders
+ * and an uptime, so every cell here is a figure the build can actually answer with instead.
+ * @param {HTMLElement | null} host @param {Awaited<ReturnType<typeof board>>} boardData
+ * @param {Awaited<ReturnType<typeof meta>>} metaData
  * @param {Awaited<ReturnType<typeof assets>>} assetList
  */
-function renderSignalStats(host, metaData, assetList) {
+function renderSignalStats(host, boardData, metaData, assetList) {
   if (!host) return;
+  // Same source as the hero strip and the leaderboard's caveat: the window's own coverage.
+  const c = boardData.coverage;
   const items = [
-    { value: Number(metaData.addressesSeen).toLocaleString('en-US'), label: 'ADDRESSES SEEN' },
-    { value: Number(metaData.addressesQualifying).toLocaleString('en-US'), label: 'CLOSED A ROUND-TRIP' },
+    { value: Number(c?.addresses_seen ?? metaData.addressesSeen).toLocaleString('en-US'),
+      label: 'ADDRESSES SEEN' },
+    { value: Number(c?.addresses_qualifying ?? metaData.addressesQualifying).toLocaleString('en-US'),
+      label: 'CLOSED A ROUND-TRIP' },
     { value: String(assetList.length), label: 'TOKENS TRACKED' },
-    // Was a typed "24/7 · MARKETS COVERED": an always-on claim over a build that folds a
-    // window and refreshes in batches, and the one cell on the strip with nothing behind it.
-    // The window the board is ranked over is a real fact the manifest already carries.
+    // The frame's "24/7 / MARKETS COVERED" is an uptime, and nothing measures it. The window
+    // the board is ranked over is a real fact the manifest already carries.
     { value: String(metaData.windowLabel), label: 'RANKING WINDOW' },
   ];
   host.replaceChildren(...items.map((s, i) => {
@@ -271,7 +286,7 @@ function initReveal() {
   // Reduced motion (or no observer support): never arm the hide rule at all, so nothing is
   // ever at opacity 0 for even one frame — the safest form of "immediately visible".
   if (globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-    || !('IntersectionObserver' in window)) return;
+    || !('IntersectionObserver' in globalThis)) return;
 
   // Whatever is already on screen (or close to it) reveals BEFORE `js-reveal` goes on the
   // document, so enabling the hide-then-animate rule next paint never hides something the
@@ -308,7 +323,7 @@ async function main() {
   renderPodium(el('hero-podium'), boardData.rows);
   renderHeroTable(el('hero-table'), boardData.rows);
   renderExplore(el('explore-mini'), boardData.rows[0], assetList);
-  renderSignalStats(el('signal-stats'), metaData, assetList);
+  renderSignalStats(el('signal-stats'), boardData, metaData, assetList);
   renderMarkets(assetList, boardData.rows);
 
   initReveal();

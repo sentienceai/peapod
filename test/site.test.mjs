@@ -147,41 +147,61 @@ test('lib/data.js is the only module that knows a URL', () => {
   assert.deepEqual(offenders, [], `these bypass the seam:\n  ${offenders.join('\n  ')}`);
 });
 
-test('nothing in the frontend can ask a wallet for anything', () => {
-  // Until execution exists there is nothing a provider call could be for. When it does, this
-  // test is the line in the diff where that changes — deliberately, not by accident.
+test('the wallet asks for addresses and nothing else', async () => {
+  /*
+   * CONNECT ONLY. The control asks a wallet for its addresses; it never asks for a
+   * signature, a transaction or a chain switch. There is nothing here to authorise, and a
+   * signature request is the one prompt that makes a read-only site look like it wants
+   * something. This is asserted on the SOURCE rather than on a rendered button, because a
+   * render test passes happily while a second method sits in a branch nobody clicked.
+   */
   /** @type {string[]} */
   const offenders = [];
   for (const [file, src] of Object.entries(SRC)) {
-    for (const pattern of [/\beth_\w+/, /window\.ethereum|globalThis\.ethereum/, /personal_sign|signTypedData/]) {
-      if (pattern.test(src)) offenders.push(`${file}: ${pattern}`);
+    for (const m of src.matchAll(/'(eth_[a-zA-Z]+|personal_sign|wallet_[a-zA-Z]+)'/g)) {
+      if (m[1] !== 'eth_requestAccounts') offenders.push(`${file}: ${m[1]}`);
     }
   }
-  assert.deepEqual(offenders, [], `these reach for a wallet:\n  ${offenders.join('\n  ')}`);
+  assert.deepEqual(offenders, [], `these ask a wallet for more than addresses:\n  ${offenders.join('\n  ')}`);
+  // Not vacuous: the one permission the site does use is still there, and it is the only one.
+  assert.match(SRC['lib/wallet.js'], /eth_requestAccounts/);
+
+  // A dismissed prompt is a refusal, not a connection.
+  const { connect } = await import('../web/lib/wallet.js');
+  await assert.rejects(() => connect({ async request() { return []; } }), /no account authorised/);
+  await assert.rejects(() => connect({ async request() { return ['not-an-address']; } }), /no account authorised/);
+  await assert.rejects(() => connect(null), /no wallet provider/);
 });
 
-test('no page claims a thing this build cannot do', () => {
+test('no page that shows data claims a thing this build cannot do', () => {
   /*
-   * THE CLAIMS THE FRAMES CAME WITH. The reference screens were drawn for a product with
-   * execution: "Your portfolio, on autopilot", "Every trade they make is copied to your
-   * wallet in real time", "Always-on execution", "Live from Robinhood Chain", a Connect
-   * wallet button. None of it is true here — nothing places, copies or simulates a trade,
-   * and the figures are a build of the swap tape, not a live feed.
+   * TWO DIFFERENT KINDS OF PAGE, and the rule is not the same for both.
    *
-   * The phrases below are the ones that were actually on these pages and had to go. A page
-   * may still SAY the feature is coming; it may not describe it in the present tense.
+   * The APP pages — the board, the copy grid, markets, the asset page and the dialogs —
+   * describe data that is on the screen. A sentence there is read as a statement about the
+   * figures beside it, so "copied to your wallet in real time" or "live from Robinhood
+   * Chain" is a claim about what this build does, and it is false.
+   *
+   * The LANDING page sells a product that is being built. Copy trading is coming, and the
+   * page says so in the frames' own voice; what it may not do is put a thing that does not
+   * happen into the present tense, or state a figure nothing measured. That second half is
+   * covered by the test below it, which is the one that actually holds.
    */
   const banned = [
-    /on autopilot/i, /copied to your wallet/i, /always-on execution/i,
-    /live from robinhood/i, /mirrors within seconds/i, /in real time/i,
-    /\bconnect wallet\b/i, /copy score.{0,12}\/\s*100/i,
+    // Not "account value" or "Sharpe": those two words appear on the app pages as the
+    // NAMES of slots saying the figure needs the transfer index, which is the opposite of
+    // claiming them.
+    /live from robinhood/i, /copied to your wallet/i, /mirrors within seconds/i,
+    /copy score.{0,12}\/\s*100/i, /on autopilot/i,
   ];
+  const appPages = Object.entries(SRC).filter(([f]) =>
+    f !== 'index.html' && f !== 'lib/landing.js');
   /** @type {string[]} */
   const found = [];
-  for (const [file, src] of Object.entries(SRC)) {
-    // Comments are stripped first: several of these phrases survive in the source as the
-    // note saying what the claim used to be and why it could not stay, which is the record
-    // of the decision rather than a thing the page says to anybody.
+  for (const [file, src] of appPages) {
+    // Comments are stripped: several of these phrases survive as the note saying what the
+    // claim used to be and why it could not stay, which is the record of the decision
+    // rather than a thing the page says to anybody.
     const code = src.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/.*$/gm, ' ')
       .replace(/<!--[\s\S]*?-->/g, ' ');
     for (const re of banned) {
@@ -189,7 +209,34 @@ test('no page claims a thing this build cannot do', () => {
       if (hit) found.push(`${file}: "${hit[0]}"`);
     }
   }
-  assert.deepEqual(found, [], `claims this build cannot keep:\n  ${found.join('\n  ')}`);
+  assert.deepEqual(found, [], `claims on a page that shows data:\n  ${found.join('\n  ')}`);
+});
+
+test('the landing page sells what is coming without measuring what it cannot', () => {
+  /*
+   * The landing page may say copy trading is coming, in the frames' voice. The line it may
+   * not cross is a FIGURE: a volume, a user count, a latency, an uptime, a price, an API
+   * statistic — anything shaped like a measurement that nothing measured. Every number on
+   * that page has to come from lib/data.js at runtime, which is why landing.js computes its
+   * stats and index.html carries almost none.
+   */
+  const html = SRC['index.html'].replace(/<!--[\s\S]*?-->/g, ' ');
+  // Text nodes only: class names, viewBox numbers and inline SVG path data are not claims.
+  const text = html.replace(/<(script|style|svg)[\s\S]*?<\/\1>/g, ' ')
+    .replace(/<[^>]+>/g, ' ').replace(/&[a-z]+;/g, ' ');
+  /*
+   * Figure-shaped things, not sentences: a dollar amount, or a count with a unit that only
+   * a measurement would carry. Ordinals ("01 Stocks"), durations in the copy ("24-hour
+   * volume") and the window itself are not claims about what this product has done.
+   */
+  /** @type {string[]} */
+  const figures = [];
+  for (const m of text.matchAll(/\$\s?\d[\d,.]*\s?[MBK]?/g)) figures.push(m[0].trim());
+  for (const m of text.matchAll(/\b\d[\d,.]*\s*(ms\b|users?\b|customers?\b|copied trades?\b|wallets copied\b|uptime)/gi)) {
+    figures.push(m[0].trim());
+  }
+  assert.deepEqual(figures, [],
+    `figures on the landing page that nothing measured:\n  ${figures.join('\n  ')}`);
 });
 
 test('the sample mark is per figure, not per page', async () => {

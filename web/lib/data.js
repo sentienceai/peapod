@@ -27,6 +27,7 @@
  */
 
 import * as mock from './mock.js';
+import { setTokenLogos } from './token.js';
 
 /**
  * Where every figure on the site comes from.
@@ -84,6 +85,10 @@ const scopeOf = (id) => (id === 'stocks' ? 'rwa' : id === 'memecoins' ? 'pons' :
 export async function meta() {
   if (mode() === 'mock') return { ...mock.META, sample: true, sampleFields: ['*'] };
   const m = await get('/api/manifest');
+  // The token logos, loaded once and shared. A page that renders a tile before the map
+  // exists draws initials and never revisits them, so the load is part of "the page has
+  // what it needs to paint" rather than something each page remembers to do.
+  await tokenLogos();
   const windows = (m.windows ?? []).map((/** @type {any} */ w) => ({
     id: w.window, label: String(w.label ?? w.window).toUpperCase(),
   }));
@@ -324,7 +329,13 @@ let logoMap = /** @type {Promise<Record<string, string>> | null} */ (null);
 export function tokenLogos() {
   if (mode() === 'mock') return Promise.resolve({});
   if (!logoMap) {
-    logoMap = get('/api/leaderboard/tokens/tokens').catch(() => ({}));
+    // Primed into token.js as soon as it lands, so assetTile() — which is synchronous, and
+    // has to be, because it is called from inside render loops — always has the map by the
+    // time a page paints. Every page awaits meta() before its first render, and meta()
+    // awaits this; that is the whole of the ordering guarantee.
+    logoMap = get('/api/leaderboard/tokens/tokens')
+      .then((map) => { setTokenLogos(map); return map; })
+      .catch(() => ({}));
   }
   return logoMap;
 }

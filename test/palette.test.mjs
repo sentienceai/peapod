@@ -32,7 +32,7 @@ const web = new URL('../web/', import.meta.url);
 const read = (/** @type {string} */ p) => readFile(new URL(p, web), 'utf8');
 
 const TOKENS = await read('styles/tokens.css');
-const SHEETS = ['base', 'board', 'copy', 'asset', 'landing', 'profile', 'search'];
+const SHEETS = ['base', 'board', 'copy', 'asset', 'landing', 'profile', 'search', 'markets'];
 /** @type {Record<string, string>} */
 const CSS = Object.fromEntries(await Promise.all(SHEETS.map(async (n) => [n, await read(`styles/${n}.css`)])));
 const PAL = palette([TOKENS], SHEETS.map((n) => CSS[n]));

@@ -311,3 +311,18 @@ input::placeholder { color: var(--placeholder); }
    a 32px square and the tile is 22, so without this it spills over the text beside it. */
 .asset-tile { position: relative; overflow: hidden; }
 .asset-tile img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+
+/* The connect control. Connected, it is the address itself — the quietest way to say the
+   button did something, and the thing you would click next. */
+.wallet-host { display: flex; align-items: center; }
+.wallet-btn { white-space: nowrap; }
+.wallet-btn--connected {
+  font-family: var(--font-mono); font-size: 13px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--fg);
+}
+.wallet-btn--connected:hover { border-color: var(--line-strong); }
+.wallet-note {
+  height: 38px; padding: 0 12px; display: inline-flex; align-items: center;
+  border: 1px solid var(--line); border-radius: var(--radius-button);
+  background: var(--surface); color: var(--muted); font-size: 13px; white-space: nowrap;
+}
