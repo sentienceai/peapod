@@ -305,11 +305,14 @@ table.board tbody tr.is-first td:first-child { color: var(--rank-1); }
 .modal-close:hover { color: var(--text); border-color: var(--text); }
 .modal-close:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
-.modal-body { display: grid; grid-template-columns: 268px minmax(0, 1fr); gap: 0; }
+/* 237px, measured: the reference's rail is narrower than ours was and the 31px goes to
+   the pane, where a seven-column table was the thing actually short of room. */
+.modal-body { display: grid; grid-template-columns: 237px minmax(0, 1fr); gap: 0; }
 .rail { border-right: 1px solid var(--line); padding: var(--s-4); display: flex; flex-direction: column; gap: var(--s-4); }
 .rail-id { display: flex; align-items: center; gap: var(--s-2); }
 .rail-id .avatar { width: 36px; height: 36px; font-size: var(--t-small); letter-spacing: var(--ls-small); }
-:where(.rail-id) b { display: block; color: var(--text); font-size: var(--t-num); letter-spacing: var(--ls-num); font-weight: var(--w-medium); }
+:where(.rail-id) b { display: block; color: var(--text); font-size: var(--t-body);
+  letter-spacing: var(--ls-body); font-weight: var(--w-regular); white-space: nowrap; }
 /* The full address, which is 42 characters and has never fitted the rail's 268px on one
    line — it was running out under the divider. It wraps rather than truncates: the short
    form is already on the line above, so the only reason to print this one is that all of
@@ -342,11 +345,32 @@ table.board tbody tr.is-first td:first-child { color: var(--rank-1); }
 :where(.scope-note) b { color: var(--text-body); font-weight: var(--w-medium); }
 
 .pane { padding: var(--s-4); display: flex; flex-direction: column; gap: var(--s-3); }
-.metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-3); }
-.metric { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); padding: var(--s-3); }
-.metric h5 { margin: 0 0 var(--s-2); font-size: var(--t-small); letter-spacing: var(--ls-small); font-weight: var(--w-regular); color: var(--text-muted); }
-.metric .big { font-size: var(--t-lead); letter-spacing: var(--ls-lead); font-weight: var(--w-semi); }
-.metric .foot { margin-top: var(--s-1); font-size: var(--t-small); letter-spacing: var(--ls-small); color: var(--text-muted); }
+
+/* MEASURED OFF THE REFERENCE DIALOG, at 2x on a ~1611px viewport: four panels 335.5px
+   wide with a 6px gutter between them, each opening with a header band 25.5px tall
+   separated by a rule. The tight gutter is the point — it makes the four read as one
+   instrument rather than four cards, which is why their KPI row scans as a single line. */
+.metric-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.metric { background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--r-card); padding: 0; display: flex; flex-direction: column; }
+.metric h5 { margin: 0; height: 26px; display: flex; align-items: center;
+  padding: 0 var(--s-2); border-bottom: 1px solid var(--line);
+  font-size: var(--t-micro); letter-spacing: var(--ls-micro);
+  font-weight: var(--w-regular); color: var(--text-muted); }
+.metric > :not(h5) { margin-inline: var(--s-2); }
+.metric .big { margin-top: var(--s-2); font-size: var(--t-lead); letter-spacing: var(--ls-lead);
+  font-weight: var(--w-regular); }
+.metric .foot { margin-top: var(--s-1); margin-bottom: var(--s-2);
+  font-size: var(--t-micro); letter-spacing: var(--ls-micro); color: var(--text-muted);
+  line-height: 1.45; }
+
+/* The quote-asset split. Two segments, told apart by brightness and by the tickers in the
+   line under them — never by the sign colours, which on this page mean up and down. */
+.mix { display: flex; height: 6px; margin-top: var(--s-2); border-radius: 3px;
+  overflow: hidden; background: var(--raised); }
+.mix i { display: block; height: 100%; }
+.mix-a { background: var(--text); }
+.mix-b { background: var(--text-muted); }
 
 /* One square per round-trip: filled is a win, hollow a loss. Colour is not the only cue. */
 .streak { display: flex; flex-wrap: wrap; gap: 3px; margin: var(--s-1) 0; }
@@ -364,12 +388,29 @@ table.board tbody tr.is-first td:first-child { color: var(--rank-1); }
 .chartcard-head { display: flex; align-items: baseline; gap: var(--s-3); margin-bottom: var(--s-2); }
 .chartcard-head h5 { margin: 0; font-size: var(--t-small); letter-spacing: var(--ls-small); font-weight: var(--w-regular); color: var(--text-muted); }
 .chartcard-head strong { font-size: var(--t-lead); letter-spacing: var(--ls-lead); font-weight: var(--w-semi); }
-.chart-stage { position: relative; }
+/* Room reserved for the axis labels: the values sit outside the plot on the right, the
+   dates under it, exactly as the reference places them. */
+.chart-stage { position: relative; padding-right: 56px; padding-bottom: 18px; }
 .chart { width: 100%; height: 220px; display: block; }
+.chart-y, .chart-x { position: absolute; font-size: 10px; letter-spacing: 0;
+  color: var(--text-muted); font-variant-numeric: tabular-nums; pointer-events: none; }
+.chart-y { right: 0; top: 0; width: 52px; height: 220px; }
+.chart-y span { position: absolute; right: 0; transform: translateY(-50%); white-space: nowrap; }
+.chart-x { left: 0; right: 56px; bottom: 0; height: 14px; }
+.chart-x span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.chart-x span:first-child { transform: none; }
+.chart-x span:last-child { transform: translateX(-100%); }
+
+/* The count beside a tab label. */
+.tab-n { margin-left: 5px; padding: 0 5px; border-radius: var(--r-pill);
+  background: var(--raised); border: 1px solid var(--line);
+  font-size: 10px; letter-spacing: 0; color: var(--text-muted);
+  font-variant-numeric: tabular-nums; }
+.subtabs button[aria-selected='true'] .tab-n { color: var(--text); }
 /* The tooltip sits on a card that is now the same value as the dialog behind it, so its
    edge is what separates it: the divider grey rather than the card-border grey. */
 .tip {
-  position: absolute; pointer-events: none; background: var(--bg);
+  position: absolute; z-index: 2; pointer-events: none; background: var(--bg);
   border: 1px solid var(--line-soft); border-radius: var(--r-card); padding: var(--s-1) var(--s-2);
   font-size: var(--t-small); letter-spacing: var(--ls-small); white-space: nowrap; transform: translate(-50%, -120%);
 }
@@ -382,13 +423,22 @@ table.board tbody tr.is-first td:first-child { color: var(--rank-1); }
 .subtabs button[aria-selected='true'] { color: var(--text); border-bottom-color: var(--text);
   transition: color var(--motion) var(--ease); }
 
-table.mini { width: 100%; border-collapse: collapse; font-size: var(--t-small); letter-spacing: var(--ls-small); }
-table.mini th { text-align: right; font-size: var(--t-micro); letter-spacing: var(--ls-micro); font-weight: var(--w-medium); color: var(--text-muted); padding: var(--s-1) var(--s-2) var(--s-1) 0; border-bottom: 1px solid var(--line-soft); }
+/* MEASURED: the reference's positions table runs a 25.5px row pitch — 51 device px,
+   consistent across seven consecutive rules. That is a log, not prose, so it takes the
+   density and the 12px type that density needs. The leaderboard's 44px rows are
+   untouched: that table IS the page. */
+table.mini { width: 100%; border-collapse: collapse;
+  font-size: var(--t-micro); letter-spacing: var(--ls-micro); }
+table.mini th { text-align: right; height: 26px; font-size: var(--t-micro);
+  letter-spacing: var(--ls-micro); font-weight: var(--w-regular); color: var(--text-muted);
+  padding: 0 var(--s-2) 0 0; border-bottom: 1px solid var(--line-soft); }
 table.mini th:first-child { text-align: left; }
-table.mini td { text-align: right; padding: var(--s-1) var(--s-2) var(--s-1) 0; border-bottom: 1px solid var(--line-soft); white-space: nowrap; }
+table.mini td { text-align: right; height: 26px; padding: 0 var(--s-2) 0 0;
+  border-bottom: 1px solid var(--line-soft); white-space: nowrap; }
 table.mini td:first-child { text-align: left; }
-.scroller { max-height: 300px; overflow-y: auto; }
+.scroller { max-height: 338px; overflow-y: auto; }   /* 13 rows at the measured pitch */
 
+@media (max-width: 1024px) { .metric-grid { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 768px) {
   .modal-body { grid-template-columns: 1fr; }
   .rail { border-right: 0; border-bottom: 1px solid var(--line); }
@@ -549,8 +599,14 @@ table.mini td:first-child { text-align: left; }
 .tcard-head { flex: none; display: flex; align-items: flex-start; gap: var(--s-2);
   padding: 13px var(--s-2) 0; min-height: 61px; }
 .tcard-who { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: var(--s-base); }
-.tcard-addr { display: flex; align-items: center; }
-:where(.tcard-addr) b { font-weight: var(--w-medium); font-size: var(--t-num); letter-spacing: var(--ls-num); color: var(--text); }
+/* One line, always. The middle-elided address still wrapped at its own ellipsis when the
+   chip row beside it was wide, which pushed every figure on that card down and broke the
+   grid's shared baselines — the reference's cards hold their address on one line and let
+   it truncate. */
+.tcard-addr { display: flex; align-items: center; min-width: 0; }
+:where(.tcard-addr) b { font-weight: var(--w-regular); font-size: var(--t-num);
+  letter-spacing: var(--ls-num); color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tcard-toks { display: flex; gap: var(--s-base); flex-wrap: wrap; }
 .tcard-ago { font-size: var(--t-micro); letter-spacing: var(--ls-micro); color: var(--text-muted); white-space: nowrap; }
 
@@ -598,23 +654,48 @@ table.mini td:first-child { text-align: left; }
  * The bar separates the way everything else here separates: a border and a small lift. The
  * verdict is carried by the words that were always in it, in the neutral ladder. */
 .tcard-bar.v-above, .tcard-bar.v-below { background: var(--raised); }
-.ev { flex: 1; min-width: 0; display: grid; align-items: center;
-  grid-template-columns: auto minmax(28px, 1fr); gap: var(--s-1); }
+/* THE BOTTOM BAR IS THE ONE PLACE PARITY COULD IMPORT A CLAIM WE DO NOT MAKE.
+ *
+ * The reference puts a rating here: "95 /100" beside a row of filled ticks. It is the
+ * same slot, the same size, and the opposite kind of statement — theirs is a score on a
+ * scale where more is better, ours is a hypothesis test with no maximum and no best.
+ * Borrow the shape and you borrow the claim.
+ *
+ * Four things keep them apart, and a test pins each:
+ *   - the figure always carries its unit, "55.7% win", never a bare number and never /100
+ *   - the track is never filled from the left. It draws a REGION — where a coin-flipper
+ *     with this many closes lands — and a mark for the observed rate
+ *   - the region is labelled in words underneath, so the shading is read as the null
+ *     rather than as a target
+ *   - a tick sits at 50%, so the axis reads as a win rate and not as a score out of 100
+ * Stacked, not side by side, because the label under the track is what does most of that
+ * work and it needs the full width of the bar.
+ */
+.ev { flex: 1; min-width: 0; display: grid; align-content: center; gap: 2px; }
 .ev-head { display: flex; align-items: baseline; gap: 3px; white-space: nowrap; }
 :where(.ev-head) b { font-size: 16px; font-weight: var(--w-semi); color: var(--text); }
 .ev-of, .ev-n { font-size: var(--t-micro); letter-spacing: var(--ls-micro); color: var(--text-muted); }
 .ev-track { position: relative; height: 6px; border-radius: 3px;
-  background: rgba(255, 255, 255, 0.06); overflow: hidden; }
-/* Where a coin-flipper with this many closes lands. */
-.ev-band { position: absolute; top: 0; bottom: 0; background: rgba(255, 255, 255, 0.12); }
-.ev-mark { position: absolute; top: -2px; width: 2px; height: 10px; margin-left: -1px;
+  background: rgba(255, 255, 255, 0.06); }
+/* Where a coin-flipper with this many closes lands. Edged, so it reads as a region with
+   two boundaries rather than as a bar that has been filled up to somewhere. */
+.ev-band { position: absolute; top: 0; bottom: 0; background: rgba(255, 255, 255, 0.14);
+  border-left: 1px solid rgba(255, 255, 255, 0.4);
+  border-right: 1px solid rgba(255, 255, 255, 0.4); }
+/* The null itself, at 50%. Without it the left end of the track looks like zero and the
+   right end looks like the goal. */
+.ev-null { position: absolute; left: 50%; top: -1px; bottom: -1px; width: 1px;
+  margin-left: -0.5px; background: rgba(255, 255, 255, 0.25); }
+.ev-mark { position: absolute; top: -3px; width: 2px; height: 12px; margin-left: -1px;
   background: var(--text); border-radius: 1px; }
 /* The mark's channel is WHERE IT SITS — inside the chance band or outside it — which is
    the whole point of drawing the band behind it. Colour would be a second, weaker copy of
    that, in a hue this page has already spent. */
 .v-above .ev-mark, .v-below .ev-mark { background: var(--text); }
-.ev-foot { display: none; }
-.ev-label { font-size: var(--t-micro); letter-spacing: var(--ls-micro); color: var(--text-body); }
+.ev-foot { display: flex; gap: 5px; align-items: baseline; min-width: 0; }
+.ev-label, .ev-null-label { font-size: 10px; letter-spacing: 0; color: var(--text-muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ev-label { color: var(--text-body); }
 /* On a green panel the verdict is carried by the panel; the label goes light. */
 .v-above .ev-label, .v-below .ev-label { color: var(--text); }
 .v-above .ev-n, .v-below .ev-n, .v-above .ev-of, .v-below .ev-of { color: var(--text-body); }

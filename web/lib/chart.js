@@ -87,5 +87,8 @@ export function areaChart(series, opts = {}) {
     return { point: series[best], x: px(xs[best]) / width };
   };
   const clear = () => cursor.setAttribute('opacity', '0');
-  return { svg, at, clear };
+  // The scale, handed back so the axis labels can be placed in HTML rather than in this
+  // SVG. The svg is drawn with preserveAspectRatio="none" so it can stretch to any width —
+  // which stretches text with it. Labels belong outside the stretched box.
+  return { svg, at, clear, scale: { lo, hi, x0, x1, pad, height } };
 }

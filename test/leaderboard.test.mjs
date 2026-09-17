@@ -24,6 +24,17 @@ const index = storeIndex();
 const defaultView = index.views.find((/** @type {any} */ v) => v.scope === 'all'
   && v.window === index.windows.at(-1).window);
 
+/**
+ * A tab's label without its count pill. The tab bar carries the row count beside the
+ * label now, as the reference does, so a tab's textContent is "Round-trips200" and the
+ * label is the part that is not the pill.
+ * @param {any} b
+ */
+const tabLabel = (b) => {
+  const pill = b.byClass('tab-n')[0];
+  return pill ? b.textContent.replace(pill.textContent, '') : b.textContent;
+};
+
 test('the coverage caveat states scope before any ranking', () => {
   const text = get('caveat').textContent;
   const c = defaultView.coverage;
@@ -194,13 +205,21 @@ test('the win/loss strip is one square per round-trip and reads without colour',
 });
 
 test('the metric grid has four cards and none needs the transfer index', () => {
+  // Four, matching the reference's KPI row. Theirs is Performance, Leverage, Margin Usage
+  // and Direction Bias; three of those are perps-only and have no honest occupant here, so
+  // the slots take what this data actually answers. The fourth used to be "Holding", which
+  // was the rail's Timing block repeated one column to the left — matching the row to four
+  // is what made that visible.
   const cards = get('metrics').byClass('metric');
   assert.equal(cards.length, 4, 'the grid lost or gained a card');
   const text = get('metrics').textContent.toLowerCase();
   assert.match(text, /performance/);
   assert.match(text, /matched flow/);
   assert.match(text, /out of scope/);
-  assert.match(text, /holding/);
+  assert.match(text, /quote asset/);
+  assert.ok(!/holding/.test(text), 'Holding is back in the grid and the rail still has it');
+  // And the hold times are still on the page, in the one place that now carries them.
+  assert.match(get('rail').textContent, /Median hold/);
 });
 
 test('the out-of-scope note states the amount and refuses to estimate it', () => {
@@ -282,8 +301,15 @@ test('the tab bar carries only tabs we can fill', async () => {
   const top = view('all', '7d').rows[0];
   await openDetail(top.address);
 
-  const labels = get('subtabs').byTag('button').map((b) => b.textContent);
+  const labels = get('subtabs').byTag('button').map(tabLabel);
   assert.deepEqual(labels, ['Round-trips', 'Trades', 'Tokens', 'Performance']);
+  // Each tab carries its row count, as the reference's POSITIONS 10 / ORDERS 1 does. On a
+  // page whose claim rests on how many closes an address has, that number belongs where it
+  // is read rather than one click away.
+  const counts = get('subtabs').byTag('button')
+    .map((/** @type {any} */ b) => b.byClass('tab-n')[0]?.textContent);
+  assert.ok(counts.filter(Boolean).length >= 3, `tabs carry no counts: ${counts}`);
+  for (const c of counts.filter(Boolean)) assert.match(c, /^\d+$/, `count is not a number: ${c}`);
   // Positions, Balances and Transfers need the transfer index. They are not stubbed and
   // not greyed out — a disabled tab still advertises a feature that does not exist.
   for (const absent of ['Positions', 'Balances', 'Transfers', 'Orders', 'Fills', 'TWAP']) {
@@ -309,7 +335,7 @@ test('the performance tab aggregates every round-trip, not the capped list', asy
 
   await openDetail(heavy.address);
   const buttons = get('subtabs').byTag('button');
-  const labels = buttons.map((/** @type {any} */ b) => b.textContent);
+  const labels = buttons.map(tabLabel);
   buttons[labels.indexOf('Performance')].onclick?.(/** @type {any} */ ({}));
 
   // Daily totals are folded over EVERY round-trip at build time. Summing the shipped
@@ -419,7 +445,7 @@ test('token logos reach the leaderboard column and every tab that names a token'
   const top = view('all', '7d').rows[0];
   await openDetail(top.address);
   const buttons = get('subtabs').byTag('button');
-  const labels = buttons.map((/** @type {any} */ b) => b.textContent);
+  const labels = buttons.map(tabLabel);
   for (const label of ['Round-trips', 'Trades', 'Tokens']) {
     buttons[labels.indexOf(label)].onclick?.(/** @type {any} */ ({}));
     const rendered = get('subtable').descendants();

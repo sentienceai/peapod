@@ -156,12 +156,17 @@ def fold(trades: pl.DataFrame):
     changes = defaultdict(int)
     first_seen = {}
     last_seen = {}
+    # Volume by the asset the trade was quoted in. The fold already carries the column and
+    # threw it away; the detail view has no honest answer to "what does this address
+    # actually trade against" without it.
+    by_quote = defaultdict(lambda: defaultdict(float))
 
-    for addr, tick, cat, qty, quote_delta, ts in zip(
+    for addr, tick, cat, qty, quote_delta, ts, quote in zip(
             trades["addr"], trades["label"], trades["cat"], trades["qty"].to_numpy(),
-            trades["usd"].to_numpy(), trades["ts"].to_numpy()):
+            trades["usd"].to_numpy(), trades["ts"].to_numpy(), trades["quote"]):
         notional = abs(quote_delta)
         total[addr] += notional
+        by_quote[addr][quote] += notional
         tokens[addr].add(tick)
         changes[addr] += 1
         moves[addr].append({"ts": int(ts), "token": tick, "side": "buy" if qty > 0 else "sell",
@@ -204,7 +209,7 @@ def fold(trades: pl.DataFrame):
             "trips": trips, "tokens": tokens, "unmatched": unmatched, "series": series,
             "detail": detail, "holds": holds, "buys": buys, "sells": sells,
             "changes": changes, "first": first_seen, "last": last_seen, "moves": moves,
-            "universes": universes}
+            "universes": universes, "by_quote": by_quote}
 
 
 def spark(points, lo, hi, n=SPARK_POINTS):
@@ -399,6 +404,13 @@ def write_address(addr: str, state, lo: int, hi: int, out: Path | None, provenan
             "first_ts": state["first"].get(addr), "last_ts": state["last"].get(addr),
             "percentile": percentile_of(state["realized"][addr], ranked)
             if (ranked and state["trips"][addr] > 0) else None,
+            # Which asset this address's volume is priced in. Not a direction and not a
+            # rating — ETH-quoted flow is converted at the trade's own timestamp, so a
+            # reader is entitled to know how much of a figure went through that step.
+            "quote_mix": [{"quote": q, "volume": v,
+                           "pct": v / total_vol * 100 if total_vol else 0}
+                          for q, v in sorted(state["by_quote"].get(addr, {}).items(),
+                                             key=lambda kv: -kv[1])],
         },
         "labels": [dict(l, earned=l["id"] in earned) for l in LABELS],
         "sequence": [1 if t["realized"] > 0 else 0 for t in trips][-120:],

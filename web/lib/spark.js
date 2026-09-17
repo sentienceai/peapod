@@ -50,6 +50,22 @@ export function sparkline(values, opts = {}) {
   const uid = `s${(seq += 1)}`;
 
   const defs = el('defs', {});
+  // A DIAGONAL HATCH UNDER THE LINE, as the reference draws it. It is not decoration: a
+  // flat fill on a dark ground reads as a solid block and the line stops being the figure,
+  // where a hatch stays legible as "area under this line" at any size. preserveAspectRatio
+  // is none on this svg, so the pattern is declared in userSpace and the stripes stretch
+  // with the box exactly as the fill does.
+  const hatch = el('pattern', { id: `${uid}-h`, width: 4, height: 4,
+    patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' });
+  hatch.append(el('rect', { x: 0, y: 0, width: 4, height: 4, fill: 'var(--up-fill)' }));
+  hatch.append(el('rect', { x: 0, y: 0, width: 1, height: 4,
+    fill: 'var(--up)', opacity: 0.22 }));
+  const hatchDown = el('pattern', { id: `${uid}-hd`, width: 4, height: 4,
+    patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' });
+  hatchDown.append(el('rect', { x: 0, y: 0, width: 4, height: 4, fill: 'var(--down-fill)' }));
+  hatchDown.append(el('rect', { x: 0, y: 0, width: 1, height: 4,
+    fill: 'var(--down)', opacity: 0.22 }));
+  defs.append(hatch, hatchDown);
   const above = el('clipPath', { id: `${uid}-a` });
   above.append(el('rect', { x: 0, y: 0, width, height: Math.max(base, 0) }));
   const below = el('clipPath', { id: `${uid}-b` });
@@ -57,11 +73,17 @@ export function sparkline(values, opts = {}) {
   defs.append(above, below);
   svg.append(defs);
 
-  svg.append(el('path', { d: area, fill: 'var(--up-fill)', 'clip-path': `url(#${uid}-a)` }));
-  svg.append(el('path', { d: area, fill: 'var(--down-fill)', 'clip-path': `url(#${uid}-b)` }));
+  svg.append(el('path', { d: area, fill: `url(#${uid}-h)`, 'clip-path': `url(#${uid}-a)` }));
+  svg.append(el('path', { d: area, fill: `url(#${uid}-hd)`, 'clip-path': `url(#${uid}-b)` }));
   svg.append(el('path', { d: line, fill: 'none', 'stroke-width': 1.5,
     stroke: 'var(--up)', 'clip-path': `url(#${uid}-a)` }));
   svg.append(el('path', { d: line, fill: 'none', 'stroke-width': 1.5,
     stroke: 'var(--down)', 'clip-path': `url(#${uid}-b)` }));
+
+  // The endpoint, marked. The reference dots the last value on every card, and it is the
+  // one point on a sparkline a reader is actually looking for: where it ended up.
+  const last = values[values.length - 1];
+  svg.append(el('circle', { cx: width - 2, cy: y(last), r: 2.5,
+    fill: last < 0 ? 'var(--down)' : 'var(--up)' }));
   return svg;
 }

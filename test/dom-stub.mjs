@@ -85,6 +85,21 @@ class Node {
     }
   }
 
+  /**
+   * Standard DOM, and the sixth method this stub has turned out not to have. Each one has
+   * been found the same way — by real page code calling it and the test reporting "not a
+   * function" rather than reporting on the page. A stub that only implements what the page
+   * happened to use yesterday fails on whatever it uses tomorrow.
+   * @param {Node|string} node @param {Node|null} ref
+   */
+  insertBefore(node, ref) {
+    if (typeof node !== 'string') node.parent = this;
+    const at = ref ? this.children.indexOf(ref) : -1;
+    if (at < 0) this.children.push(node);
+    else this.children.splice(at, 0, node);
+    return node;
+  }
+
   /** @param {(Node|string)[]} nodes */
   replaceChildren(...nodes) {
     this.children = [];

@@ -178,13 +178,20 @@ function evidenceBar(r) {
   const band = node('i', 'ev-band');
   band.style.left = `${b.lo * 100}%`;
   band.style.width = `${Math.max(0, (b.hi - b.lo) * 100)}%`;
+  // The null, drawn. Without it the track's left end reads as zero and its right end as
+  // the goal, which is the reference's rating idiom and the opposite of this bar.
+  const nul = node('i', 'ev-null');
   const mark = node('i', 'ev-mark');
   mark.style.left = `${b.rate * 100}%`;
-  track.append(band, mark);
+  track.append(band, nul, mark);
   left.append(track);
 
+  // The shaded region named in words. This is the line that stops the bar being read as a
+  // score: it says what the shading IS, and the range it names has no maximum in it.
   const foot = node('div', 'ev-foot');
   foot.append(node('span', 'ev-label', b.label));
+  foot.append(node('span', 'ev-null-label',
+    `· chance ${(b.lo * 100).toFixed(0)}–${(b.hi * 100).toFixed(0)}% over ${r.round_trips}`));
   left.append(foot);
 
   const cta = node('button', 'ev-cta', 'Trades');

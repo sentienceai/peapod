@@ -180,12 +180,89 @@ function renderMetrics(d) {
   scope.append(node('div', 'foot', 'Sold with no on-chain buy. Not counted, not estimated.'));
   grid.append(scope);
 
-  const timing = node('div', 'metric');
-  timing.append(node('h5', undefined, 'Holding'));
-  timing.append(node('div', 'big', duration(s.median_hold_s)));
-  timing.append(node('div', 'foot',
-    `median · ${duration(s.avg_hold_s)} average · style from median hold only`));
-  grid.append(timing);
+  // The fourth panel is the quote split. "Holding" used to sit here showing the median
+  // hold, the average hold and the style — which is the rail's Timing block verbatim, one
+  // column to the left. Matching the reference's four-panel row is what made the
+  // duplication obvious; the rail keeps them and the row gets a figure that was nowhere.
+  grid.append(quoteMix(s));
+}
+
+/**
+ * The fourth panel, where the reference puts Direction Bias.
+ *
+ * We have no direction — a spot AMM position is long or it does not exist — so the slot
+ * takes the bias we DO have: which asset this address's volume is priced in. It earns the
+ * space rather than filling it, because an ETH-quoted figure has been through a conversion
+ * at the trade's own timestamp and a USDG-quoted one has not, and the reader is entitled
+ * to know the mix behind a dollar number.
+ *
+ * NO SIGN COLOURS. A quote asset is not a gain and not a direction; the two shares are
+ * told apart by brightness and by their labels, which are the asset tickers themselves.
+ * @param {any} s
+ */
+function quoteMix(s) {
+  const panel = node('div', 'metric');
+  panel.append(node('h5', undefined, 'Quote asset'));
+  const mix = /** @type {any[]} */ (s.quote_mix ?? []);
+  if (!mix.length) {
+    panel.append(node('div', 'big muted-figure', '—'));
+    panel.append(node('div', 'foot', 'No quoted volume in this window.'));
+    return panel;
+  }
+  const top = mix[0];
+  panel.append(node('div', 'big', `${top.pct.toFixed(1)}% ${top.quote}`));
+
+  const track = node('div', 'mix');
+  track.setAttribute('role', 'img');
+  track.setAttribute('aria-label',
+    `Volume by quote asset: ${mix.map((m) => `${m.quote} ${m.pct.toFixed(1)} percent`).join(', ')}.`);
+  for (const [i, m] of mix.entries()) {
+    const seg = node('i', i === 0 ? 'mix-a' : 'mix-b');
+    seg.style.width = `${Math.max(0, m.pct)}%`;
+    seg.title = `${m.quote} ${m.pct.toFixed(1)}%`;
+    track.append(seg);
+  }
+  panel.append(track);
+  panel.append(node('div', 'foot',
+    `${mix.map((m) => `${m.quote} ${m.pct.toFixed(0)}%`).join(' · ')} of total volume`
+    + (mix.some((m) => m.quote === 'ETH') ? ' · ETH converts at the trade\'s own timestamp' : '')));
+  return panel;
+}
+
+/**
+ * Axis labels, as the reference draws them: values down the right edge, dates along the
+ * bottom, four of each and all of them muted.
+ *
+ * Every label names a value the chart actually reaches — the top and bottom ticks are the
+ * series' own extremes, not a rounded axis the line never touches — because a tick the
+ * data does not reach invites reading a peak off the gridline instead of off the line.
+ * @param {any} stage @param {any} tip @param {any} scale
+ */
+function drawAxes(stage, tip, scale) {
+  const { lo, hi, pad, height, x0, x1 } = scale;
+  const ys = node('div', 'chart-y');
+  for (let i = 0; i < 4; i += 1) {
+    const v = hi - ((hi - lo) * i) / 3;
+    const frac = (pad + (1 - (v - lo) / (hi - lo || 1)) * (height - pad * 2)) / height;
+    const t = node('span', undefined, money(v));
+    t.style.top = `${frac * 100}%`;
+    ys.append(t);
+  }
+  const xs = node('div', 'chart-x');
+  // The tick format follows the span, not the clock. Four identical dates is what a
+  // date-only format gives you on a one-day window, and it says nothing at all; four
+  // times of day is what a multi-week window gives you, and it says nothing either.
+  const days = (x1 - x0) / 86400;
+  for (let i = 0; i < 4; i += 1) {
+    const t = x0 + ((x1 - x0) * i) / 3;
+    const full = when(t);
+    const s = node('span', undefined,
+      days > 2 ? full.replace(/\s\d\d:\d\d$/, '') : (full.match(/\d\d:\d\d$/)?.[0] ?? full));
+    s.style.left = `${(i / 3) * 100}%`;
+    xs.append(s);
+  }
+  stage.insertBefore(ys, tip);
+  stage.insertBefore(xs, tip);
 }
 
 /** @param {Detail} d */
@@ -201,8 +278,9 @@ function renderChart(d) {
   head.replaceChildren();
   head.append(signed(total));
 
-  const { svg, at, clear } = areaChart(series, { width: 900, height: 220 });
+  const { svg, at, clear, scale } = areaChart(series, { width: 900, height: 220 });
   stage.prepend(svg);
+  if (scale) drawAxes(stage, tip, scale);
   if (!at) return;
   svg.addEventListener('mousemove', (e) => {
     const r = stage.getBoundingClientRect();
@@ -258,8 +336,13 @@ let tab = 0;
 function renderTable(d) {
   const bar = el('subtabs');
   bar.replaceChildren();
-  TABS.forEach(([label], /** @type {number} */ i) => {
+  TABS.forEach(([label, build], /** @type {number} */ i) => {
     const b = node('button', undefined, /** @type {string} */ (label));
+    // The count, in a pill beside the label, as the reference does it. It tells you which
+    // tabs are worth opening before you open them — and on a page where "how many closes"
+    // is the whole basis of the claim, the round-trip count belongs where it is read.
+    const n = /** @type {any} */ (build)(d)?.rows?.length ?? 0;
+    if (n) b.append(node('span', 'tab-n', String(n)));
     b.setAttribute('role', 'tab');
     b.setAttribute('aria-selected', String(i === tab));
     b.onclick = () => { tab = i; renderTable(d); };

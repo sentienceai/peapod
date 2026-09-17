@@ -593,3 +593,62 @@ test('both pages ask for a window the build actually has', async () => {
       `${page} still hardcodes a window that a short tape does not publish`);
   }
 });
+
+test('the bottom bar cannot be read as a score out of 100', () => {
+  /*
+   * THE ONE PLACE VISUAL PARITY COULD IMPORT A CLAIM WE DO NOT MAKE.
+   *
+   * The reference puts a rating in this slot — "95 /100" beside a row of filled ticks —
+   * and we put a hypothesis test in the same slot at the same size. Same shape, opposite
+   * statement: a score has a maximum and more of it is better; a test has neither, and the
+   * finding is whether the observed rate sits outside the band, not how far right it is.
+   *
+   * Each assertion below is one of the four things keeping them apart.
+   */
+  const bars = cards().map((/** @type {any} */ c) => c.byClass('tcard-bar')[0]);
+  assert.ok(bars.length > 4, `only ${bars.length} cards rendered`);
+  for (const bar of bars) {
+    const text = bar.textContent;
+
+    // 1. The figure always carries its unit. Never a bare number, never out of a total.
+    assert.ok(!/\/\s*100\b/.test(text), `the bar shows a total: ${text}`);
+    assert.ok(!/\bout of\b/i.test(text), `the bar shows a total: ${text}`);
+    assert.ok(!/\bscore\b|\brating\b|\brank(ed|ing)?\b/i.test(text),
+      `the bar calls itself a score: ${text}`);
+    const head = bar.byClass('ev-head')[0];
+    assert.match(head.textContent, /%/, `the headline figure has no unit: ${head.textContent}`);
+    assert.match(head.textContent, /win/, `the headline figure does not say what it counts`);
+
+    // 2. The track draws a REGION and a mark, never a fill from the left. A progress fill
+    //    is the rating idiom, and one element with a width starting at zero is what it
+    //    looks like in the DOM.
+    const track = bar.byClass('ev-track')[0];
+    assert.ok(track, 'the track is gone');
+    assert.equal(track.byClass('ev-band').length, 1, 'the chance region is gone');
+    assert.equal(track.byClass('ev-mark').length, 1, 'the observed mark is gone');
+    const band = track.byClass('ev-band')[0];
+    assert.ok(!/^\s*left:\s*0(%|px)?\s*;/.test(band.getAttribute('style') ?? ''),
+      'the chance region starts at the left edge, which reads as a fill');
+
+    // 3. The null is drawn, so the axis reads as a win rate and not as a score.
+    assert.equal(track.byClass('ev-null').length, 1,
+      'the 50% chance tick is gone — without it the right end reads as the goal');
+
+    // 4. The shading is named in words, under the track, on every card.
+    const foot = bar.byClass('ev-foot')[0];
+    assert.ok(foot, 'the bar no longer says what the shaded region is');
+    assert.match(foot.textContent, /chance/i,
+      `the region is not named: ${foot.textContent}`);
+  }
+});
+
+test('the bar reports the same verdict the criterion defines', () => {
+  // Parity of shape must not drift into parity of meaning: whatever the bar draws, the
+  // words under it come from chanceBand, which is the published criterion.
+  for (const bar of cards().slice(0, 12).map((/** @type {any} */ c) => c.byClass('tcard-bar')[0])) {
+    const label = bar.byClass('ev-label')[0].textContent.trim();
+    assert.ok(['Beyond chance', 'Below chance', 'Within chance', 'No closed round-trips']
+      .includes(label) || /^Too few closes to tell/.test(label),
+      `the bar invented a verdict: ${label}`);
+  }
+});
