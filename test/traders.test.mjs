@@ -17,7 +17,7 @@ import { readFile } from 'node:fs/promises';
 import { install } from './dom-stub.mjs';
 import { index, sample, view } from './store.mjs';
 import * as chromeMod from '../web/lib/chrome.js';
-import { chanceBand } from '../web/lib/evidence.js';
+import { chanceBand, CRITERION } from '../web/lib/evidence.js';
 
 const { get } = await install(new URL('../web/traders.html', import.meta.url));
 await import('../web/traders.js');
@@ -26,26 +26,84 @@ const board = view('all', '7d');
 
 const cards = () => get('grid').byClass('tcard');
 
-test('the coin-flip band is the published criterion, and small samples answer themselves', () => {
-  // One lucky trade can never read as skill: the band covers the whole range.
-  const one = chanceBand(1, 1);
-  assert.equal(one.verdict, 'none');
-  assert.equal(one.decisive, false);
+test('the band is the exact binomial region, and it honours what the criterion claims', () => {
+  // THE BUG THIS REPLACES. The band was 0.5 +/- 1.96*sqrt(0.25/n), which at n = 4 is
+  // 1%..99% — so a 4/4 record read "Beyond chance" while the exact probability of four
+  // heads in four flips is 2*(1/2)^4 = 0.125. One time in eight, reported as one in twenty.
+  for (const n of [1, 2, 3, 4, 5]) {
+    const all = chanceBand(n, n);
+    assert.equal(all.verdict, 'none', `${n}/${n} claims a verdict the test cannot support`);
+    assert.equal(all.decisive, false);
+    assert.match(all.label, /Too few closes/);
+  }
+  // Six is where the most extreme outcome first clears the bar: 2*(1/2)^6 = 0.03125.
+  assert.equal(chanceBand(6, 6).verdict, 'above');
+  assert.equal(chanceBand(0, 6).verdict, 'below');
+  assert.equal(chanceBand(5, 6).verdict, 'within', '5/6 is p = 0.22, not a finding');
 
-  // 37 closes at 83.8% is outside 0.5 +/- 1.96*sqrt(0.25/37) = 0.339..0.661.
+  // The exact region at n = 37 is 35.1%..64.9%, wider than the 33.9%..66.1% the normal
+  // approximation drew — a discrete exact test is conservative, and that is the direction
+  // an honest error goes.
   const real = chanceBand(31, 37);
   assert.equal(real.verdict, 'above');
-  assert.ok(Math.abs(real.lo - 0.3389) < 0.001 && Math.abs(real.hi - 0.6611) < 0.001,
+  assert.ok(Math.abs(real.lo - 13 / 37) < 1e-9 && Math.abs(real.hi - 24 / 37) < 1e-9,
     `band moved: ${real.lo} ${real.hi}`);
-
-  // The band is symmetric about a coin flip, and losing streaks are called too.
-  const bad = chanceBand(6, 37);
-  assert.equal(bad.verdict, 'below');
+  assert.equal(chanceBand(6, 37).verdict, 'below', 'losing streaks are called too');
   assert.equal(chanceBand(19, 37).verdict, 'within');
 
-  // It narrows with n, which is the whole point of showing n beside it.
-  assert.ok(chanceBand(60, 100).hi < chanceBand(6, 10).hi);
+  assert.ok(chanceBand(60, 100).hi < chanceBand(6, 10).hi, 'the band must narrow with n');
   assert.equal(chanceBand(0, 0).verdict, 'none');
+});
+
+test('the drawn band really does cover at least 95% of coin-flippers', () => {
+  // The criterion is a claim about coverage, so it is checked as one: sum the binomial
+  // pmf over the counts the band admits and require it to reach 0.95. The old band failed
+  // this at every small n — at n = 4 it admitted 1..3 of 4, which is 14/16 = 87.5%.
+  for (const n of [6, 7, 8, 12, 20, 37, 64, 101, 250]) {
+    const b = chanceBand(Math.floor(n / 2), n);
+    const klo = Math.round(b.lo * n);
+    const khi = Math.round(b.hi * n);
+    // pmf held relative to the mode, the way the implementation does it, so this is an
+    // independent sum rather than a restatement of the same arithmetic.
+    const mode = Math.floor(n / 2);
+    const w = new Float64Array(n + 1);
+    w[mode] = 1;
+    for (let k = mode; k < n; k += 1) w[k + 1] = (w[k] * (n - k)) / (k + 1);
+    for (let k = mode; k > 0; k -= 1) w[k - 1] = (w[k] * k) / (n - k + 1);
+    let total = 0;
+    let inside = 0;
+    for (let k = 0; k <= n; k += 1) { total += w[k]; if (k >= klo && k <= khi) inside += w[k]; }
+    const coverage = inside / total;
+    assert.ok(coverage >= 0.95,
+      `n=${n}: the band covers ${(coverage * 100).toFixed(2)}% of coin-flippers, not 95%`);
+    // And the boundary is where the definition puts it, which is the property that
+    // actually matters. A doubling-tail region is not the narrowest 95% interval — at
+    // n = 8 it admits 1..7 for 99.2% coverage and 2..7 would still clear 95% — so width is
+    // the wrong thing to assert. Every admitted count must have p > 0.05 and every
+    // excluded one p <= 0.05.
+    /** @param {number} k */
+    const pTwo = (k) => {
+      let lower = 0;
+      let upper = 0;
+      for (let i = 0; i <= k; i += 1) lower += w[i];
+      for (let i = k; i <= n; i += 1) upper += w[i];
+      return Math.min(1, (2 * Math.min(lower, upper)) / total);
+    };
+    assert.ok(pTwo(klo) > 0.05 && pTwo(khi) > 0.05,
+      `n=${n}: the band admits a count the test rejects`);
+    if (klo > 0) assert.ok(pTwo(klo - 1) <= 0.05, `n=${n}: the band excludes a count it should admit`);
+    if (khi < n) assert.ok(pTwo(khi + 1) <= 0.05, `n=${n}: the band excludes a count it should admit`);
+  }
+});
+
+test('the criterion text describes the band the code actually draws', () => {
+  assert.match(CRITERION, /exact binomial/, 'the text still describes an approximation');
+  assert.match(CRITERION, /at least 95%/,
+    'a discrete region over-covers; the text must not promise exactly 95%');
+  assert.match(CRITERION, /six closes/, 'the text does not state where the test gains power');
+  assert.match(CRITERION, /one chance in eight/, 'the worked example is gone');
+  assert.ok(!/1\.96|sqrt|square root/i.test(CRITERION),
+    'the text still quotes the normal approximation');
 });
 
 test('the grid renders cards in the reference shape', () => {
@@ -642,13 +700,18 @@ test('the bottom bar cannot be read as a score out of 100', () => {
   }
 });
 
-test('the bar reports the same verdict the criterion defines', () => {
-  // Parity of shape must not drift into parity of meaning: whatever the bar draws, the
-  // words under it come from chanceBand, which is the published criterion.
-  for (const bar of cards().slice(0, 12).map((/** @type {any} */ c) => c.byClass('tcard-bar')[0])) {
-    const label = bar.byClass('ev-label')[0].textContent.trim();
-    assert.ok(['Beyond chance', 'Below chance', 'Within chance', 'No closed round-trips']
-      .includes(label) || /^Too few closes to tell/.test(label),
-      `the bar invented a verdict: ${label}`);
+test('the verdict on a card comes from the criterion, not from the drawing', () => {
+  // Parity of shape must not drift into parity of meaning. The verdict lives in the card
+  // body — the bar carries only what the shaded region is — and whatever it says has to be
+  // one of the labels chanceBand produces.
+  const allowed = ['Beyond chance', 'Below chance', 'Within chance', 'No closed round-trips'];
+  for (const c of cards().slice(0, 16)) {
+    const label = c.byClass('tcard-verdict')[0].textContent.trim();
+    assert.ok(allowed.includes(label) || /^Too few closes to tell/.test(label),
+      `a card invented a verdict: ${label}`);
+    // And the bar under it names the region rather than repeating the verdict.
+    const foot = c.byClass('ev-foot')[0].textContent;
+    assert.match(foot, /^chance \d+–\d+% over \d+$/, `the region is not named: ${foot}`);
+    assert.ok(!allowed.some((a) => foot.includes(a)), `the bar repeats the verdict: ${foot}`);
   }
 });

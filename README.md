@@ -32,10 +32,15 @@ on-chain buy behind it — because a record scored over 96% of an address is a d
 claim from one scored over 49%. The top-ranked address is at 100%; the one below it, 73%.
 
 The win-rate badge answers one question with a published criterion: an address closed *n*
-round-trips and *k* at a profit; 95% of traders with no skill and the same *n* land inside
-`0.5 ± 1.96·√(0.25/n)`, so a rate outside that band is one chance produces less than one
-time in twenty. It measures the rate, not the profit, and only the selling it can see.
-That last limit was tested rather than assumed — see `export/selection_bias.py`.
+round-trips and *k* at a profit; the shaded band is the exact two-sided 95% acceptance
+region of `Binomial(n, 0.5)`, so a count outside it is one chance produces less than one
+time in twenty. Below six closes nothing can clear that bar — the most extreme result
+available is `2·(1/2)^n`, which is 0.0625 at five and 0.031 at six — so those read "too few
+closes to tell" rather than a verdict. This used to be the normal approximation
+`0.5 ± 1.96·√(0.25/n)`, which drew a 1–99% band at *n* = 4 and called four wins from four
+beyond chance, at a true probability of one in eight. It measures the rate, not the profit,
+and only the selling it can see. That last limit was tested rather than assumed — see
+`export/selection_bias.py`.
 
 ## Running it
 

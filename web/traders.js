@@ -81,7 +81,14 @@ function ago(ts, anchor) {
   return `${Math.round(s / 86400)}D AGO`;
 }
 
-/** How far outside the coin-flip band, in standard errors. Orders "strength of evidence". */
+/**
+ * The score statistic, used ONLY to order the grid by strength of evidence.
+ *
+ * It is not the test any more — the verdict on each card comes from the exact binomial
+ * region in evidence.js — and it is kept here because ordering wants a continuous quantity
+ * and the exact p-value is flat across the whole "too few closes" range, which would sort
+ * a hundred addresses arbitrarily. Nothing on a card is claimed from this number.
+ */
 const zOf = (/** @type {any} */ r) => (r.round_trips
   ? ((r.wins / r.round_trips) - 0.5) * 2 * Math.sqrt(r.round_trips) : 0);
 
@@ -188,10 +195,12 @@ function evidenceBar(r) {
 
   // The shaded region named in words. This is the line that stops the bar being read as a
   // score: it says what the shading IS, and the range it names has no maximum in it.
+  // What the shading IS, and nothing else. The verdict is already on the card two lines
+  // up at a readable size; repeating it here cost the region label the width it needs,
+  // and the region label is the part that stops the bar being read as a score.
   const foot = node('div', 'ev-foot');
-  foot.append(node('span', 'ev-label', b.label));
-  foot.append(node('span', 'ev-null-label',
-    `· chance ${(b.lo * 100).toFixed(0)}–${(b.hi * 100).toFixed(0)}% over ${r.round_trips}`));
+  foot.append(node('span', 'ev-label',
+    `chance ${(b.lo * 100).toFixed(0)}–${(b.hi * 100).toFixed(0)}% over ${r.round_trips}`));
   left.append(foot);
 
   const cta = node('button', 'ev-cta', 'Trades');
