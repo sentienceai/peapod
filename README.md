@@ -4,9 +4,9 @@ Realized profit and loss for every address that has traded on **Robinhood Chain*
 (Arbitrum Orbit L2, chain 4663), across both tokenized equities and the Pons memecoin
 pools, in one ranking. Searchable by address, whether or not the address ranks.
 
-Over the current seven-day window: **103,920 addresses traded, 30,014 of them closed a
-round-trip.** 64.8% of those finished in profit, which sounds healthy until you see the
-sizes: the best made $188,639, the median made **$0.85**, and the top 1% took half of
+Over the current seven-day window: **78,343 addresses traded, 19,928 of them closed a
+round-trip.** 64.1% of those finished in profit, which sounds healthy until you see the
+sizes: the best made $188,639, the median made **$0.89**, and the top 1% took 47% of
 everything won.
 
 ## What it measures, and what it does not
@@ -17,7 +17,7 @@ difference is the result. That is the whole definition.
 
 It follows that a great deal is **out of scope, not estimated**:
 
-- **72.7% of volume has no matched round-trip behind it.** Tokens that were bridged in,
+- **75.4% of volume has no matched round-trip behind it.** Tokens that were bridged in,
   minted, airdropped or transferred from another wallet have no on-chain purchase, so
   selling them produces no cost basis and no number. They are excluded, not guessed at.
 - **There is no unrealized PnL.** That would require a balance for every address at every
@@ -131,15 +131,15 @@ exactly the kind of fault that arrives on a cold volume.
 
 - **The window is seven days.** Not all-time. Earlier windows produce very different
   numbers: at 23 hours the best result on the equity side was $65; at seven days it is
-  $1,634. Any figure here is a statement about this window.
+  $1,703. Any figure here is a statement about this window.
 - **Robinhood Chain ran under a gas subsidy that ends 2026-09-29, after the tape behind
   every figure here.** None of this volume was recorded under real costs, so all of it is
   provisional. This is on every page, not only here.
 - **Coverage percentages are shares of this universe**, not of the chain. An address that
   qualifies has closed at least one round-trip *in these pools in this window*; an address
   that does not still gets a page explaining what it did do.
-- **RWA looks safer than Pons and is not.** 84.4% of qualifying RWA addresses are in
-  profit against 53.4% on Pons, but the best RWA result is $1,634 against $188,639. The
+- **RWA looks safer than Pons and is not.** 90.8% of qualifying RWA addresses are in
+  profit against 51.5% on Pons, but the best RWA result is $1,703 against $188,639. The
   higher success rate reflects how little is at stake. The interface says so on that tab.
 - **Elapsed times are measured from the end of the tape**, not from now, because the data
   is a fixed historical window.
