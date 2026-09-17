@@ -15,6 +15,7 @@ import { readFile } from 'node:fs/promises';
 import { install } from './dom-stub.mjs';
 import { detail, index as storeIndex, sample, scalar, view } from './store.mjs';
 
+const APP_CSS = await readFile(new URL('../web/styles/app.css', import.meta.url), 'utf8');
 const { get, clipboard } = await install(new URL('../web/index.html', import.meta.url));
 await import('../web/index.js');
 
@@ -564,4 +565,60 @@ test('the detail rail carries the copy glyph next to the address', async () => {
   const [e] = clickEvent();
   await buttons[0].onclick?.(e);
   assert.deepEqual(clipboard.writes, [top.address]);
+});
+
+test('only a signed figure is allowed a sign colour', () => {
+  /*
+   * WHY THIS EXISTS. Win rate used to render green above 60%, amber in the middle and red
+   * below 45. That was defensible while the positive colour was a teal no other column
+   * used. On this palette the positive colour is the brand lime, and 88.2% drawn in it
+   * reads as +88.2% — which it is not. A win rate is a rate, and a high one over tiny
+   * round-trips is the exact thing the coverage caveat exists to warn about, so making it
+   * look like a gain argues the opposite of the page.
+   *
+   * The rule is general, not a spot check on one column: the sign classes belong to
+   * figures that HAVE a sign. Anything else is a quantity, and quantities are neutral.
+   * Asserted on the rendered table rather than on the stylesheet, so it survives a
+   * re-skin that renames every colour.
+   */
+  const rows = get('rows').byTag('tr');
+  assert.ok(rows.length > 10, `only ${rows.length} rows rendered`);
+  /** @type {string[]} */
+  const offenders = [];
+  for (const tr of rows) {
+    const cells = tr.byTag('td');
+    for (const [i, td] of cells.entries()) {
+      const signed = [...td.descendants(), td].some(
+        (n) => /(^|\s)(up|down)(\s|$)/.test(n.className || ''));
+      if (!signed) continue;
+      // The realized column is the only signed quantity on this table. It is the one that
+      // carries a + or a − in its own text, which is how the test knows rather than by
+      // trusting a column index.
+      if (!/[+−]/.test(td.textContent)) {
+        offenders.push(`column ${i} "${td.textContent.trim()}" is coloured as a sign `
+          + 'but carries no sign character');
+      }
+    }
+  }
+  assert.deepEqual(offenders, [], `\n  ${offenders.join('\n  ')}`);
+});
+
+test('the win rate is drawn in the neutral channel, and says so in text', () => {
+  // The claim the page makes about a rate is made underneath it by the evidence bar and
+  // the criterion, not by its colour. If the banding ever comes back, it comes back with
+  // a colour that is not one of the two the sign channel owns.
+  const app = APP_CSS;
+  const classes = ['rate-high', 'rate-mid', 'rate-low'];
+  for (const cls of classes) {
+    const rule = new RegExp(`\\.${cls}[^{]*\\{([^}]*)\\}`, 'g');
+    for (const m of app.matchAll(rule)) {
+      assert.ok(!/var\(--up\)|var\(--down\)/.test(m[1]),
+        `.${cls} takes a sign colour: ${m[1].trim()}`);
+    }
+  }
+  // And the column still exists and still carries a number, so this is not passing by
+  // having quietly dropped the thing it guards.
+  const cells = get('rows').byTag('tr')[0].byTag('td');
+  assert.ok(cells.some((/** @type {any} */ c) => /^\d+(\.\d+)?%$/.test(c.textContent.trim())),
+    'the win-rate column is gone');
 });

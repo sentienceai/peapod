@@ -184,3 +184,132 @@ test('nothing can override the colour of a signed figure', async () => {
   assert.match(stripped, /(^|\n)\.up \{ color: var\(--up\); \}/);
   assert.match(stripped, /(^|\n)\.down \{ color: var\(--down\); \}/);
 });
+
+/**
+ * Colour is a channel this page cannot assume it has.
+ *
+ * Asked whether the lime band survives a greyscale screenshot: it does, and the reason is
+ * structural rather than lucky. WCAG contrast is a ratio of RELATIVE LUMINANCE, which is
+ * already an achromatic measure — so a pairing that clears it clears it with the colour
+ * thrown away. The lime sits at Y 0.84 and the ink at Y 0.006, a 140-fold gap that no hue
+ * transform can close. What the simulation below adds is the dichromatic cases, where
+ * luminance does move.
+ *
+ * Machado, Oliveira & Fernandes (2009), severity 1.0, applied in LINEAR light. Applying
+ * these matrices to gamma-encoded values is the usual way to get a flattering wrong answer.
+ */
+/** @type {Record<string, number[][]>} */
+const CVD = {
+  protanopia: [[0.152286, 1.052583, -0.204868], [0.114503, 0.786281, 0.099216],
+    [-0.003882, -0.048116, 1.051998]],
+  deuteranopia: [[0.367322, 0.860646, -0.227968], [0.280085, 0.672501, 0.047413],
+    [-0.011820, 0.042940, 0.968881]],
+  tritanopia: [[1.255528, -0.076749, -0.178779], [-0.078411, 0.930809, 0.147602],
+    [0.004733, 0.691367, 0.303900]],
+};
+/** @param {string} h */
+const linear = (h) => rgb(h).map((u) => (u <= 0.04045 ? u / 12.92 : ((u + 0.055) / 1.055) ** 2.4));
+/** @param {number[]} v */
+const relLum = (v) => 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2];
+/** @param {string} hex @param {string} kind */
+function seenAs(hex, kind) {
+  const v = linear(hex);
+  if (kind === 'greyscale') return [relLum(v), relLum(v), relLum(v)];
+  return CVD[kind].map((row) => row[0] * v[0] + row[1] * v[1] + row[2] * v[2]);
+}
+/** @param {number[]} a @param {number[]} b */
+function ratio(a, b) {
+  const [hi, lo] = [relLum(a), relLum(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+test('the headline on the lime band survives with no colour at all', () => {
+  /** @type {string[]} */
+  const failures = [];
+  for (const kind of ['greyscale', 'protanopia', 'deuteranopia', 'tritanopia']) {
+    const r = ratio(seenAs(T['brand-ink'], kind), seenAs(T.brand, kind));
+    // AAA, not AA: this is 72px display type and the band is the page's first impression.
+    if (r < 7) failures.push(`${kind}: ${r.toFixed(2)}`);
+    // And the band must still read as a band — a surface interrupting a black page —
+    // or the headline is legible inside something nobody can see the edges of.
+    const band = ratio(seenAs(T.brand, kind), seenAs(T.bg, kind));
+    if (band < 7) failures.push(`${kind}: the band itself is ${band.toFixed(2)} on the ground`);
+  }
+  assert.deepEqual(failures, [], `the band loses its legibility without colour:\n  ${failures.join('\n  ')}`);
+});
+
+test('every figure stays readable on its ground without colour', () => {
+  /** @type {[string, string][]} */
+  const pairs = [['up', 'bg'], ['down', 'bg'], ['text', 'bg'], ['text-muted', 'bg'],
+    ['brand-ink-soft', 'brand'], ['rank-3', 'bg']];
+  /** @type {string[]} */
+  const failures = [];
+  for (const kind of ['greyscale', 'protanopia', 'deuteranopia', 'tritanopia']) {
+    for (const [fg, bg] of pairs) {
+      const r = ratio(seenAs(T[fg], kind), seenAs(T[bg], kind));
+      if (r < 4.5) failures.push(`${kind}: --${fg} on --${bg} is ${r.toFixed(2)}`);
+    }
+  }
+  assert.deepEqual(failures, [], `below AA without colour:\n  ${failures.join('\n  ')}`);
+});
+
+test('the two sign colours are NOT distinguishable without colour, which is the point', () => {
+  // Measured: up against down falls to 2.15 under deuteranopia and 2.45 in greyscale, and
+  // in greyscale the positive renders #e5e5e5 against plain white text at #ffffff. So a
+  // reader without colour cannot tell a gain from a loss by colour, and is not expected
+  // to — that is precisely why every signed figure also carries ▲/▼ and an explicit + or
+  // −, asserted in leaderboard.test.mjs. This test exists so that the redundancy is never
+  // removed on the grounds that "the colours are different enough".
+  const worst = Math.min(...['greyscale', 'protanopia', 'deuteranopia', 'tritanopia']
+    .map((k) => ratio(seenAs(T.up, k), seenAs(T.down, k))));
+  assert.ok(worst < 4.5,
+    `up and down now separate at ${worst.toFixed(2)} without colour. If that is real, the `
+    + 'glyph is still required — revisit this note, do not delete the glyph.');
+});
+
+test('the sign colours are spent only on things that have a sign', () => {
+  /*
+   * THE GENERAL FORM OF THE WIN-RATE DECISION, so it cannot be undone one rule at a time.
+   *
+   * On this palette the positive colour IS the brand lime, which means every lime thing on
+   * the page competes with the one figure that needs it. Three separate places had taken
+   * it for quantities that carry no sign — the win-rate column, the card's bottom bar, and
+   * the matched-flow meter in the detail view, which was the widest lime object on the page
+   * and reported a share of volume.
+   *
+   * The line is: a SIGNED QUANTITY may take a sign colour. A rate, a share, a verdict or an
+   * ordinal may not — those use the neutral ladder. A transient status indicator (a copy
+   * confirmation, a wallet error, the serving dot) is not a quantity at all and is left
+   * alone; it is listed below so that the exemption is deliberate rather than an oversight.
+   *
+   * Adding a selector here is allowed. Doing it without reading the paragraph above is what
+   * this is trying to prevent.
+   */
+  const allowed = new Map([
+    ['.up', 'the sign class itself'],
+    ['.down', 'the sign class itself'],
+    ['.streak i', 'one square per round-trip — each square is a win or a loss'],
+    ['.streak i.loss', 'the same, outlined instead of filled'],
+    ['.copy.is-ok', 'status: a copy succeeded. Not a quantity'],
+    ['.copy.is-fail', 'status: a copy failed. Not a quantity'],
+    ['.wallet-note.is-fail', 'status: a wallet refused. Not a quantity'],
+    ['.status-dot', 'status: a build is being served. Not a quantity'],
+  ]);
+  const stripped = app.replace(/\/\*[\s\S]*?\*\//g, '');
+  /** @type {string[]} */
+  const offenders = [];
+  for (const m of stripped.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    if (!/var\(--(up|down)\)/.test(m[2])) continue;
+    for (const sel of m[1].split(',').map((x) => x.trim())) {
+      if (!sel || sel.startsWith('@') || allowed.has(sel)) continue;
+      offenders.push(`${sel} { ${m[2].trim()} }`);
+    }
+  }
+  assert.deepEqual(offenders, [],
+    'these take a sign colour and are not in the allowlist — read the note above this test '
+    + `before adding them:\n  ${offenders.join('\n  ')}`);
+
+  // Not vacuous: the sign classes must still be here and still be the sign colours.
+  assert.match(stripped, /\.up \{ color: var\(--up\); \}/);
+  assert.match(stripped, /\.down \{ color: var\(--down\); \}/);
+});

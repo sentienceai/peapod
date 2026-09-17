@@ -285,7 +285,7 @@ table.board tbody tr.is-first td:first-child { color: var(--rank-1); }
 .modal-backdrop[hidden] { display: none !important; }
 .modal {
   width: min(1180px, 100%);
-  background: var(--bg); border: 1px solid var(--line); border-radius: 12px;
+  background: var(--bg); border: 1px solid var(--line); border-radius: var(--r-card);
   overflow: hidden;
 }
 .modal-head {
@@ -345,7 +345,10 @@ table.board tbody tr.is-first td:first-child { color: var(--rank-1); }
 .streak i.loss { border-color: var(--down); background: transparent; }
 
 .bar { height: 6px; background: var(--raised); border-radius: 3px; overflow: hidden; margin-top: var(--s-2); }
-.bar i { display: block; height: 100%; background: var(--up); }
+/* The matched-flow meter. NOT the sign colour: 92.9% of flow being round-tripped is a
+   share, not a gain, and drawing it in lime made the largest bar in the detail view read
+   as the largest profit in it. Same rule as win rate and the card's bottom bar. */
+.bar i { display: block; height: 100%; background: var(--text); }
 .bar i.warn { background: var(--warn); }
 
 .chartcard { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: var(--s-3); }
@@ -439,14 +442,37 @@ table.mini td:first-child { text-align: left; }
    because they are one pair rather than two sections, 31 before the cards, and 57 for the
    one real section break further down. The hero used to run to about 300px — half a
    1300px viewport before any content. It is now about 150. */
-.hero { position: relative; min-height: 116px; padding: 37px 360px 0 0; }
-.hero h1 { font-size: clamp(20px, 2vw, 26px); font-weight: var(--w-semi);
-  line-height: 1.15; letter-spacing: -0.02em; color: var(--text); margin: 0; }
-.hero h1 em { font-style: normal; color: var(--accent-soft); }
-.hero-sub { margin: var(--s-1) 0 0; color: var(--text-body);
-  font-size: var(--t-num); letter-spacing: var(--ls-num); line-height: 1.45; }
-.hero .caveat { margin: 6px 0 0; max-width: 84ch; font-size: var(--t-small); letter-spacing: var(--ls-small);
-  line-height: 1.45; }
+/* The same brand band as the leaderboard's, so the two pages open the same way. The deck
+   stays exactly where it was — absolutely positioned inside the hero — and the signed
+   figures it carries are safe because each deck card draws its own black surface. That is
+   the rule working rather than being worked around: lime never sits under a sign. */
+/* The band is the wrapper, so it reaches both edges by structure. The hero keeps the
+   shell's measure inside it, which is also what keeps the deck on the page's right margin
+   instead of the window's. */
+.heroband { background: var(--brand); color: var(--brand-ink); margin-bottom: var(--s-7); }
+.hero { position: relative; min-height: 116px; padding: var(--s-7) 360px var(--s-7) 0; }
+.hero h1 {
+  font-family: var(--display);
+  font-size: var(--t-display); letter-spacing: var(--ls-display); line-height: var(--lh-display);
+  font-weight: var(--w-regular); color: var(--brand-ink); margin: 0;
+}
+/* The accented clause is gone. On the band there is one usable ink and the spec allows one
+   weight, so colouring half a sentence was not available — and accenting a single phrase in
+   a headline is a tell rather than a device. The sentence does the work; it is two flat
+   statements and the second one lands on its own. */
+.hero h1 em { font-style: normal; color: inherit; }
+.hero-sub { margin: var(--s-3) 0 0; color: var(--brand-ink-soft);
+  font-size: var(--t-body); letter-spacing: var(--ls-body); line-height: var(--lh-body); }
+:where(.hero-sub) b { color: var(--brand-ink); font-weight: var(--w-regular); }
+.hero .caveat { margin: 6px 0 0; max-width: 84ch; color: var(--brand-ink-soft);
+  font-size: var(--t-small); letter-spacing: var(--ls-small); line-height: 1.45; }
+/* The one link on the band. Colour is not available to mark it, so it is marked. */
+.hero .sub-link { color: var(--brand-ink); border-bottom-color: currentColor; }
+.hero .sub-link:hover { color: var(--brand-ink); border-bottom-width: 2px; }
+
+@media (max-width: 1024px) { .hero h1 { font-size: 56px; } }
+@media (max-width: 768px)  { .hero h1 { font-size: 40px; letter-spacing: var(--ls-head); } }
+@media (max-width: 485px)  { .hero h1 { font-size: 32px; } }
 
 /* The deck is the page's only decoration: three real cards from the ranking, overlapped
    the way the reference stacks them. Short enough that it cannot drive the hero's height. */
@@ -456,11 +482,14 @@ table.mini td:first-child { text-align: left; }
   padding: var(--s-1); border-radius: var(--r-card); box-sizing: border-box;
   background: var(--surface); border: 1px solid var(--line);
   display: flex; flex-direction: column; gap: 2px; }
-.deckcard:nth-child(1) { left: 0; top: 20px; z-index: 1;
-  transform: rotate(-5deg); opacity: 0.4; }
+/* FULLY OPAQUE, all three. They used to recede at 0.4 alpha, which was fine over a dark
+   page and is not over the band: a 40% black card on lime is an olive rectangle, and the
+   signed figure inside it is then effectively printed on the lime at a contrast the sign
+   rule exists to prevent. Depth comes from the overlap and the rotation instead, which is
+   what the reference uses anyway. */
+.deckcard:nth-child(1) { left: 0; top: 20px; z-index: 1; transform: rotate(-5deg); }
 .deckcard:nth-child(2) { left: 74px; top: 0; z-index: 3; }
-.deckcard:nth-child(3) { left: 148px; top: 18px; z-index: 2;
-  transform: rotate(5deg); opacity: 0.4; }
+.deckcard:nth-child(3) { left: 148px; top: 18px; z-index: 2; transform: rotate(5deg); }
 .deck-addr { font-size: var(--t-micro); letter-spacing: var(--ls-micro); color: var(--text-muted); }
 .deck-fig { font-size: var(--t-body); letter-spacing: var(--ls-body); }
 .deckcard .spark { width: 100%; height: 30px; flex: none; }
@@ -493,9 +522,10 @@ table.mini td:first-child { text-align: left; }
 @media (max-width: 485px) { .cardgrid { grid-template-columns: 1fr; } }
 
 .tcard { display: flex; flex-direction: column; min-height: 232px;
-  background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card);
   overflow: hidden; cursor: pointer; }
-.tcard:hover { border-color: color-mix(in srgb, var(--accent-soft) 24%, var(--line)); }
+.tcard:hover { border-color: color-mix(in srgb, var(--text) 24%, var(--line));
+  transition: border-color var(--motion) var(--ease); }
 .tcard:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
 .tcard-head { flex: none; display: flex; align-items: flex-start; gap: var(--s-2);
@@ -511,16 +541,18 @@ table.mini td:first-child { text-align: left; }
   gap: var(--s-2); padding: var(--s-1) var(--s-2) var(--s-2); align-items: center; }
 .tcard-figs { display: flex; flex-direction: column; min-width: 0; }
 /* The PnL is the largest thing on the card: it is what the card is about. */
-.tcard-figs strong { font-size: 22px; font-weight: var(--w-semi); line-height: 1.15;
-  letter-spacing: -0.02em; white-space: nowrap; }
+.tcard-figs strong { font-size: var(--t-lead); letter-spacing: var(--ls-lead);
+  font-weight: var(--w-regular); line-height: var(--lh-lead); white-space: nowrap; }
 .tcard-second { font-size: var(--t-num); letter-spacing: var(--ls-num); color: var(--text-body); margin-top: var(--s-2); }
 .tcard-label { font-size: var(--t-micro); letter-spacing: var(--ls-micro); color: var(--text-muted); margin-top: 1px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* The verdict and what it is scored over, in the column that has room for words. In the
    46px bar "Beyond chance" truncated to "Beyond ch". */
 .tcard-verdict { margin-top: var(--s-2); font-size: var(--t-micro); letter-spacing: var(--ls-micro); font-weight: var(--w-medium); }
-.tcard-verdict.v-above { color: var(--up); }
-.tcard-verdict.v-below { color: var(--down); }
+/* Brightness, not hue — the medals' ladder, for the same reason. "Beyond chance" is the
+   claim worth reading, so it is the one at full strength. */
+.tcard-verdict.v-above { color: var(--text); }
+.tcard-verdict.v-below { color: var(--rank-2); }
 .tcard-verdict.v-within, .tcard-verdict.v-none { color: var(--text-muted); }
 .tcard-record { margin-top: 1px; font-size: 10px; color: var(--text-muted);
   letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -532,11 +564,22 @@ table.mini td:first-child { text-align: left; }
 .tcard-bar { display: flex; align-items: center; gap: var(--s-2);
   padding: 0 var(--s-2); height: 46px; flex: none; border-top: 1px solid var(--line);
   background: var(--raised); margin-top: auto; }
-/* The reference's bottom bar sits 3.3x the card's luminance — it advances. The forest
-   swatch against the slate card is only 1.23x, so at full strength it reads as no panel
-   at all. Lifted toward the positive green, which keeps both swatches as the source. */
-.tcard-bar.v-above { background: color-mix(in srgb, var(--up-fill) 72%, var(--up) 28%); }
-.tcard-bar.v-below { background: color-mix(in srgb, var(--down-fill) 76%, var(--down) 24%); }
+/* THE BAR NO LONGER TINTS BY VERDICT, for two reasons that arrived together.
+ *
+ * The luminance target stopped meaning anything. The old mix was tuned to the reference's
+ * measured 3.3x advance over its card — and it still hits it exactly, 3.32x — but that
+ * card was a slate. Against a black card every ratio is governed by the +0.05 floor in the
+ * formula, so "3.3x the card" is satisfied by a mid grey that would be heavier than the
+ * figures above it.
+ *
+ * And the colour was wrong on this palette anyway. "Beyond chance" is a test result, not a
+ * signed quantity, so it may not take the sign colour — the same rule that moved win rate
+ * to the neutral channel. A lime-tinted bar under every winning card was more lime on the
+ * page than the signed figures themselves.
+ *
+ * The bar separates the way everything else here separates: a border and a small lift. The
+ * verdict is carried by the words that were always in it, in the neutral ladder. */
+.tcard-bar.v-above, .tcard-bar.v-below { background: var(--raised); }
 .ev { flex: 1; min-width: 0; display: grid; align-items: center;
   grid-template-columns: auto minmax(28px, 1fr); gap: var(--s-1); }
 .ev-head { display: flex; align-items: baseline; gap: 3px; white-space: nowrap; }
@@ -548,15 +591,17 @@ table.mini td:first-child { text-align: left; }
 .ev-band { position: absolute; top: 0; bottom: 0; background: rgba(255, 255, 255, 0.12); }
 .ev-mark { position: absolute; top: -2px; width: 2px; height: 10px; margin-left: -1px;
   background: var(--text); border-radius: 1px; }
-.v-above .ev-mark { background: var(--up); }
-.v-below .ev-mark { background: var(--down); }
+/* The mark's channel is WHERE IT SITS — inside the chance band or outside it — which is
+   the whole point of drawing the band behind it. Colour would be a second, weaker copy of
+   that, in a hue this page has already spent. */
+.v-above .ev-mark, .v-below .ev-mark { background: var(--text); }
 .ev-foot { display: none; }
 .ev-label { font-size: var(--t-micro); letter-spacing: var(--ls-micro); color: var(--text-body); }
 /* On a green panel the verdict is carried by the panel; the label goes light. */
 .v-above .ev-label, .v-below .ev-label { color: var(--text); }
 .v-above .ev-n, .v-below .ev-n, .v-above .ev-of, .v-below .ev-of { color: var(--text-body); }
-.v-text-above { color: var(--up); }
-.v-text-below { color: var(--down); }
+.v-text-above { color: var(--text); }
+.v-text-below { color: var(--rank-2); }
 .v-text-within, .v-text-none { color: var(--text-muted); }
 
 .ev-cta { flex: none; padding: 5px 10px; border-radius: var(--r-card); cursor: pointer;
