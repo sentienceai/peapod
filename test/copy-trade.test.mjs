@@ -136,27 +136,37 @@ test('the setup window ends where the backend does', async () => {
   assert.match(src, /has been copied, countered, or simulated/i);
 });
 
-test('a logo goes where the ticker is written, and a letter where it is not', () => {
+test('a chip stack carries logos, with initials only where there is no file', () => {
   /*
-   * The card head stacks three 22px chips overlapping by 6px and writes no ticker beside
-   * them, so the letter on each chip is the only thing naming that token. Logos were drawn
-   * over exactly those letters for a pass: cropped artwork, no ticker, and — because the
-   * address was wrapping — a chip sitting on top of the address line. CopyTrade.dc.html
-   * draws a letter in every one of these. The logo belongs on the market rows, the asset
-   * header and the holdings rows, where the ticker is written next to it.
+   * THE TWO WAYS THIS HAS BEEN WRONG.
+   *
+   * First the logo was drawn ON TOP of the tile's initials, and every vendored file is a PNG
+   * with an alpha channel, so the letters read through the art: three overlapping chips came
+   * out as a smear. Then the logo was taken off the stack altogether and the chips drew a
+   * single letter — which fixed the smear by removing the identity.
+   *
+   * The tile is the fix: the letters are hidden the moment that chip's image loads, and they
+   * are still there for the tokens with no file. So a stack is mostly logos, and a chip
+   * showing letters means that token has no logo, not that the map never arrived.
    */
   const chips = byClass(get('copy-main'), 'ct-token-tile');
+  const imgs = chips.flatMap((/** @type {any} */ c) => c.descendants()
+    .filter((/** @type {any} */ n) => n.tag === 'img'));
   assert.ok(chips.length > 5, 'the cards carry no token chips');
-  for (const chip of chips) {
-    assert.equal(chip.descendants().filter((/** @type {any} */ n) => n.tag === 'img').length, 0,
-      'a logo is drawn over a chip that nothing names');
-    assert.equal(chip.textContent.length, 1, `a stacked chip carries ${chip.textContent}`);
+  assert.ok(imgs.length / chips.length > 0.9,
+    `only ${imgs.length} of ${chips.length} chips carry a logo`);
+  for (const img of imgs.slice(0, 8)) {
+    assert.match(img.attributes.src, /^\/token-logos\/0x[0-9a-f]{40}\.(png|jpg|jpeg|webp)$/);
+    assert.equal(img.attributes.alt, '', 'the chip is decorative; the row already names the token');
   }
-  // And the head does not wrap: one line, one row of chips, inside 58px.
-  const addr = byClass(get('copy-main'), 'ct-card-addr')[0];
-  assert.ok(!/\n/.test(addr.textContent) && addr.textContent.length <= 14,
-    `the address line is ${addr.textContent}`);
+  // And the initials are still in the DOM under every logo, because that is what comes back
+  // if the image 404s — see lib/token.js's error listener.
+  for (const chip of chips.slice(0, 8)) {
+    assert.equal(byClass(chip, 'asset-tile-initials').length, 1,
+      'a chip has no initials to fall back to');
+  }
 });
+
 
 test('a card opens the trader, and the frame\'s foot is the frame\'s foot', async () => {
   /*

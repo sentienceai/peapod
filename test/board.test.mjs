@@ -133,31 +133,39 @@ test('the tabs offer only what the build publishes', () => {
   }
 });
 
-test('a logo goes where the ticker is written, and a letter where it is not', () => {
+test('a chip stack carries logos, with initials only where there is no file', () => {
   /*
-   * BOTH HALVES OF THIS ARE FAILURES THAT SHIPPED.
+   * THE TWO WAYS THIS HAS BEEN WRONG.
    *
-   * First the map never arrived: 433 vendored files, and every tile on the site drawing two
-   * letters because two pages built tiles by hand instead of calling the helper.
+   * First the logo was drawn ON TOP of the tile's initials, and every vendored file is a PNG
+   * with an alpha channel, so the letters read through the art: three overlapping chips came
+   * out as a smear. Then the logo was taken off the stack altogether and the chips drew a
+   * single letter — which fixed the smear by removing the identity.
    *
-   * Then the logos arrived everywhere, including the "top assets" column — three 22px chips
-   * overlapping by 6px, with no ticker written next to them. A square photograph drawn over
-   * those chips covers the only letters naming the token and leaves cropped artwork behind:
-   * the column became unreadable, and none of the frames put a picture there at all. Every
-   * identity chip in CopyTrade.dc.html and TraderModal.dc.html carries one letter.
-   *
-   * So: a stack of chips is letters; a tile with the ticker beside it may carry the logo.
+   * The tile is the fix: the letters are hidden the moment that chip's image loads, and they
+   * are still there for the tokens with no file. So a stack is mostly logos, and a chip
+   * showing letters means that token has no logo, not that the map never arrived.
    */
   const stack = byClass(get('rows'), 'chipstack');
   assert.ok(stack.length > 5, 'the top-assets column is gone');
   const chips = stack.flatMap((/** @type {any} */ s) => byClass(s, 'asset-tile'));
+  const imgs = stack.flatMap((/** @type {any} */ s) => s.descendants()
+    .filter((/** @type {any} */ n) => n.tag === 'img'));
   assert.ok(chips.length > 5, 'no chips in the stack');
-  for (const chip of chips) {
-    assert.equal(chip.descendants().filter((/** @type {any} */ n) => n.tag === 'img').length, 0,
-      `a logo is drawn over a chip that nothing names: ${chip.title}`);
-    assert.equal(chip.textContent.length, 1, `a stacked chip carries ${chip.textContent}`);
+  assert.ok(imgs.length / chips.length > 0.9,
+    `only ${imgs.length} of ${chips.length} chips carry a logo`);
+  for (const img of imgs.slice(0, 8)) {
+    assert.match(img.attributes.src, /^\/token-logos\/0x[0-9a-f]{40}\.(png|jpg|jpeg|webp)$/);
+    assert.equal(img.attributes.alt, '', 'the chip is decorative; the row already names the token');
+  }
+  // And the initials are still in the DOM under every logo, because that is what comes back
+  // if the image 404s — see lib/token.js's error listener.
+  for (const chip of chips.slice(0, 8)) {
+    assert.equal(byClass(chip, 'asset-tile-initials').length, 1,
+      'a chip has no initials to fall back to');
   }
 });
+
 
 test('nothing in the rows says "undefined"', () => {
   const junk = [...placeholders(get('rows')), ...placeholders(get('podium'))];

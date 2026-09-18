@@ -33,6 +33,18 @@
   --inv-bg: #11140F;
   --inv-fg: #FFFFFF;
   --inv-hover: #2A2E25;
+  /* THE INVERTED SURFACE'S OWN SET. The landing page's rule card is the one panel drawn in
+     the opposite theme, and Landing.dc.html gives it a palette of its own: a softer text, a
+     rule for its dashed connector and chip grounds, a green wash for the values the reader
+     sets, and an amber for LIMIT — the one place a third hue on that page carries meaning,
+     because a cap is neither the condition nor the action. Every one of these flips with the
+     theme, because the card itself does. */
+  --inv-fg-soft: #C9CEC4;
+  --inv-line: #3A3F33;
+  --accent-on-inv: #7BE39B;
+  --accent-wash-inv: #14351F;
+  --warn-bg-inv: #3A2A1A;
+  --warn-on-inv: #F5C77B;
   color-scheme: light;
   --accent: #00B843;
   --accent-ink: #0A0B09;
@@ -90,6 +102,13 @@
   --inv-bg: #EEF1EA;
   --inv-fg: #0B0C0A;
   --inv-hover: #FFFFFF;
+  /* The inverted card is a LIGHT card in dark mode, so its own set flips with it. */
+  --inv-fg-soft: #33382D;
+  --inv-line: #C9CEC5;
+  --accent-on-inv: #0F7A37;
+  --accent-wash-inv: #DFF6E6;
+  --warn-bg-inv: #F7ECD2;
+  --warn-on-inv: #6B4A05;
   --accent-text: #00E05B;
   color-scheme: dark;
 }

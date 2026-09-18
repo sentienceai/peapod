@@ -22,7 +22,7 @@ import { markSample } from './sample.js';
 import { subsidyNote } from './findings.js';
 import { sparkline } from './spark.js';
 import {
-  ago, compact, copyButton, el, icon, letterChip, node, pct, shortAddr, signed, signedPct,
+  ago, assetTile, compact, copyButton, el, icon, node, pct, shortAddr, signed, signedPct,
 } from './format.js';
 
 /*
@@ -107,10 +107,11 @@ function assetChips(r) {
   const shown = r.tokens.slice(0, 3);
   shown.forEach((/** @type {string} */ symbol, /** @type {number} */ i) => {
     const a = state.assets.find((x) => x.symbol === symbol);
-    // A LETTER, NOT A LOGO. These three chips overlap and nothing beside them names the
-    // token, so a logo drawn over the letters leaves cropped artwork and no ticker — see
-    // format.js's letterChip(). The logo belongs where the ticker is written next to it.
-    const chip = letterChip(symbol, a?.kind ?? 'stock');
+    // assetTile(), so the chip carries the token's logo with its initials as the fallback —
+    // the same treatment as a market row. It read as a smear for one pass because the image
+    // was drawn OVER the letters and every logo file has a transparent background; that is
+    // fixed in the tile itself now (format.js/token.js), not by taking the logo away.
+    const chip = assetTile(symbol, a?.kind ?? 'stock');
     chip.style.zIndex = String(shown.length - i);
     chip.title = a ? `${a.symbol} — ${a.name}` : symbol;
     wrap.append(chip);

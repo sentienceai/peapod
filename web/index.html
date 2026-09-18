@@ -73,7 +73,7 @@
   <section id="product" class="lp-section">
     <div class="lp-section-head lp-reveal">
       <span class="lp-eyebrow">[ WHAT YOU GET ]</span>
-      <h2 class="lp-h2">Where <em>real</em> wallets meet <em>real</em> data</h2>
+      <h2 class="lp-h2 lp-h2--lg">Where <em>real</em> wallets meet <em>real</em> data</h2>
     </div>
     <div class="lp-feature-grid">
 
@@ -200,17 +200,19 @@
           </div>
           <div class="lp-rule-row">
             <span class="lp-rule-kw lp-rule-kw--if">IF</span>
-            <span class="lp-rule-parts"><b>TSLA</b> falls <b>5%</b> in <b>24H</b></span>
+            <span class="lp-rule-parts"><b class="lp-rule-chip">TSLA</b> falls
+              <b class="lp-rule-chip">5%</b> in <b class="lp-rule-chip">24H</b></span>
           </div>
           <div class="lp-rule-connector" aria-hidden="true"></div>
           <div class="lp-rule-row">
             <span class="lp-rule-kw lp-rule-kw--then">THEN</span>
-            <span class="lp-rule-parts">buy <b>your set size</b>, take profit at <b>+8%</b></span>
+            <span class="lp-rule-parts">buy <b class="lp-rule-chip">your set size</b>
+              take profit at <b class="lp-rule-chip">+8%</b></span>
           </div>
           <div class="lp-rule-connector" aria-hidden="true"></div>
           <div class="lp-rule-row">
             <span class="lp-rule-kw lp-rule-kw--limit">LIMIT</span>
-            <span class="lp-rule-parts">max <b>3 trades</b> per day</span>
+            <span class="lp-rule-parts">max <b class="lp-rule-chip">3 trades</b> per day</span>
           </div>
         </div>
         <div class="lp-activity-card">
@@ -221,10 +223,30 @@
                  the log this rule will keep rather than one it kept. -->
             <span class="lp-activity-badge"><i class="lp-dot" aria-hidden="true"></i>Preview</span>
           </div>
-          <div class="lp-activity-row"><i class="lp-dot lp-dot--warn" aria-hidden="true"></i><span>Rule matches &mdash; TSLA falls past your trigger</span></div>
-          <div class="lp-activity-row"><i class="lp-dot" aria-hidden="true"></i><span>It buys TSLA at the size you set</span></div>
-          <div class="lp-activity-row"><i class="lp-dot lp-dot--accent" aria-hidden="true"></i><span>It sells at your take-profit</span></div>
-          <div class="lp-activity-row"><i class="lp-dot lp-dot--faint" aria-hidden="true"></i><span>Not running yet &mdash; this is the log it will keep</span></div>
+          <!-- The frame's row is a title over a detail, with an amount and a time on the
+               right: "Bought TSLA / 1.46 shares at $342.18 / -$500.00 / 09:31". The shape is
+               kept and the right-hand column is not, because a fill, a size and a clock time
+               are the record of a run that has never happened. -->
+          <div class="lp-activity-row">
+            <i class="lp-activity-dot lp-dot--warn" aria-hidden="true"></i>
+            <span class="lp-activity-text"><span class="lp-activity-title">Rule matches</span>
+              <span class="lp-activity-detail">TSLA falls past your trigger</span></span>
+          </div>
+          <div class="lp-activity-row">
+            <i class="lp-activity-dot" aria-hidden="true"></i>
+            <span class="lp-activity-text"><span class="lp-activity-title">It buys TSLA</span>
+              <span class="lp-activity-detail">At the size you set, never more</span></span>
+          </div>
+          <div class="lp-activity-row">
+            <i class="lp-activity-dot lp-dot--accent" aria-hidden="true"></i>
+            <span class="lp-activity-text"><span class="lp-activity-title">It sells</span>
+              <span class="lp-activity-detail">At your take-profit, or your stop</span></span>
+          </div>
+          <div class="lp-activity-row">
+            <i class="lp-activity-dot lp-dot--faint" aria-hidden="true"></i>
+            <span class="lp-activity-text"><span class="lp-activity-title">Not running yet</span>
+              <span class="lp-activity-detail">This is the log it will keep</span></span>
+          </div>
         </div>
       </div>
     </div>

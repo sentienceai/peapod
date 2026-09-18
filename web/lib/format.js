@@ -165,28 +165,6 @@ export function assetTile(symbol, kind, extra) {
   return t;
 }
 
-/**
- * The identity chip the frames draw where tokens stack: 22px, one letter, no image.
- *
- * WHERE THE LOGO MAY GO, AND WHERE IT MAY NOT. A logo is a picture of a token and reads as
- * one only when the ticker is written beside it — a market row, a holdings row, an asset
- * header. In a stack of three 22px chips overlapping by 6px, nothing names the token but the
- * letters on the chip, and a square photograph drawn over those letters leaves a smear of
- * cropped artwork: the board's "top assets" column and the copy card's head both read as
- * unidentifiable. CopyTrade.dc.html and TraderModal.dc.html draw a letter in every one of
- * these, and that is what this builds.
- * @param {string} symbol @param {string} kind @param {string} [extra]
- */
-export function letterChip(symbol, kind, extra) {
-  const chip = node('span', `asset-tile asset-tile--${kind}${extra ? ` ${extra}` : ''}`,
-    (symbol || '?').slice(0, 1).toUpperCase());
-  chip.setAttribute('aria-hidden', 'true');
-  // Not an accessible name — the row or the profile this sits in already names the token —
-  // but a pointer can ask which one it is.
-  chip.title = symbol;
-  return chip;
-}
-
 /** A token as it reads in a row: tile, then ticker. @param {{symbol: string, kind: string}} a */
 export function token(a) {
   const wrap = node('span', 'token');

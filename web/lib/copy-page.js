@@ -38,7 +38,7 @@ import { openProfile } from './profile.js';
 import { openSetup } from './copy-setup.js';
 import { sparkline } from './spark.js';
 import {
-  node, el, icon, ICONS, compact, pct, signed, signedPct, shortAddr, ago, letterChip,
+  node, el, icon, ICONS, compact, pct, signed, signedPct, shortAddr, ago, assetTile,
 } from './format.js';
 import { mountChrome, mountFoot } from './chrome.js';
 
@@ -216,13 +216,13 @@ function buildCard(row) {
 
   const idCol = node('div', 'ct-card-id');
   idCol.append(node('span', 'mono ct-card-addr', shortAddr(row.address)));
-  // The frame's identity chips: a 22px circle per token, overlapped by 6px, carrying ONE
-  // letter. No logo goes here — see format.js's letterChip(): the image covers the letter
-  // that is the only thing naming the token in a stack with no ticker beside it.
+  // The frame's identity chips — a 22px circle per token, overlapped by 6px — carrying the
+  // token's logo, with its initials underneath for the tokens we have no file for. Same
+  // treatment as a market row: the logo is the identity, the letters are the fallback.
   const tokRow = node('div', 'ct-tokens');
   const shownTokens = row.tokens.slice(0, 3);
   shownTokens.forEach((sym, i) => {
-    const tile = letterChip(sym, state.tokenKind.get(sym) ?? 'stock', 'ct-token-tile');
+    const tile = assetTile(sym, state.tokenKind.get(sym) ?? 'stock', 'ct-token-tile');
     if (i > 0) tile.style.marginLeft = '-6px';
     tokRow.append(tile);
   });

@@ -848,6 +848,12 @@ function pairedGround(raw) {
   if (name === 'inv-fg') return ['inv-bg'];
   if (name === 'accent-ink') return ['accent'];
   if (name === 'inv-hover') return ['inv-bg'];
+  // The inverted card's own set: a softer foreground on that card, and the two chip inks
+  // that sit on their own washes. Naming the ground is not an exemption — the ratio is
+  // still checked, against the surface the text is actually drawn on.
+  if (name === 'inv-fg-soft') return ['inv-bg', 'inv-line'];
+  if (name === 'accent-on-inv') return ['accent-wash-inv'];
+  if (name === 'warn-on-inv') return ['warn-bg-inv'];
   const medal = /^medal-(gold|silver|bronze)$/.exec(name);
   if (medal) return [`medal-${medal[1]}-bg`];
   return null;

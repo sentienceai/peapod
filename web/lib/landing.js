@@ -33,7 +33,7 @@
  * window the board is ranked over instead of the frame's "24/7".
  */
 
-import { board, meta, assets } from './data.js';
+import { board, meta, assets, trader } from './data.js';
 import { mountChrome, mountFoot } from './chrome.js';
 import {
   node, el, compact, pct, signed, signedPct, shortAddr, token, assetTile,
@@ -160,7 +160,7 @@ function renderHeroTable(host, rows) {
  * actual top of the actual board.
  * @param {HTMLElement | null} host @param {any} row @param {Awaited<ReturnType<typeof assets>>} assetList
  */
-function renderExplore(host, row, assetList) {
+function renderExplore(host, row, assetList, /** @type {any} */ detail) {
   if (!host || !row) return;
   const kindOf = new Map(assetList.map((/** @type {AssetRow} */ a) => [a.symbol, a.kind]));
   const panel = node('div', 'lp-mock-panel');
@@ -171,11 +171,46 @@ function renderExplore(host, row, assetList) {
   top.append(id, signed(row.realized, 'lp-mock-pnl'));
   panel.append(top);
 
-  const chips = node('div', 'lp-token-row');
-  for (const sym of row.tokens.slice(0, 5)) {
-    chips.append(token({ symbol: sym, kind: kindOf.get(sym) ?? 'stock' }));
+  /*
+   * THE MIX BAR, WHICH IS THE FRAME'S AND IS ALSO MEASURED.
+   *
+   * Landing.dc.html draws a wallet's holdings split — NVDA 34%, HOOD 24%, and so on — over a
+   * portfolio value. A holdings split needs balances, which need the transfer index. What
+   * the build does publish per wallet is matched volume per token: how much of the money
+   * this address actually round-tripped went through each one. That is a real mix of a real
+   * wallet, so the bar is drawn from it and the caption says which mix it is, rather than
+   * letting a reader take it for a portfolio.
+   */
+  const stats = (detail?.tokenStats ?? []).filter((/** @type {any} */ t) => t.matched > 0)
+    .sort((/** @type {any} */ a, /** @type {any} */ b) => b.matched - a.matched);
+  const total = stats.reduce((/** @type {number} */ sum, /** @type {any} */ t) => sum + t.matched, 0);
+  if (total > 0) {
+    const shown = stats.slice(0, 5);
+    const bar = node('div', 'lp-mix-bar');
+    bar.setAttribute('aria-hidden', 'true');
+    shown.forEach((/** @type {any} */ t, /** @type {number} */ i) => {
+      const seg = node('i', `lp-mix-seg lp-mix-seg--${i + 1}`);
+      seg.style.flexGrow = String(t.matched / total);
+      bar.append(seg);
+    });
+    panel.append(bar);
+    const legend = node('div', 'lp-mix-legend');
+    shown.forEach((/** @type {any} */ t, /** @type {number} */ i) => {
+      const item = node('div', 'lp-mix-item');
+      item.append(node('i', `lp-mix-dot lp-mix-seg--${i + 1}`));
+      item.append(node('span', 'lp-mix-sym', t.symbol));
+      item.append(node('span', 'mono lp-mix-pct', pct(t.matched / total * 100, 0)));
+      legend.append(item);
+    });
+    panel.append(legend);
+    panel.append(node('span', 'lp-mix-caption', 'Share of matched volume, by token'));
+  } else {
+    const chips = node('div', 'lp-token-row');
+    for (const sym of row.tokens.slice(0, 5)) {
+      chips.append(token({ symbol: sym, kind: kindOf.get(sym) ?? 'stock' }));
+    }
+    panel.append(chips);
   }
-  panel.append(chips);
 
   const badge = node('div', 'lp-float-badge');
   badge.append(node('span', 'lp-float-label', `Win rate · ${row.roundTrips} closes`));
@@ -329,12 +364,20 @@ async function main() {
   mountChrome(el('chrome'), { current: 'home' });
 
   const [boardData, metaData, assetList] = await Promise.all([board(), meta(), assets()]);
+  /*
+   * The explore mock wants a wallet with more than one token in it, because the mix bar is
+   * the point of that card; rows[0] on this tape traded exactly one. It is still a real,
+   * ranked wallet and the card says which rank it is.
+   */
+  const mixRow = boardData.rows.find((/** @type {any} */ r) => (r.tokens?.length ?? 0) >= 3)
+    ?? boardData.rows[0];
+  const mixDetail = mixRow ? await trader(mixRow.address).catch(() => null) : null;
   mountFoot(el('foot'), metaData);
 
   renderHeroStats(el('hero-stats'), boardData, metaData, assetList);
   renderPodium(el('hero-podium'), boardData.rows);
   renderHeroTable(el('hero-table'), boardData.rows);
-  renderExplore(el('explore-mini'), boardData.rows[0], assetList);
+  renderExplore(el('explore-mini'), mixRow, assetList, mixDetail);
   renderSignalStats(el('signal-stats'), boardData, metaData, assetList);
   renderMarkets(assetList, boardData.rows);
 

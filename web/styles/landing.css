@@ -40,15 +40,19 @@
   margin: 0; max-width: 62rem; font-family: var(--font-display); font-weight: 400;
   font-size: 88px; line-height: 0.96; letter-spacing: -0.03em; text-align: center;
 }
+/* 68px is Landing.dc.html's size for every section heading on the page but two: the centred
+   "[ WHAT YOU GET ]" one is 72 and the closing banner is 104. This file had them all at 52,
+   which is why the page read as a smaller version of the frame rather than the frame. */
 .lp-h2 {
   margin: 0; font-family: var(--font-display); font-weight: 400;
-  font-size: 52px; line-height: 1.02; letter-spacing: -0.025em;
+  font-size: 68px; line-height: 1; letter-spacing: -0.025em;
 }
+.lp-h2--lg { font-size: 72px; }
 .lp-h2--wide { max-width: 44rem; }
 .lp-h2--inv { color: var(--inv-fg); }
 .lp-h3 {
   margin: 0; font-family: var(--font-display); font-weight: 400;
-  font-size: 34px; line-height: 1.05; letter-spacing: -0.02em;
+  font-size: 44px; line-height: 1.02; letter-spacing: -0.02em;
 }
 .lp-h1 em, .lp-h2 em, .lp-h3 em, .lp-cta-h em {
   /* --accent-text, not --accent: --accent is a FILL (2.65:1 on white, fine behind
@@ -57,7 +61,7 @@
   font-family: var(--font-display); font-style: italic; font-weight: 400; color: var(--accent-text);
 }
 .lp-eyebrow {
-  font-family: var(--font-mono); font-size: 13px; letter-spacing: 0.06em; color: var(--muted);
+  font-family: var(--font-mono); font-size: 13px; letter-spacing: 0.08em; color: var(--muted);
 }
 /* --subtle and --faint are fills/rules only (never text — see tokens.css); every step-number
    and secondary label on this page that read from --subtle now reads from --muted instead. */
@@ -177,21 +181,23 @@
 
 /* ── product feature cards ──────────────────────────────────────────────────────────────── */
 .lp-feature-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.lp-feature-grid { min-height: 560px; }
 .lp-feature-card {
-  box-sizing: border-box; padding: 32px; border-radius: var(--radius-card); border: 1px solid var(--line);
+  box-sizing: border-box; padding: 36px; border-radius: var(--radius-card); border: 1px solid var(--line);
   background: var(--sunken); display: flex; flex-direction: column; gap: 12px;
 }
-.lp-feature-p { margin: 0; max-width: 30rem; font-size: 16px; line-height: 1.5; color: var(--muted); }
+.lp-feature-p { margin: 0; max-width: 460px; font-size: 17px; line-height: 1.5; color: var(--muted); }
 .lp-feature-visual {
-  position: relative; flex-grow: 1; min-height: 260px; margin-top: 12px; border-radius: 18px;
+  position: relative; flex-grow: 1; min-height: 300px; margin-top: 16px; border-radius: 18px;
   overflow: hidden; background-color: var(--muted-bg-2);
   background-image: radial-gradient(var(--line-strong) 1px, transparent 1px); background-size: 18px 18px;
   display: flex; align-items: flex-start;
 }
 .lp-mock-panel {
-  position: relative; margin: 24px; width: min(360px, calc(100% - 48px)); box-sizing: border-box; padding: 16px;
-  border-radius: var(--radius-panel); background: var(--surface); box-shadow: var(--shadow-float);
-  display: flex; flex-direction: column; gap: 12px;
+  position: relative; margin: 30px 0 0 36px; width: min(340px, calc(100% - 48px));
+  box-sizing: border-box; padding: 18px; border-radius: var(--radius-panel);
+  background: var(--surface); box-shadow: var(--shadow-float);
+  display: flex; flex-direction: column; gap: 14px;
 }
 .lp-mock-row { display: flex; align-items: center; gap: 10px; }
 .lp-mock-id { flex-grow: 1; min-width: 0; display: flex; flex-direction: column; }
@@ -202,6 +208,26 @@
 .lp-mock-sub { font-size: 13px; color: var(--muted); }
 .lp-mock-row .lp-mock-pnl, .lp-mock-row strong { font-size: 17px; }
 .lp-token-row { display: flex; flex-wrap: wrap; gap: 10px; }
+/* The wallet's mix, the frame's 8px bar with a two-column key under it. The five colours are
+   positional — first segment, second segment — and carry no meaning beyond telling one slice
+   from the next, so they come from the asset pastels rather than from anything that means up
+   or down. */
+.lp-mix-bar { height: 8px; border-radius: 4px; overflow: hidden; display: flex; gap: 2px; }
+.lp-mix-seg { display: block; min-width: 2px; }
+.lp-mix-seg--1 { background: var(--fg); }
+.lp-mix-seg--2 { background: var(--subtle); }
+.lp-mix-seg--3 { background: var(--meme-fill); }
+.lp-mix-seg--4 { background: var(--accent); }
+.lp-mix-seg--5 { background: var(--line-strong-2); }
+.lp-mix-legend {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 18px; row-gap: 8px; font-size: 13px;
+}
+.lp-mix-item { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.lp-mix-dot { width: 8px; height: 8px; flex-shrink: 0; border-radius: 2px; display: block; }
+.lp-mix-sym { flex-grow: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lp-mix-pct { color: var(--muted); }
+.lp-mix-caption { font-size: 12px; color: var(--muted); }
 .lp-float-badge {
   position: absolute; right: 24px; bottom: 24px; box-sizing: border-box; padding: 12px 16px;
   border-radius: 16px; background: var(--inv-bg); color: var(--inv-fg); box-shadow: var(--shadow-float);
@@ -295,15 +321,18 @@
 .lp-split--reverse .lp-split-copy { order: 2; }
 .lp-split--reverse .lp-phones { order: 1; }
 .lp-split-copy { display: flex; flex-direction: column; gap: 18px; }
-.lp-split-p { margin: 0; font-size: 17px; line-height: 1.5; color: var(--muted); }
+.lp-split-p { margin: 0; font-size: 18px; line-height: 1.5; color: var(--muted); }
 .lp-split-p--dark { color: var(--inv-fg); opacity: 0.68; }
-.lp-split-visual { position: relative; min-height: 460px; }
+/* 588px is the frame's own height for this pair, and it is what keeps them apart: the rule
+   card sits at the top, the activity card is pinned to the bottom, and at 460 the second one
+   rode up over the first and covered the THEN and LIMIT rows. */
+.lp-split-visual { position: relative; min-height: 588px; }
 
 .lp-points { margin: 6px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
 .lp-points li { padding: 14px 0; border-top: 1px solid var(--line); display: flex; align-items: center; gap: 14px; }
 .lp-points-n { color: var(--muted); }
-.lp-points-t { flex-grow: 1; font-size: 16px; font-weight: 600; }
-.lp-points-note { font-size: 13px; color: var(--muted); }
+.lp-points-t { flex-grow: 1; font-size: 17px; font-weight: 600; }
+.lp-points-note { font-size: 14px; color: var(--muted); }
 
 .lp-rule-card {
   position: relative; width: min(420px, 100%); box-sizing: border-box; padding: 20px; border-radius: var(--radius-card);
@@ -311,24 +340,40 @@
   display: flex; flex-direction: column; margin-bottom: 24px;
 }
 .lp-rule-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; font-size: 16px; font-weight: 600; }
-.lp-rule-deploy { height: 28px; padding: 0 12px; border-radius: 8px; background: var(--accent); color: var(--accent-ink); font-size: 13px; font-weight: 700; display: flex; align-items: center; }
+.lp-rule-deploy {
+  height: 32px; padding: 0 14px; border-radius: var(--radius-button); background: var(--accent);
+  color: var(--accent-ink); font-size: 13px; font-weight: 700; display: flex; align-items: center;
+}
 .lp-rule-row {
   padding: 12px; border-radius: 14px; background: var(--inv-hover); display: flex; align-items: flex-start; gap: 10px;
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--inv-fg) 6%, transparent) inset;
 }
 .lp-rule-kw {
-  width: 48px; height: 26px; flex-shrink: 0; border-radius: 8px; font-family: var(--font-mono); font-size: 13px;
-  font-weight: 600; display: flex; align-items: center; justify-content: center; background: var(--inv-fg); color: var(--inv-bg);
+  width: 44px; height: 26px; flex-shrink: 0; border-radius: 8px; font-family: var(--font-mono);
+  font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center;
+  background: var(--inv-line); color: var(--inv-fg-soft);
 }
 .lp-rule-kw--then { background: var(--accent); color: var(--accent-ink); }
-.lp-rule-parts { flex-grow: 1; font-size: 15px; padding-top: 3px; opacity: 0.92; }
-.lp-rule-parts b { font-weight: 700; }
-.lp-rule-connector { height: 10px; margin-left: 23px; border-left: 2px dashed var(--inv-hover); }
+/* The frame gives LIMIT its own amber, which is the one place on this page a third colour
+   carries meaning: a cap is neither the condition nor the action. */
+.lp-rule-kw--limit { background: var(--warn-bg-inv); color: var(--warn-on-inv); }
+/* Values are chips, connectives are not — the frame's own split, and it is what makes the
+   row read as a sentence with the reader's own inputs picked out of it. */
+.lp-rule-parts {
+  flex-grow: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  font-size: 15px; padding-top: 3px; color: var(--inv-fg-soft);
+}
+.lp-rule-chip {
+  height: 28px; padding: 0 10px; border-radius: var(--radius-control-sm); font-weight: 600;
+  display: flex; align-items: center;
+  background: var(--accent-wash-inv); color: var(--accent-on-inv);
+}
+.lp-rule-connector { height: 12px; margin-left: 27px; border-left: 2px dashed var(--inv-line); }
 
 .lp-activity-card {
-  position: absolute; right: 0; bottom: 0; width: min(340px, 100%); box-sizing: border-box; padding: 18px;
+  position: absolute; right: 0; bottom: 0; width: min(380px, 100%); box-sizing: border-box; padding: 20px;
   border-radius: var(--radius-card); background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-float);
-  display: flex; flex-direction: column; gap: 10px;
+  display: flex; flex-direction: column; gap: 12px;
 }
 .lp-activity-head { display: flex; align-items: center; justify-content: space-between; font-size: 15px; font-weight: 700; }
 .lp-activity-badge {
@@ -337,8 +382,21 @@
   height: 24px; padding: 0 9px; border-radius: 12px; background: var(--muted-bg); color: var(--muted); font-size: 13px;
   font-weight: 600; display: flex; align-items: center; gap: 6px;
 }
-.lp-activity-row { padding-top: 10px; border-top: 1px solid var(--muted-bg); display: flex; align-items: center; gap: 10px; font-size: 14px; }
+.lp-activity-row {
+  padding-top: 10px; border-top: 1px solid var(--muted-bg);
+  display: flex; align-items: center; gap: 12px;
+}
 .lp-activity-row:first-of-type { padding-top: 0; border-top: 0; }
+.lp-activity-dot { width: 9px; height: 9px; flex-shrink: 0; border-radius: 5px; display: block; background: var(--fg); }
+/* Compound, because .lp-dot--warn and friends are declared earlier in this file and would
+   otherwise lose the tie to the rule above on source order alone — which drew all four dots
+   in the same ink and lost the frame's sequence: waiting, filled, closed, idle. */
+.lp-activity-dot.lp-dot--accent { background: var(--accent); }
+.lp-activity-dot.lp-dot--warn { background: var(--warn-fill); }
+.lp-activity-dot.lp-dot--faint { background: var(--faint); }
+.lp-activity-text { flex-grow: 1; min-width: 0; display: flex; flex-direction: column; }
+.lp-activity-title { font-size: 14px; font-weight: 600; }
+.lp-activity-detail { font-size: 12px; color: var(--muted); }
 
 /* ── mobile phones ───────────────────────────────────────────────────────────────────────── */
 .lp-phones { position: relative; min-height: 440px; }
