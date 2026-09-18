@@ -126,7 +126,13 @@ def write_days(df: pl.DataFrame, root: Path, ts: np.ndarray) -> dict[str, int]:
             continue
         out = root / f"dt={day}"
         out.mkdir(parents=True, exist_ok=True)
-        n = len(list(out.glob("part-*.parquet")))
+        # ONE PAST THE HIGHEST, not the count. A day whose parts have a gap in them — a
+        # crash between two writes, or a compaction interrupted — has fewer files than its
+        # highest index, and counting would hand back a name that already exists and
+        # overwrite somebody else's rows.
+        used = [int(q.stem.split("-")[-1]) for q in out.glob("part-*.parquet")
+                if q.stem.split("-")[-1].isdigit()]
+        n = max(used) + 1 if used else 0
         tmp = out / f".part-{n:05d}.parquet.tmp"
         chunk.write_parquet(tmp)
         tmp.rename(out / f"part-{n:05d}.parquet")   # rename is atomic within a directory
@@ -318,14 +324,23 @@ def compact(root: Path, dedup_on: tuple[str, ...] = ("block", "log_index"),
         if df is None or not df.height:
             continue
         before = sum(p.stat().st_size for p in parts)
+        # THE DAY IS NEVER SHORT OF ROWS, AT ANY INSTANT. The obvious order — delete the
+        # originals, then rename the merged file into place — has a window between the two
+        # where a kill leaves the day empty and the merged rows sitting under a dotted name
+        # no reader globs. So the merged file becomes a REAL part first, under an index
+        # nothing else uses; then the originals go, with the day fully readable throughout
+        # (the reader dedups, so the overlap is invisible); then it takes the first index.
+        # A crash at any point leaves a day that reads correctly and a spare part the next
+        # compaction folds away.
         tmp = day / ".compact.parquet.tmp"
         df.write_parquet(tmp)
-        merged = day / "part-00000.parquet"
-        # The merged file takes the first index; everything else goes, including the file
-        # that index used to name — so it is written aside and moved in one rename.
+        staged = day / "part-99999.parquet"
+        tmp.rename(staged)
         for p in parts:
-            p.unlink()
-        tmp.rename(merged)
+            if p != staged:
+                p.unlink()
+        merged = day / "part-00000.parquet"
+        staged.rename(merged)
         report["days"] += 1
         report["parts_before"] += len(parts)
         report["parts_after"] += 1

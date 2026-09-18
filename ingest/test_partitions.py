@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime as dt
+from pathlib import Path
 
 import numpy as np
 import polars as pl
@@ -280,3 +281,55 @@ def test_compaction_never_holds_more_than_one_part_beyond_the_result(tmp_path, m
     # Five reads of two rows each, never one read of ten.
     assert live == [2, 2, 2, 2, 2], live
     assert read_days(dst, dedup_on=("block", "log_index")).height == 2
+
+
+def test_a_day_is_never_short_of_rows_while_it_is_being_compacted(tmp_path, monkeypatch):
+    """A kill between "delete the originals" and "rename the merged file" must not empty
+    the day. The merged rows become a real part BEFORE anything is removed, so every
+    instant of the swap has a readable day — the reader dedups the overlap."""
+    dst = tmp_path / "days"
+    clock = clock_for([(100, 1_700_000_000), (200, 1_700_000_001)])
+    for i in range(3):
+        src = flat(tmp_path / f"s{i}", [(100, 0), (200, 0)])
+        migrate(src, dst, clock, incremental=False)
+    day = dst / "dt=2023-11-14"
+
+    real_unlink = Path.unlink
+    state = {"n": 0}
+
+    def crash_on_second_unlink(self, *a, **kw):
+        state["n"] += 1
+        if state["n"] == 2:
+            raise KeyboardInterrupt("killed mid-compaction")
+        return real_unlink(self, *a, **kw)
+
+    monkeypatch.setattr(Path, "unlink", crash_on_second_unlink)
+    with pytest.raises(KeyboardInterrupt):
+        compact(dst)
+    monkeypatch.undo()
+
+    got = read_days(dst, dedup_on=("block", "log_index"))
+    assert sorted(got["block"].to_list()) == [100, 200], "the crash lost the day's rows"
+    # And the next run tidies up what the crash left behind.
+    compact(dst)
+    assert len(list(day.glob("part-*.parquet"))) == 1
+    assert not list(day.glob("*.tmp"))
+
+
+def test_a_gap_in_the_part_numbers_does_not_overwrite_a_part(tmp_path):
+    """Names come from one past the highest index, not from the count.
+
+    A day whose parts are 00000 and 00002 — a crash between two writes — has two files and
+    a highest index of two, and naming the next one by the count would write part-00002
+    straight over somebody else's rows.
+    """
+    root = tmp_path / "days"
+    day = root / "dt=2023-11-14"
+    day.mkdir(parents=True)
+    for n in (0, 2):
+        pl.DataFrame([(100 + n, 0)], schema={"block": pl.Int64, "log_index": pl.Int64},
+                     orient="row").write_parquet(day / f"part-{n:05d}.parquet")
+    write_days(pl.DataFrame([(300, 0)], schema={"block": pl.Int64, "log_index": pl.Int64},
+                            orient="row"), root, np.array([1_700_000_000]))
+    got = read_days(root, dedup_on=("block", "log_index"))
+    assert sorted(got["block"].to_list()) == [100, 102, 300], "a part was overwritten"
