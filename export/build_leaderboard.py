@@ -741,25 +741,50 @@ def write_address(addr: str, state, lo: int, hi: int, out: Path | None, provenan
 
 
 def ticker_addresses(tokens: pl.DataFrame) -> dict[str, str]:
-    """ticker -> contract address, for the tickers where that map is unambiguous.
+    """ticker -> contract address, for the tickers that name exactly one contract.
 
-    The same rule the logo map uses, for the same reason: three tickers in the registry
-    resolve to more than one address ("P" covers four), and a supply read off the wrong
-    contract is a market cap for a different company. Those tickers get nothing.
+    AMBIGUITY IS COUNTED ACROSS BOTH SOURCES, which is the whole of this function. The
+    registry has four contracts whose symbol is "P"; the logo map has always refused to
+    give that ticker a picture for exactly that reason. This function refused too — and
+    then handed the ticker straight back, because the fallback that names the Pons side
+    (whose symbols have to be read off the chain) ran `setdefault` per address and the
+    first "P" it met won.
+
+    What that produced was live for one cycle: P's price came from the tokenized equity
+    and P's supply from a memecoin with a billion tokens, and the market cap column showed
+    their product — $105.7 BILLION, on a chain whose entire 24-hour volume is under $50M.
+    It is the exact shape of failure this repository exists to refuse: two real numbers
+    about two different things, multiplied.
+
+    The chain map duplicates "GME" and "AMD" the same way. So both sources go into one
+    table and a ticker survives only if every contract that answers to it is the same one.
     """
-    rwa = tokens.filter(pl.col("kind") == "rwa_spot")
-    by_ticker: dict[str, list[str]] = defaultdict(list)
-    for row in rwa.iter_rows(named=True):
-        by_ticker[row["symbol"]].append(row["address"].lower())
-    out = {t: a[0] for t, a in by_ticker.items() if len(a) == 1}
-    # The Pons side, whose symbols the equity registry never carried.
+    by_ticker: dict[str, set[str]] = defaultdict(set)
+    for row in tokens.filter(pl.col("kind") == "rwa_spot").iter_rows(named=True):
+        by_ticker[row["symbol"]].add(row["address"].lower())
     try:
         from token_decimals import symbols as chain_symbols  # noqa: PLC0415
         for addr, sym in chain_symbols().items():
-            out.setdefault(sym, addr.lower())
+            if sym:
+                by_ticker[sym].add(addr.lower())
     except Exception:                                        # noqa: BLE001
         pass
-    return out
+    return {t: next(iter(a)) for t, a in by_ticker.items() if len(a) == 1}
+
+
+def ambiguous_tickers(tokens: pl.DataFrame) -> set[str]:
+    """Tickers more than one contract answers to. They get no logo and no supply."""
+    by_ticker: dict[str, set[str]] = defaultdict(set)
+    for row in tokens.filter(pl.col("kind") == "rwa_spot").iter_rows(named=True):
+        by_ticker[row["symbol"]].add(row["address"].lower())
+    try:
+        from token_decimals import symbols as chain_symbols  # noqa: PLC0415
+        for addr, sym in chain_symbols().items():
+            if sym:
+                by_ticker[sym].add(addr.lower())
+    except Exception:                                        # noqa: BLE001
+        pass
+    return {t for t, a in by_ticker.items() if len(a) > 1}
 
 
 def supplies(tokens: pl.DataFrame) -> dict[str, dict]:
@@ -791,22 +816,19 @@ def write_token_logos(tokens: pl.DataFrame, web: Path, store=None) -> dict:
     logo_dir = web / "token-logos"
     files = {p.stem.lower(): p.name for p in logo_dir.iterdir()
              if p.is_file() and p.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp"}}
-    rwa = tokens.filter(pl.col("kind") == "rwa_spot")
-    by_ticker: dict[str, list[str]] = defaultdict(list)
-    for row in rwa.iter_rows(named=True):
-        by_ticker[row["symbol"]].append(row["address"].lower())
-    mapping = {t: files[a[0]] for t, a in by_ticker.items()
-               if len(a) == 1 and a[0] in files}
+    # One rule for both maps: a ticker that more than one contract answers to gets
+    # nothing. It used to be computed here over the registry alone, and then the chain
+    # symbols below handed the ambiguous ones back through setdefault.
+    unambiguous = ticker_addresses(tokens)
+    mapping = {t: files[a] for t, a in unambiguous.items() if a in files}
     # Also key by contract address. 204 of the logo files are for tokens the equity
     # registry never named — Pons tokens whose symbol had to be read off the chain — and
     # a ticker-only map cannot reach them.
-    from token_decimals import symbols as chain_symbols  # noqa: PLC0415
     for addr, name in files.items():
         mapping.setdefault(addr, name)
-    for a, sy in chain_symbols().items():
-        if a.lower() in files:
-            mapping.setdefault(sy, files[a.lower()])
-    ambiguous = sorted(t for t, a in by_ticker.items() if len(a) > 1)
+    ambiguous = sorted(ambiguous_tickers(tokens))
+    for t in ambiguous:
+        mapping.pop(t, None)
     (web / "data" / "tokens.json").write_text(json.dumps(mapping, sort_keys=True))
     # Also into the store: the container has no checked-in web/data, so a page
     # that fetched the file would silently lose every logo before the first cycle.
@@ -984,6 +1006,7 @@ def main() -> int:
     gaps = json.loads(gaps_path.read_text()) if gaps_path.exists() else []
     g = gatemod.run(gatemod.Gates(), before=before, stats=stats, trades=trades,
                     asset_rows=shipped_asset_rows,
+                    ambiguous=ambiguous_tickers(__import__("registry").tokens()),
                     views=index["views"], declared=[s["id"] for s in SCOPES],
                     missing_ranked=len(ranked - stored),
                     address_count=store.counts()["addresses"], eth=eth_stats, gaps=gaps)

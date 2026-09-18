@@ -23,7 +23,7 @@
   "test/site.test.mjs": 10,
   "test/tick-math-sweep.test.mjs": 6,
   "test/wait-for-pid.test.mjs": 7,
-  "export/test_assets.py": 22,
+  "export/test_assets.py": 24,
   "export/test_bandwalk.py": 8,
   "export/test_build_output.py": 17,
   "export/test_figures.py": 6,

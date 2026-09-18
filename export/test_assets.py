@@ -11,7 +11,8 @@ from __future__ import annotations
 import polars as pl
 import pytest
 
-from build_leaderboard import ASSET_TRADES, addressable, assets
+from build_leaderboard import (ASSET_TRADES, addressable, ambiguous_tickers, assets,
+                               ticker_addresses)
 
 SCHEMA = {"addr": pl.String, "label": pl.String, "cat": pl.String, "qty": pl.Float64,
           "usd": pl.Float64, "ts": pl.Int64, "quote": pl.String}
@@ -233,3 +234,42 @@ def test_a_cap_under_a_cent_is_not_a_cap():
     a = assets(tape(rows), NOW, supply={"T": {"supply": 1.0, "read_at": NOW}})[0]["asset"]
     assert a["price"] is not None and a["price"] > 0
     assert a["market_cap"] is None
+
+
+# ── one ticker, one contract ─────────────────────────────────────────────────────────────
+
+def test_a_ticker_more_than_one_contract_answers_to_gets_no_supply():
+    """WHAT THIS COST. Four contracts on this chain answer symbol() == "P". The logo map
+    had always refused that ticker; the supply map refused it too and then handed it back,
+    because the fallback that names the Pons side ran setdefault per address and the first
+    "P" it met won. Live for one cycle: P's price from the tokenized equity, P's supply
+    from a memecoin with a billion tokens, and the market cap column showing the product —
+    $105.7 BILLION, on a chain whose entire day of volume is under $50M.
+    """
+    tokens = pl.DataFrame(
+        [("0xaaa", "P", "rwa_spot", 18), ("0xbbb", "P", "rwa_spot", 18),
+         ("0xccc", "SOLO", "rwa_spot", 18)],
+        schema={"address": pl.Utf8, "symbol": pl.Utf8, "kind": pl.Utf8, "decimals": pl.Int64},
+        orient="row")
+    assert "P" not in ticker_addresses(tokens)
+    assert ticker_addresses(tokens)["SOLO"] == "0xccc"
+    # A superset: the chain-read symbol cache on this machine duplicates GME and AMD too,
+    # and this function reads it. What matters is that a duplicated ticker is in here.
+    assert "P" in ambiguous_tickers(tokens)
+
+
+def test_the_ambiguity_is_counted_across_the_registry_and_the_chain(monkeypatch):
+    """The two sources are one table. A ticker the registry names once and the chain names
+    again, for a different contract, is ambiguous — that is how GME and AMD look here."""
+    import build_leaderboard as b  # noqa: PLC0415
+    tokens = pl.DataFrame(
+        [("0xaaa", "GME", "rwa_spot", 18)],
+        schema={"address": pl.Utf8, "symbol": pl.Utf8, "kind": pl.Utf8, "decimals": pl.Int64},
+        orient="row")
+    import token_decimals  # noqa: PLC0415
+    monkeypatch.setattr(token_decimals, "symbols", lambda extra=None: {"0xbbb": "GME"})
+    assert "GME" not in b.ticker_addresses(tokens)
+    assert "GME" in b.ambiguous_tickers(tokens)
+    # And the one the chain names once keeps its address: this is not a blanket refusal.
+    monkeypatch.setattr(token_decimals, "symbols", lambda extra=None: {"0xddd": "PONSONLY"})
+    assert b.ticker_addresses(tokens)["PONSONLY"] == "0xddd"

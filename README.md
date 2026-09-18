@@ -4,9 +4,9 @@ Realized profit and loss for every address that has traded on **Robinhood Chain*
 (Arbitrum Orbit L2, chain 4663), across both tokenized equities and the Pons memecoin
 pools, in one ranking. Searchable by address, whether or not the address ranks.
 
-Over the current seven-day window: **117,887 addresses traded, 29,538 of them closed a
-round-trip.** 64.9% of those finished in profit, which sounds healthy until you see the
-sizes: the best made $175,266, the median made **$0.57**, and the top 1% took 47% of
+Over the current seven-day window: **116,367 addresses traded, 29,485 of them closed a
+round-trip.** 64.8% of those finished in profit, which sounds healthy until you see the
+sizes: the best made $175,611, the median made **$0.57**, and the top 1% took 47% of
 everything won.
 
 ## What it measures, and what it does not
@@ -138,8 +138,8 @@ exactly the kind of fault that arrives on a cold volume.
 - **Coverage percentages are shares of this universe**, not of the chain. An address that
   qualifies has closed at least one round-trip *in these pools in this window*; an address
   that does not still gets a page explaining what it did do.
-- **RWA looks safer than Pons and is not.** 84.8% of qualifying RWA addresses are in
-  profit against 46.6% on Pons, but the best RWA result is $4,796 against $175,266. The
+- **RWA looks safer than Pons and is not.** 84.7% of qualifying RWA addresses are in
+  profit against 46.6% on Pons, but the best RWA result is $4,796 against $175,611. The
   higher success rate reflects how little is at stake. The interface says so on that tab.
 - **Elapsed times are measured from the end of the tape**, not from now, because the data
   is a fixed historical window.

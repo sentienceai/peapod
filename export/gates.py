@@ -76,7 +76,7 @@ def snapshot(store) -> dict:
 def run(gates: Gates, *, before: dict, stats: dict, trades, views: list,
         missing_ranked: int, address_count: int, eth: dict | None,
         gaps: list | None = None, declared: list | None = None,
-        asset_rows: list | None = None) -> Gates:
+        asset_rows: list | None = None, ambiguous: set | list | None = None) -> Gates:
     first = not before.get("build")
 
     # 0. A range the ingest could not read. This is the only gate that describes the tape
@@ -174,6 +174,18 @@ def run(gates: Gates, *, before: dict, stats: dict, trades, views: list,
         gates.check("the supply read is from this cycle", not ages or oldest < 2 * 3600,
                     f"{len(priced):,} of {len(rows):,} tokens have a supply; "
                     f"oldest read {oldest / 60:.0f} minutes ago", fatal=False)
+
+    # 6d. A supply belongs to ONE contract. Four contracts on this chain answer to the
+    #     ticker "P", and two more pairs share GME and AMD; for one cycle the site showed
+    #     P's price from a tokenized equity times a memecoin's billion-token supply, and
+    #     called the product a $105.7 BILLION market cap on a chain whose whole day of
+    #     volume is under $50M. The build's ticker->contract map refuses an ambiguous
+    #     ticker; this refuses to publish if one ever slips through it again.
+    if rows and ambiguous:
+        leaked = sorted({r["symbol"] for r in rows
+                         if r.get("supply") is not None and r["symbol"] in set(ambiguous)})
+        gates.check("no ambiguous ticker carries a supply", not leaked,
+                    f"{len(leaked)} ticker(s) more than one contract answers to: {leaked[:5]}")
 
     # 7. Numbers are numbers. NaN and Infinity are not JSON and would break the page at
     #    parse time, which is a blank screen rather than a wrong figure.
