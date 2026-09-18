@@ -76,6 +76,10 @@ if [ "${CYCLE_SKIP_INGEST:-0}" != "1" ]; then
   stage "compact days" $PY ingest/partitions.py --compact --min-parts 24 \
                                                                    || say "compaction skipped"
   stage "eth/usd"      $PY ingest/eth_usd.py --stage series        || exit 1
+  # DECIMALS FIRST, because supply cannot be scaled without them. This is the read that IS
+  # cached: decimals are a property of the contract, so the stage is a no-op the moment
+  # every priced token is known and costs one eth_call each for the ones that are not.
+  stage "token decimals" $PY ingest/token_decimals.py                || say "token decimals FAILED; new tokens will have no supply until it succeeds"
   # SUPPLY IS READ EVERY CYCLE, unlike decimals, which are read once and cached: a
   # Robinhood-issued token is minted on the way in and burned on the way out, so the number
   # moves on its own. One eth_call per token, ~294 of them in 6 batched requests, well under

@@ -107,23 +107,26 @@ def symbols(extra: dict[str, str] | None = None) -> dict[str, str]:
 
 
 def main() -> int:
+    """Read decimals for every priced token that does not have them yet.
+
+    IT IS A CYCLE STAGE NOW, and it needs no checkout. The `root = lp_terminal()` this
+    opened with was dead — nothing below it used the value, and it was the only line tying
+    a stage that reads the vendored registry to an lp-terminal tree that no container has.
+    Meanwhile the deployed supply read was reporting "60 answered but have no decimals and
+    cannot be scaled": 60 tokens whose supply the chain gave us and which the site could
+    not turn into a market cap, because nothing in the container had ever read their
+    decimals. It is a no-op once the cache is warm — the work is whatever is still unknown.
+    """
     import sys  # noqa: PLC0415
     sys.path.insert(0, str(HERE.parent / "export"))
-    from upstream import lp_terminal  # noqa: PLC0415
-    root = lp_terminal()
-    # Only the pools the leaderboard prices, not all 384,930 on the chain.
-    import sys as _s; _s.path.insert(0, str(HERE.parent / "export"))
-    from registry import basket as _basket, pools as _pools, tokens as _tokens  # noqa: PLC0415
-    basket = _basket()
-    ids = {t["pair"] for t in basket["tokens"] if t.get("pair")}
-    pools = _pools()
+    from registry import tokens as _tokens  # noqa: PLC0415
     tok = _tokens()
     have = {a for a, d in zip(tok["address"], tok["decimals"]) if d is not None}
-    # Only the 90 Pons pools. Everything the RWA side prices already has decimals in the
-    # registry; filtering 384,930 pools with two large is_in lists takes minutes and finds
-    # nothing extra.
-    priced = pools.filter(pl.col("pool_id").is_in(list(ids)))
-    wanted = set(priced["currency0"].to_list()) | set(priced["currency1"].to_list())
+    # EVERY TOKEN THE SITE PRICES, not only the basket's own pairs. Scoping this to the
+    # basket covered 106 addresses; the site ships 253 tokens, and the ones it left out are
+    # exactly the Pons side the registry never named.
+    wanted = {str(a).lower() for a in tok["address"].to_list()
+              if isinstance(a, str) and a.startswith("0x")}
     todo = sorted(a for a in wanted if a not in have or a not in symbols())
     print(f"{len(wanted):,} tokens in pools, {len(have):,} already have decimals, "
           f"{len(todo):,} to read from the chain")
