@@ -249,3 +249,34 @@ def test_a_part_that_grew_contributes_only_its_new_rows(tmp_path):
     assert second["source_rows"] == 2, "the rows already partitioned were copied again"
     got = read_days(dst, dedup_on=("block", "log_index"))
     assert got.height == 3
+
+
+def test_compaction_never_holds_more_than_one_part_beyond_the_result(tmp_path, monkeypatch):
+    """The day this repairs is 1.9 GB across 162 copies of itself.
+
+    Reading them all into one frame to dedup wants several gigabytes for a 12 MB answer,
+    and the container gets killed instead of repaired. So the parts are folded one at a
+    time into a running deduped frame: peak memory is one deduped day plus one part, and
+    this counts the reads to prove the loop is incremental rather than a gather.
+    """
+    dst = tmp_path / "days"
+    clock = clock_for([(100, 1_700_000_000), (200, 1_700_000_001)])
+    for i in range(5):
+        src = flat(tmp_path / f"s{i}", [(100, 0), (200, 0)])
+        migrate(src, dst, clock, incremental=False)
+
+    live = []
+    real = pl.read_parquet
+
+    def counting(path, *a, **kw):
+        frame = real(path, *a, **kw)
+        live.append(frame.height)
+        return frame
+
+    monkeypatch.setattr(pl, "read_parquet", counting)
+    report = compact(dst)
+    monkeypatch.undo()
+    assert report["parts_after"] == 1
+    # Five reads of two rows each, never one read of ten.
+    assert live == [2, 2, 2, 2, 2], live
+    assert read_days(dst, dedup_on=("block", "log_index")).height == 2

@@ -32,6 +32,6 @@
   "export/test_windows_built.py": 7,
   "ingest/test_dedup.py": 11,
   "ingest/test_eth_usd.py": 11,
-  "ingest/test_partitions.py": 20,
+  "ingest/test_partitions.py": 21,
   "ingest/test_swaps_fetch.py": 40
 }

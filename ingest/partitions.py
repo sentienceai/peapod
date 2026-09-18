@@ -296,21 +296,27 @@ def compact(root: Path, dedup_on: tuple[str, ...] = ("block", "log_index"),
         # few file handles. Left to accumulate a day's worth of small parts first.
         if len(parts) < max(2, min_parts):
             continue
-        frames = []
-        for p in parts:
-            try:
-                frames.append(pl.read_parquet(p))
-            except Exception:                       # noqa: BLE001
-                continue                            # a part a crash left short
-        if not frames:
-            continue
+        # ONE PART AT A TIME, DEDUPED AS IT GOES. A day on the volume this repairs is 1.9 GB
+        # across 162 copies of itself; reading them all into one frame before deduping wants
+        # several gigabytes of RAM for a result that is 12 MB, and the container would be
+        # killed rather than repaired. Folding each part into a running deduped frame keeps
+        # the peak at one deduped day plus one part.
+        #
         # Diagonal for the same reason migrate() is: a day can hold parts from two
         # generations of the ingest's schema, and the older one is missing columns rather
         # than disagreeing about their type.
-        df = pl.concat(frames, how="diagonal_relaxed")
-        have = tuple(c for c in dedup_on if c in df.columns)
-        if have:
-            df = df.unique(subset=have)
+        df = None
+        for p in parts:
+            try:
+                one = pl.read_parquet(p)
+            except Exception:                       # noqa: BLE001
+                continue                            # a part a crash left short
+            df = one if df is None else pl.concat([df, one], how="diagonal_relaxed")
+            have = tuple(c for c in dedup_on if c in df.columns)
+            if have:
+                df = df.unique(subset=have)
+        if df is None or not df.height:
+            continue
         before = sum(p.stat().st_size for p in parts)
         tmp = day / ".compact.parquet.tmp"
         df.write_parquet(tmp)
