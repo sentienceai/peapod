@@ -22,12 +22,14 @@
 
 import { assets, meta } from './data.js';
 import { mountChrome, mountFoot } from './chrome.js';
-import { assetTile, compact, el, icon, ICONS, node, price, signed } from './format.js';
+import { assetTile, compact, el, icon, ICONS, node, price, signed, units } from './format.js';
 
 const PAGE = 40;
 
-/** @typedef {{symbol: string, kind: string, price: number|null, change24h: number|null,
- *   volume24h: number, volume: number, traders: number, trades: number}} Asset */
+/** @typedef {{symbol: string, kind: string, price: number|null, change1h: number|null,
+ *   change24h: number|null, change7d: number|null, supply: number|null,
+ *   market_cap: number|null, volume24h: number, volume: number, traders: number,
+ *   trades: number}} Asset */
 
 const KINDS = [
   { id: 'all', label: 'All' },
@@ -40,7 +42,7 @@ const state = {
   /** @type {any} */ meta: null,
   kind: 'all',
   query: '',
-  sort: /** @type {'volume24h' | 'volume' | 'traders' | 'trades' | 'change24h' | 'symbol'} */ ('volume24h'),
+  sort: /** @type {string} */ ('volume24h'),
   dir: -1,
   limit: PAGE,
 };
@@ -50,12 +52,35 @@ const state = {
 const COLUMNS = ([
   { key: 'symbol', label: 'Token', align: 'left' },
   { key: 'price', label: 'Last trade', align: 'right', sortable: false },
+  { key: 'change1h', label: '1H', align: 'right' },
   { key: 'change24h', label: '24H', align: 'right' },
+  { key: 'change7d', label: '7D', align: 'right' },
+  // "Token mcap", not "Market cap": these are tokens issued on Robinhood Chain, and the
+  // supply on this chain is a small fraction of the company's shares. NVDA's token cap is
+  // tens of millions against a company in the trillions, and a column headed "Market cap"
+  // beside a ticker everybody recognises will be read as the company's every time.
+  { key: 'market_cap', label: 'Token mcap', align: 'right' },
+  { key: 'supply', label: 'Supply', align: 'right' },
   { key: 'volume24h', label: '24H volume', align: 'right' },
-  { key: 'volume', label: 'Window volume', align: 'right' },
   { key: 'traders', label: 'Traders', align: 'right' },
   { key: 'trades', label: 'Trades', align: 'right' },
 ]);
+
+/**
+ * A cell with nothing in it, and a reason a pointer can find.
+ *
+ * NOT A DASH AND NOT A ZERO. A zero is a measurement — "it did not move", "nothing is
+ * issued" — and this is the absence of one. A dash is better but it is still a mark in a
+ * column of figures, and on a table with three change columns most rows would be dashes
+ * for want of a tape that goes back far enough. So the cell is empty and says why when
+ * asked.
+ * @param {string} why
+ */
+function blank(why) {
+  const cell = node('div', 'row-cell num mk-none');
+  cell.title = why;
+  return cell;
+}
 
 /** @param {Asset} a */
 function row(a) {
@@ -69,21 +94,35 @@ function row(a) {
   who.append(node('span', 'mk-kind', a.kind === 'meme' ? 'Memecoin' : 'Stock'));
   r.append(who);
 
-  r.append(node('div', 'row-cell num', a.price === null ? '—' : price(a.price)));
+  // A price of zero is not a price — one token on this tape divides out to exactly that —
+  // so the build sends null and the cell is empty.
+  r.append(a.price === null || !Number.isFinite(a.price)
+    ? blank('The last trade on this tape divides out to zero; that is not a price')
+    : node('div', 'row-cell num', price(a.price)));
 
-  // A change is a signed figure, so it carries the sign three ways. A missing one is a dash
-  // and not a zero: "no trade 24 hours back" and "flat" are different facts.
-  const chg = node('div', 'row-cell num');
-  if (a.change24h === null || !Number.isFinite(a.change24h)) {
-    chg.append(node('span', 'mk-none', '—'));
-    chg.title = 'No trade in this window 24 hours back to measure from';
-  } else {
-    chg.append(signed(a.change24h, undefined, (/** @type {number} */ n) => `${n.toFixed(2)}%`));
+  // Each change is a signed figure and carries the sign three ways. An absent one means the
+  // tape holds no trade at or before that boundary — for 7D, that is every token that first
+  // traded inside the last week, and every token at all until the tape is a week deep.
+  for (const [key, label] of [['change1h', 'an hour'], ['change24h', '24 hours'],
+    ['change7d', '7 days']]) {
+    const v = /** @type {any} */ (a)[key];
+    if (v === null || !Number.isFinite(v)) {
+      r.append(blank(`No trade on this tape ${label} back to measure from`));
+    } else {
+      const cell = node('div', 'row-cell num');
+      cell.append(signed(v, undefined, (/** @type {number} */ n) => `${n.toFixed(2)}%`));
+      r.append(cell);
+    }
   }
-  r.append(chg);
+
+  r.append(a.market_cap === null || !Number.isFinite(a.market_cap)
+    ? blank('Needs both a price and a supply this build could read')
+    : node('div', 'row-cell num', compact(a.market_cap)));
+  r.append(a.supply === null || !Number.isFinite(a.supply)
+    ? blank('This token did not answer totalSupply(), or its decimals are unknown')
+    : node('div', 'row-cell num', units(a.supply)));
 
   r.append(node('div', 'row-cell num', compact(a.volume24h)));
-  r.append(node('div', 'row-cell num', compact(a.volume)));
   r.append(node('div', 'row-cell num', Number(a.traders).toLocaleString('en-US')));
   r.append(node('div', 'row-cell num', Number(a.trades).toLocaleString('en-US')));
   return r;
@@ -150,9 +189,16 @@ function render() {
   el('note').textContent = `${rows.length.toLocaleString('en-US')} of `
     + `${state.rows.length.toLocaleString('en-US')} tokens traded over ${state.meta?.windowLabel ?? 'the window'}. `
     + 'Price is the last trade the tape holds for a token — an execution against a pool, not '
-    + 'a mid and not a quote, and on a thin token it can be hours old. Volume is the quote '
-    + 'side of every swap, converted at each trade’s own timestamp. Holder counts and '
-    + 'market caps are not here: both need an ERC-20 transfer index this build does not have.';
+    + 'a mid and not a quote, and on a thin token it can be hours old. 1H, 24H and 7D compare '
+    + 'it with the last trade at or before each of those marks; a token with no trade that far '
+    + 'back shows nothing there, and nothing is also what the whole 7D column shows until the '
+    + 'tape itself is seven days deep. Supply is totalSupply() read from each token contract '
+    + 'once per build — these tokens are minted and burned as people move the underlying on '
+    + 'and off this chain, so it moves. Token mcap is that supply times that last trade: it is '
+    + 'the market cap of the TOKEN on Robinhood Chain and not of the company, and for a '
+    + 'tokenized equity the two are orders of magnitude apart. Volume is the quote side of '
+    + 'every swap, converted at each trade\u2019s own timestamp. Holder counts are not here: '
+    + 'they need an ERC-20 transfer index this build does not have.';
 }
 
 function renderKinds() {

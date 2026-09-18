@@ -48,6 +48,26 @@ export function compact(n) {
 }
 
 /**
+ * A COUNT OF TOKENS, which is not money and must not wear a dollar sign.
+ *
+ * A supply runs from 30,741 (a tokenized equity nobody has minted much of) to 840 billion
+ * (a memecoin), so it compacts the same way a dollar figure does — but with no "$", because
+ * "$840B" for the supply of a token worth two cents is a market cap off by four orders of
+ * magnitude, and it is exactly the mistake the column beside it is there to make obvious.
+ * @param {number} n
+ */
+export function units(n) {
+  if (!Number.isFinite(n) || n < 0) return '';
+  const a = Math.abs(n);
+  if (a >= 1e12) return `${(a / 1e12).toFixed(a >= 1e13 ? 0 : 2)}T`;
+  if (a >= 1e9) return `${(a / 1e9).toFixed(a >= 1e10 ? 0 : 2)}B`;
+  if (a >= 1e6) return `${(a / 1e6).toFixed(a >= 1e7 ? 0 : 1)}M`;
+  if (a >= 1e3) return `${(a / 1e3).toFixed(a >= 1e5 ? 0 : 1)}k`;
+  if (a >= 1) return a.toLocaleString('en-US', { maximumFractionDigits: 0 });
+  return a.toPrecision(2);
+}
+
+/**
  * A PRICE, which is not the same problem as an amount of money.
  *
  * This chain lists a $442 stock and a $0.00041 memecoin in the same column. money() rounds to

@@ -53,36 +53,90 @@ test('every token the build ships is reachable from here', async () => {
   }
 });
 
-test('the columns are the tape\'s, and the price says which price it is', () => {
+test('the columns are the tape\'s, and each one says what it is', () => {
   const head = get('thead').textContent;
   // "Price" alone is read as a market price. This is the last trade — an execution against
   // a pool — and on a thin token it can be hours old.
   assert.match(head, /Last trade/);
   assert.ok(!/\bPrice\b/.test(head), 'a column is called Price without saying which price');
-  for (const col of ['24H volume', 'Traders', 'Trades']) {
+  for (const col of ['1H', '24H', '7D', 'Supply', '24H volume', 'Traders', 'Trades']) {
     assert.ok(head.includes(col), `the ${col} column is gone`);
   }
-  for (const banned of ['Holders', 'Market cap', 'Supply', 'In profit']) {
+  /*
+   * THE CAP IS THE TOKEN'S, AND THE HEADER HAS TO SAY SO. An NVDA token on this chain is a
+   * claim minted against the share, and the supply of it here is a rounding error against
+   * Nvidia's shares outstanding: the token's cap is tens of millions where the company's is
+   * in the trillions. A column headed "Market cap" next to a ticker everybody recognises
+   * gets read as the company's every time, so the word "token" is part of the label.
+   */
+  assert.match(head, /Token mcap|Token market cap/i, 'the market cap column is gone');
+  assert.ok(!/(^|[^n])\bMarket cap\b/i.test(head.replace(/Token mcap/gi, '')),
+    'a market cap column does not say whose market cap it is');
+  for (const banned of ['Holders', 'In profit']) {
     assert.ok(!head.includes(banned), `${banned} needs the transfer index and cannot be a column`);
   }
   const note = get('note').textContent;
   assert.match(note, /not a mid and not a quote/);
   assert.match(note, /transfer index/);
+  assert.match(note, /totalSupply\(\)/, 'the note does not say where supply comes from');
+  assert.match(note, /market cap of the TOKEN|not of the company/i,
+    'the note does not separate the token from the company');
 });
 
-test('a 24h change is signed three ways, and a missing one is not a zero', async () => {
-  const wrong = signChannels(get('rows'));
-  assert.deepEqual(wrong, [], `\n  ${wrong.join('\n  ')}`);
-  // A token that first traded inside the last day has nothing to measure a change from.
-  // That is a dash, because zero would file it among the ones that did not move.
+test('supply and the cap are the endpoint\'s, and the cap is the product', async () => {
   const list = await endpoint();
-  const missing = list.filter((/** @type {any} */ a) => a.change24h === null);
-  for (const a of missing.slice(0, 3)) {
+  const { compact, units } = await import('../web/lib/format.js');
+  const priced = list.filter((/** @type {any} */ a) => a.supply !== null && a.market_cap !== null);
+  assert.ok(priced.length > 20, `only ${priced.length} tokens carry a supply and a cap`);
+  for (const a of priced.slice(0, 8)) {
+    // The cap is the product, to the digit the page prints.
+    assert.ok(Math.abs(a.market_cap - a.price * a.supply) < Math.max(1e-6, a.market_cap * 1e-9),
+      `${a.symbol}: cap ${a.market_cap} is not price × supply`);
     const row = byClass(get('rows'), 'mk-row')
       .find((/** @type {any} */ r) => byClass(r, 'mk-sym')[0]?.textContent === a.symbol);
-    if (!row) continue; // below the visible cut, which is fine
-    assert.ok(byClass(row, 'mk-none').length === 1, `${a.symbol} shows a figure it does not have`);
+    if (!row) continue;
+    assert.ok(row.textContent.includes(units(a.supply)), `${a.symbol}: supply is not the endpoint's`);
+    assert.ok(row.textContent.includes(compact(a.market_cap)), `${a.symbol}: cap is not the endpoint's`);
   }
+  // Nothing is ever zero: a zero supply reads as "none issued" and a zero cap as "worthless",
+  // and both are what an unread contract or an unpriced token would produce.
+  for (const a of list) {
+    assert.ok(a.supply === null || a.supply > 0, `${a.symbol} ships a supply of ${a.supply}`);
+    assert.ok(a.market_cap === null || a.market_cap > 0, `${a.symbol} ships a cap of ${a.market_cap}`);
+    assert.ok(a.price === null || a.price > 0, `${a.symbol} ships a price of ${a.price}`);
+  }
+});
+
+test('every change is signed three ways, and a missing one is nothing at all', async () => {
+  const wrong = signChannels(get('rows'));
+  assert.deepEqual(wrong, [], `\n  ${wrong.join('\n  ')}`);
+  /*
+   * A token that first traded inside the last hour, day or week has nothing to measure that
+   * change from — and until the tape itself is seven days deep, NO token has a 7D figure.
+   * The cell is EMPTY: not a zero, which reads as "it did not move", and not a dash, which
+   * is still a mark in a column of figures. It keeps its place in the grid and carries the
+   * reason in its title.
+   */
+  const list = await endpoint();
+  const rows = byClass(get('rows'), 'mk-row');
+  const rowFor = (/** @type {string} */ sym) => rows
+    .find((/** @type {any} */ r) => byClass(r, 'mk-sym')[0]?.textContent === sym);
+  let checked = 0;
+  for (const a of list) {
+    const gaps = ['change1h', 'change24h', 'change7d', 'supply', 'market_cap']
+      .filter((k) => /** @type {any} */ (a)[k] === null).length;
+    const row = rowFor(a.symbol);
+    if (!row || !gaps) continue;
+    const blanks = byClass(row, 'mk-none');
+    assert.equal(blanks.length, gaps, `${a.symbol}: ${gaps} figures missing, ${blanks.length} blank cells`);
+    for (const b of blanks) {
+      assert.equal(b.textContent, '', `${a.symbol} draws "${b.textContent}" where it has no figure`);
+      assert.ok((b.attributes.title ?? '').length > 10, 'a blank cell does not say why it is blank');
+    }
+    checked += 1;
+    if (checked >= 6) break;
+  }
+  assert.ok(checked > 0, 'no row on this build has a missing figure to check');
 });
 
 test('the tokens carry their logos here too', () => {

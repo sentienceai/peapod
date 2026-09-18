@@ -183,3 +183,29 @@ test('stages run in dependency order', async () => {
   assert.ok(price > Math.max(...swaps),
     'eth/usd prices the Pons window, so the Pons tape must exist before it runs');
 });
+
+test('the supply read is a cycle stage, and the build survives it failing', async () => {
+  /*
+   * WHY IT IS IN THE CYCLE AND NOT A ONE-SHOT. Decimals are a property of a contract and
+   * are read once; supply is a balance. These tokens are minted when somebody moves the
+   * underlying onto this chain and burned when they take it off, so a supply cached at
+   * first sight drifts — and a market cap built on it is wrong in the direction nobody
+   * checks, because it still looks like a number.
+   *
+   * WHY IT IS NOT FATAL. Every other stage in this cycle feeds the fold: without the swap
+   * tape there is no ranking. Without a fresh supply there is a market-cap column that
+   * shows nothing for a cycle, which is the rule the whole site is built on. So the stage
+   * may fail without taking the build down, and the gate on staleness says so out loud
+   * when it keeps failing.
+   */
+  const supply = STAGES.find(([, argv]) => argv[0] === 'ingest/token_supply.py');
+  assert.ok(supply, 'the cycle never reads totalSupply(), so the market cap goes stale');
+  const src = await readFile(new URL('../scripts/cycle.sh', import.meta.url), 'utf8');
+  const line = src.split('\n').find((l) => l.includes('token_supply.py')) ?? '';
+  assert.ok(!/\|\|\s*exit\s+1/.test(line),
+    'a failed supply read kills the cycle; the build should publish without it');
+  // And it reads the chain, not a file somebody has to keep up to date.
+  const py = await readFile(new URL('../ingest/token_supply.py', import.meta.url), 'utf8');
+  assert.match(py, /0x18160ddd/, 'the supply stage does not call totalSupply()');
+  assert.match(py, /eth_call/);
+});

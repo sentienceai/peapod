@@ -35,6 +35,7 @@ Q96 = 1 << 96
 DUST = 1e-12
 SPARK_POINTS = 24
 DAY = 86400
+HOUR = 3600
 ASSET_SERIES_CAP = 200
 ASSET_TRADES = 50
 # How many wallets the asset page's cluster draws. The panel is one box; past roughly this
@@ -446,7 +447,22 @@ def swap_positions(part: pl.DataFrame, price: float | None, ranked: set[str]) ->
     return out
 
 
-def assets(trades: pl.DataFrame, to_ts: int, ranked: set[str] | None = None) -> list[dict]:
+def price_at(ts: np.ndarray, prices: np.ndarray, when: int) -> float | None:
+    """The last trade at or before `when`, or None when the tape holds none that old.
+
+    None is not zero and not "unchanged": a token whose first trade is inside the window
+    has nothing to measure a change from, and so does every token when the tape itself is
+    younger than the lookback. The page shows nothing for it.
+    """
+    i = int(np.searchsorted(ts, when, side="right")) - 1
+    if i < 0:
+        return None
+    p = float(prices[i])
+    return p if p > 0 else None
+
+
+def assets(trades: pl.DataFrame, to_ts: int, ranked: set[str] | None = None,
+           history: pl.DataFrame | None = None, supply: dict[str, dict] | None = None) -> list[dict]:
     """Per-asset aggregates, folded from the same window the ranking is.
 
     THE SAME WINDOW, NOT A SECOND PASS OVER THE TAPE. These rows and the leaderboard rows
@@ -472,6 +488,23 @@ def assets(trades: pl.DataFrame, to_ts: int, ranked: set[str] | None = None) -> 
     """
     day_ago = to_ts - DAY
     ranked = ranked or set()
+    supply = supply or {}
+    # PRICE CHANGES READ A LONGER TAPE THAN THE VOLUMES DO. Volume, traders and trade
+    # counts are the window's, because those are the figures read beside the leaderboard
+    # and two aggregations over two windows would disagree. A 7-day change cannot come from
+    # a 7-day window at all: the reference price is the last trade at or BEFORE the
+    # boundary, which by definition sits outside it. So the changes are measured against
+    # the whole tape the build holds, and where the tape is younger than the lookback the
+    # figure is absent rather than wrong.
+    past = {}
+    if history is not None:
+        for part in history.sort("ts").partition_by("label", maintain_order=True):
+            priced_h = part.filter((pl.col("qty").abs() > DUST) & pl.col("usd").is_finite())
+            if priced_h.height == 0:
+                continue
+            h_ts = priced_h["ts"].to_numpy()
+            h_px = np.abs(priced_h["usd"].to_numpy()) / np.abs(priced_h["qty"].to_numpy())
+            past[part["label"][0]] = (h_ts, h_px)
     out, skipped = [], []
     for part in trades.sort("ts").partition_by("label", maintain_order=True):
         symbol = part["label"][0]
@@ -485,12 +518,24 @@ def assets(trades: pl.DataFrame, to_ts: int, ranked: set[str] | None = None) -> 
         pqty = np.abs(priced["qty"].to_numpy())
         pusd = np.abs(priced["usd"].to_numpy())
         prices = pusd / pqty
-        price = float(prices[-1]) if len(prices) else None
+        # A PRICE OF ZERO IS NOT A PRICE. One token on this tape (OPAI) trades quantities
+        # large enough, against a quote side small enough, that its last execution divides
+        # out to exactly 0.0 — and a zero price propagates into a zero change and a zero
+        # market cap, each of which reads as a measurement. None of them are, so the token
+        # keeps its volume and its trade count and shows nothing for the rest.
+        price = float(prices[-1]) if len(prices) and prices[-1] > 0 else None
         # The last trade at or before the boundary, by position: the window is sorted, so
         # this is a lookup rather than a second filter.
-        back = int(np.searchsorted(pts, day_ago, side="right")) - 1
-        change = ((price - float(prices[back])) / float(prices[back]) * 100
-                  if price is not None and back >= 0 and prices[back] > 0 else None)
+        h_ts, h_px = past.get(symbol, (pts, prices))
+        def moved(seconds: int) -> float | None:
+            """Percent change from the last trade at or before `seconds` ago to the last."""
+            if price is None:
+                return None
+            ref = price_at(h_ts, h_px, to_ts - seconds)
+            return (price - ref) / ref * 100 if ref else None
+        change = moved(DAY)
+        change1h = moved(HOUR)
+        change7d = moved(7 * DAY)
         series = []
         if len(pts):
             # One point per hour, and the point is the last trade in that hour rather than
@@ -498,6 +543,12 @@ def assets(trades: pl.DataFrame, to_ts: int, ranked: set[str] | None = None) -> 
             hour = pts // 3600
             for i in np.flatnonzero(np.append(hour[1:] != hour[:-1], True)):
                 series.append([int(pts[i]), float(prices[i])])
+        held = supply.get(symbol)
+        sup = float(held["supply"]) if held and held["supply"] > 0 else None
+        sup_at = int(held["read_at"]) if held else None
+        cap = price * sup if (price is not None and sup) else None
+        if cap is not None and cap < 0.01:
+            cap = None
         addrs = priced["addr"].to_list()
         signed = priced["qty"].to_numpy()
         positions = swap_positions(priced, price, ranked)
@@ -513,11 +564,22 @@ def assets(trades: pl.DataFrame, to_ts: int, ranked: set[str] | None = None) -> 
                 # 'pons' are what the tape calls them and mean nothing to a reader.
                 "kind": "stock" if part["cat"][-1] == "rwa" else "meme",
                 "price": price,
+                "change1h": change1h,
                 "change24h": change,
+                "change7d": change7d,
                 "volume24h": float(usd[ts > day_ago].sum()),
                 "volume": float(usd.sum()),
                 "traders": part["addr"].n_unique(),
                 "trades": part.height,
+                # SUPPLY IS THIS CHAIN'S, AND SO IS THE CAP. totalSupply() counts the
+                # tokens issued on Robinhood Chain — for a tokenized equity that is a
+                # fraction of the company's shares, and the cap below is the token's, not
+                # the company's. The site's column says so; this is where it comes from.
+                "supply": sup,
+                "supply_read_at": sup_at,
+                # A cap under a cent is the same non-figure as a price of zero: it is what
+                # a denormal price times a supply produces, and it would print as "$0".
+                "market_cap": cap,
             },
             "series": downsample(series, ASSET_SERIES_CAP),
             "positions": positions,
@@ -678,6 +740,45 @@ def write_address(addr: str, state, lo: int, hi: int, out: Path | None, provenan
         json.dumps(payload, separators=(",", ":"), allow_nan=False, default=plain))
 
 
+def ticker_addresses(tokens: pl.DataFrame) -> dict[str, str]:
+    """ticker -> contract address, for the tickers where that map is unambiguous.
+
+    The same rule the logo map uses, for the same reason: three tickers in the registry
+    resolve to more than one address ("P" covers four), and a supply read off the wrong
+    contract is a market cap for a different company. Those tickers get nothing.
+    """
+    rwa = tokens.filter(pl.col("kind") == "rwa_spot")
+    by_ticker: dict[str, list[str]] = defaultdict(list)
+    for row in rwa.iter_rows(named=True):
+        by_ticker[row["symbol"]].append(row["address"].lower())
+    out = {t: a[0] for t, a in by_ticker.items() if len(a) == 1}
+    # The Pons side, whose symbols the equity registry never carried.
+    try:
+        from token_decimals import symbols as chain_symbols  # noqa: PLC0415
+        for addr, sym in chain_symbols().items():
+            out.setdefault(sym, addr.lower())
+    except Exception:                                        # noqa: BLE001
+        pass
+    return out
+
+
+def supplies(tokens: pl.DataFrame) -> dict[str, dict]:
+    """ticker -> {supply, read_at}, from the last totalSupply() read.
+
+    Absent for a ticker whose contract did not answer, whose decimals are unknown, or
+    which does not resolve to exactly one address. Absent is the answer the site shows as
+    nothing; there is no zero anywhere in this path.
+    """
+    try:
+        from token_supply import known as supply_known  # noqa: PLC0415
+    except Exception:                                    # noqa: BLE001
+        return {}
+    by_addr = supply_known()
+    if not by_addr:
+        return {}
+    return {t: by_addr[a] for t, a in ticker_addresses(tokens).items() if a in by_addr}
+
+
 def write_token_logos(tokens: pl.DataFrame, web: Path, store=None) -> dict:
     """Map ticker -> logo filename, for the tickers where that map is unambiguous.
 
@@ -742,6 +843,9 @@ def main() -> int:
     # commits, so a crash halfway rolls back rather than serving half a ranking.
     store.begin()
     write_token_logos(__import__("registry").tokens(), web, store)
+    # Read by ingest/token_supply.py at the top of the cycle; absent on a cold volume, and
+    # then every supply-derived figure is simply absent too.
+    supply_table = supplies(__import__("registry").tokens())
 
     trades = combined(root, args.source)
     lo, hi = int(trades["ts"].min()), int(trades["ts"].max())
@@ -760,6 +864,9 @@ def main() -> int:
              "scopes": [], "windows": [], "views": []}
     headline = {"qualifying": 0, "top": 0.0, "addresses": 0}
     ranked_any: set[str] = set()
+    # Empty unless the detail window builds; the gate that reads it then has nothing to say
+    # rather than a KeyError on a build that shipped no assets.
+    shipped_asset_rows: list[dict] = []
     buildable, detail_window = windows_for(span_h, windows)
     for name, hours in windows.items():
         if name not in buildable:
@@ -841,7 +948,11 @@ def main() -> int:
         # Assets come off the same frame as the detail records, for the same reason: the
         # widest window that built is the one every other payload is written from, so an
         # asset page and the address pages that link to it cannot disagree about the window.
-        shipped_assets = store.put_assets(assets(w_all, hi, ranked_any), build_id)
+        # `trades` — the whole tape, not the window — for the price lookbacks: a 7-day
+        # change measures against a trade that sits outside a 7-day window by definition.
+        asset_payloads = assets(w_all, hi, ranked_any, history=trades, supply=supply_table)
+        shipped_asset_rows = [a["asset"] for a in asset_payloads]
+        shipped_assets = store.put_assets(asset_payloads, build_id)
         print(f"        stored {shipped_assets:,} assets from the {name} window")
 
     index["scopes"] = [{"id": s["id"], "label": s["label"], "cat": s["cat"],
@@ -872,6 +983,7 @@ def main() -> int:
     gaps_path = HERE.parent / "ingest" / "out" / "gaps.json"
     gaps = json.loads(gaps_path.read_text()) if gaps_path.exists() else []
     g = gatemod.run(gatemod.Gates(), before=before, stats=stats, trades=trades,
+                    asset_rows=shipped_asset_rows,
                     views=index["views"], declared=[s["id"] for s in SCOPES],
                     missing_ranked=len(ranked - stored),
                     address_count=store.counts()["addresses"], eth=eth_stats, gaps=gaps)

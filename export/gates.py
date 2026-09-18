@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import math
+import time
 from dataclasses import dataclass, field
 
 
@@ -74,7 +75,8 @@ def snapshot(store) -> dict:
 
 def run(gates: Gates, *, before: dict, stats: dict, trades, views: list,
         missing_ranked: int, address_count: int, eth: dict | None,
-        gaps: list | None = None, declared: list | None = None) -> Gates:
+        gaps: list | None = None, declared: list | None = None,
+        asset_rows: list | None = None) -> Gates:
     first = not before.get("build")
 
     # 0. A range the ingest could not read. This is the only gate that describes the tape
@@ -145,6 +147,33 @@ def run(gates: Gates, *, before: dict, stats: dict, trades, views: list,
         gates.check("every declared scope produced a ranking", not absent,
                     f"{len(absent)} of {len(declared)} scopes built nothing in any "
                     f"window: {absent[:5]}")
+
+    # 6c. Supply and the cap it multiplies out to. Both are absent for a token that could
+    #     not be read, and absent is what the page draws as nothing — so the failure this
+    #     catches is a ZERO or a negative reaching the payload, which would print as a real
+    #     market cap of nothing. It also refuses a supply read that has gone stale: it is
+    #     re-read every cycle precisely because these tokens mint and burn, and a figure
+    #     from six hours ago multiplied by a price from a minute ago is not a market cap.
+    rows = asset_rows or []
+    if rows:
+        priced = [r for r in rows if r.get("supply") is not None]
+        bad_supply = [r["symbol"] for r in priced if not (r["supply"] > 0)]
+        gates.check("no supply is zero or negative", not bad_supply,
+                    f"{len(bad_supply)} token(s): {bad_supply[:5]}")
+        bad_cap = [r["symbol"] for r in rows
+                   if r.get("market_cap") is not None and not (r["market_cap"] > 0)]
+        gates.check("no market cap is zero or negative", not bad_cap,
+                    f"{len(bad_cap)} token(s): {bad_cap[:5]}")
+        # Against the clock, not against the tape head: the supply is read AFTER the head
+        # the build folds to, so measuring from the head reports a negative age.
+        now = int(time.time())
+        ages = [now - r["supply_read_at"] for r in priced if r.get("supply_read_at")]
+        oldest = max(ages) if ages else 0
+        # Two hours: eight cycles at the deployed cadence. Past that the supply stage has
+        # been failing quietly and the cap is being drawn from a number nobody refreshed.
+        gates.check("the supply read is from this cycle", not ages or oldest < 2 * 3600,
+                    f"{len(priced):,} of {len(rows):,} tokens have a supply; "
+                    f"oldest read {oldest / 60:.0f} minutes ago", fatal=False)
 
     # 7. Numbers are numbers. NaN and Infinity are not JSON and would break the page at
     #    parse time, which is a blank screen rather than a wrong figure.

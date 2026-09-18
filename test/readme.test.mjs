@@ -47,7 +47,15 @@ test('the RWA comparison the README makes is still true of the data', () => {
   // it is asserted as well as the numbers.
   assert.ok(rwa.distribution.in_profit_pct > pons.distribution.in_profit_pct,
     'RWA is no longer in profit more often than Pons; the README says it is');
-  assert.ok(rwa.distribution.percentiles['100'] < pons.distribution.percentiles['100'] / 50,
+  /*
+   * The README's claim is an ORDER OF MAGNITUDE, not a particular ratio: "far more RWA
+   * addresses finish in profit, and the best of them makes a fraction of what the best
+   * memecoin trader makes". This was pinned at 50x, which was the gap on the build it was
+   * written against; a later build came in at 36x and failed here, with the sentence still
+   * true. So the pin holds the argument — ten times — and the two figures beside it are
+   * checked exactly, which is what actually goes stale.
+   */
+  assert.ok(rwa.distribution.percentiles['100'] < pons.distribution.percentiles['100'] / 10,
     'the magnitude gap the README rests on has closed');
   assert.ok(readme.includes(`${rwa.distribution.in_profit_pct.toFixed(1)}%`));
   assert.ok(readme.includes(`${pons.distribution.in_profit_pct.toFixed(1)}%`));

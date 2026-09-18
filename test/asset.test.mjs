@@ -176,17 +176,29 @@ test('the cluster is measured positions, and never called holders', async () => 
   for (const m of ['holders', 'inProfit', 'avgEntry']) assert.ok(metrics.includes(m));
 });
 
-test('the filter over the cluster is live, and names both directions', () => {
+test('the filter over the cluster is live, and names both directions', async () => {
   const seg = byClass(main(), 'as-cluster-filter')[0];
   assert.ok(seg, 'the frame\'s filter is missing');
   const buttons = seg.byTag('button');
   assert.deepEqual(buttons.map((/** @type {any} */ b) => b.textContent), ['All', 'In profit', 'Underwater']);
   for (const b of buttons) assert.equal(b.disabled, false, 'the filter is inert over data that exists');
-  const lit = byClass(main(), 'as-bubble').filter((/** @type {any} */ b) => b.attributes.opacity !== '0.18');
+  /*
+   * How many bubbles SHOULD dim is a property of the build, not a constant: on a token
+   * where every measured position happens to be above its cost, filtering to "in profit"
+   * correctly dims nothing. So the expected count comes from the endpoint.
+   */
+  const d = await endpoint('TSLA');
+  const under = (d.positions ?? []).filter((/** @type {any} */ p) => Number.isFinite(p.pnl_pct) && p.pnl_pct < 0);
+  const lit = () => byClass(main(), 'as-bubble')
+    .filter((/** @type {any} */ b) => b.attributes.opacity !== '0.18').length;
+  const all = lit();
   buttons[1].onclick?.({});
-  const afterProfit = byClass(main(), 'as-bubble').filter((/** @type {any} */ b) => b.attributes.opacity !== '0.18');
-  assert.ok(afterProfit.length < lit.length, 'filtering to "in profit" dimmed nothing');
+  assert.equal(lit(), all - under.length,
+    `filtering to "in profit" dimmed ${all - lit()} of the ${under.length} positions below cost`);
+  buttons[2].onclick?.({});
+  assert.equal(lit(), under.length, 'filtering to "underwater" left the wrong bubbles lit');
   buttons[0].onclick?.({});
+  assert.equal(lit(), all, 'going back to "all" did not light them all again');
   // The legend is the key to the two colours and the ring, all three of them.
   const legend = byClass(main(), 'as-legend-swatch');
   assert.equal(legend.length, 3);

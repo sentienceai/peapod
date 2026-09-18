@@ -69,6 +69,13 @@ if [ "${CYCLE_SKIP_INGEST:-0}" != "1" ]; then
   stage "identity"     $PY ingest/resolve_senders.py --max-hours 0.2 || exit 1
   stage "partitions"   $PY ingest/partitions.py                    || exit 1
   stage "eth/usd"      $PY ingest/eth_usd.py --stage series        || exit 1
+  # SUPPLY IS READ EVERY CYCLE, unlike decimals, which are read once and cached: a
+  # Robinhood-issued token is minted on the way in and burned on the way out, so the number
+  # moves on its own. One eth_call per token, ~294 of them in 6 batched requests, well under
+  # half a second — the stage prints its own count and elapsed time into this log. A failed
+  # read is not fatal: the build falls back to the last parquet it wrote and the figures it
+  # cannot scale simply do not appear.
+  stage "token supply" $PY ingest/token_supply.py                  || say "token supply FAILED; the build will use the last read"
 fi
 
 # The build runs the gates and either commits in one transaction or rolls back.

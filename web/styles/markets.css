@@ -2,10 +2,14 @@
    address. Everything shared — .row, .thead, .th, .row-cell — comes from board.css, which
    this page loads first; only the columns and the token cell are here. */
 
+/* TEN COLUMNS AT 1400. The token takes the slack; the nine figure columns are equal and
+   narrow enough that the widest of them — a compacted market cap like "$23.3M" — fits with
+   the column gap halved from the board's 16px. Below 1280 the two least load-bearing go
+   (trades, then traders), and the ladder from there is the site's usual one. */
 .mk-row {
   display: grid;
-  grid-template-columns: minmax(0, 1.6fr) repeat(6, minmax(0, 1fr));
-  align-items: center; column-gap: 16px;
+  grid-template-columns: minmax(0, 1.5fr) repeat(9, minmax(0, 1fr));
+  align-items: center; column-gap: 8px;
   color: inherit;
 }
 .mk-row .row-who { display: flex; align-items: center; gap: 10px; min-width: 0; }
@@ -14,21 +18,30 @@
   font-size: 11px; color: var(--muted); padding: 1px 7px; border-radius: var(--radius-control-sm);
   background: var(--muted-bg); white-space: nowrap;
 }
-/* A missing figure is a dash in the muted channel — never a zero, which would read as flat. */
+/* A missing figure is an EMPTY cell — not a zero, which reads as "it did not move" or
+   "nothing is issued", and not a dash, which is still a mark in a column of figures. The
+   cell keeps its place in the grid and carries the reason in its title. */
 .mk-none { color: var(--muted); }
 
 #thead {
   display: grid;
-  grid-template-columns: minmax(0, 1.6fr) repeat(6, minmax(0, 1fr));
-  column-gap: 16px;
+  grid-template-columns: minmax(0, 1.5fr) repeat(9, minmax(0, 1fr));
+  column-gap: 8px;
 }
+/* The figures are 13px here rather than the board's 14: nine columns of them, and a market
+   cap and a supply are both wider than anything the board puts in a cell. */
+.mk-row .row-cell, #thead .th { font-size: 13px; }
 
+@media (max-width: 1280px) {
+  .mk-row, #thead { grid-template-columns: minmax(0, 1.5fr) repeat(7, minmax(0, 1fr)); }
+  .mk-row > :nth-child(n + 9), #thead > :nth-child(n + 9) { display: none; }
+}
 @media (max-width: 1024px) {
-  .mk-row, #thead { grid-template-columns: minmax(0, 1.4fr) repeat(3, minmax(0, 1fr)); }
-  .mk-row > :nth-child(n + 5), #thead > :nth-child(n + 5) { display: none; }
+  .mk-row, #thead { grid-template-columns: minmax(0, 1.4fr) repeat(5, minmax(0, 1fr)); }
+  .mk-row > :nth-child(n + 7), #thead > :nth-child(n + 7) { display: none; }
 }
 @media (max-width: 768px) {
-  .mk-row, #thead { grid-template-columns: minmax(0, 1.2fr) repeat(2, minmax(0, 1fr)); }
-  .mk-row > :nth-child(n + 4), #thead > :nth-child(n + 4) { display: none; }
+  .mk-row, #thead { grid-template-columns: minmax(0, 1.2fr) repeat(3, minmax(0, 1fr)); }
+  .mk-row > :nth-child(n + 5), #thead > :nth-child(n + 5) { display: none; }
   .mk-kind { display: none; }
 }

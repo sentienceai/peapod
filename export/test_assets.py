@@ -9,6 +9,7 @@ Those must come out None, and stay None.
 from __future__ import annotations
 
 import polars as pl
+import pytest
 
 from build_leaderboard import ASSET_TRADES, addressable, assets
 
@@ -164,3 +165,71 @@ def test_every_number_survives_the_json_boundary():
     rows = [("0xa", "TSLA", "rwa", 1.0, -10.0, NOW - DAY - 1),
             ("0xb", "TSLA", "rwa", -1.0, 0.0, NOW - 30)]
     json.dumps(assets(tape(rows), NOW), allow_nan=False)
+
+
+# ── the price changes, the supply, and the cap they multiply out to ──────────────────────
+#
+# THE CHANGES READ A LONGER TAPE THAN THE VOLUMES DO. A 7-day change measures against the
+# last trade at or before the 7-day mark, which sits OUTSIDE a 7-day window by definition,
+# so `assets` takes the history separately. Where the history does not reach, the figure is
+# absent — and absent has to survive all the way to the page, because a zero there reads as
+# "it did not move" and a zero market cap reads as "worthless".
+
+def test_the_changes_measure_against_the_history_not_the_window():
+    window = [("0xa", "T", "rwa", 1.0, -110.0, NOW - 60)]
+    history = window + [
+        ("0xa", "T", "rwa", 1.0, -100.0, NOW - 8 * DAY),   # 7d reference
+        ("0xa", "T", "rwa", 1.0, -50.0, NOW - 2 * DAY),    # 24h reference
+        ("0xa", "T", "rwa", 1.0, -100.0, NOW - 2 * HOUR),  # 1h reference
+    ]
+    a = assets(tape(window), NOW, history=tape(history))[0]["asset"]
+    assert a["price"] == 110.0
+    assert a["change1h"] == pytest.approx(10.0)
+    assert a["change24h"] == pytest.approx(120.0)
+    assert a["change7d"] == pytest.approx(10.0)
+
+
+def test_a_change_with_nothing_that_far_back_is_absent_not_zero():
+    rows = [("0xa", "T", "rwa", 1.0, -100.0, NOW - 30 * 60),
+            ("0xa", "T", "rwa", 1.0, -110.0, NOW - 60)]
+    a = assets(tape(rows), NOW, history=tape(rows))[0]["asset"]
+    # Half an hour of tape: the hourly mark has a trade before it, the other two do not.
+    assert a["change1h"] is None
+    assert a["change24h"] is None
+    assert a["change7d"] is None
+
+
+def test_supply_and_cap_are_absent_for_a_token_with_no_reading():
+    a = one([("0xa", "T", "rwa", 1.0, -100.0, NOW - 60)])["asset"]
+    assert a["supply"] is None and a["market_cap"] is None and a["supply_read_at"] is None
+
+
+def test_the_cap_is_the_price_times_the_supply_read_this_cycle():
+    rows = [("0xa", "T", "rwa", 1.0, -100.0, NOW - 60)]
+    got = assets(tape(rows), NOW, supply={"T": {"supply": 1_000.0, "read_at": NOW - 30}})
+    a = got[0]["asset"]
+    assert a["supply"] == 1_000.0
+    assert a["market_cap"] == pytest.approx(100_000.0)
+    assert a["supply_read_at"] == NOW - 30
+
+
+def test_a_price_of_zero_is_no_price_and_carries_nothing_with_it():
+    # One token on the live tape (OPAI) trades quantities large enough against a quote side
+    # small enough that its last execution divides out to exactly 0.0. A zero price makes a
+    # zero change and a zero market cap, and all three read as measurements.
+    rows = [("0xa", "T", "pons", 1e9, 0.0, NOW - 2 * DAY),
+            ("0xa", "T", "pons", 1e9, 0.0, NOW - 60)]
+    a = assets(tape(rows), NOW, history=tape(rows),
+               supply={"T": {"supply": 1e9, "read_at": NOW}})[0]["asset"]
+    assert a["price"] is None
+    assert a["change24h"] is None
+    assert a["market_cap"] is None
+    # What it does keep: it traded, and the volume and the count are real.
+    assert a["trades"] == 2
+
+
+def test_a_cap_under_a_cent_is_not_a_cap():
+    rows = [("0xa", "T", "pons", 1e12, -1e-6, NOW - 60)]
+    a = assets(tape(rows), NOW, supply={"T": {"supply": 1.0, "read_at": NOW}})[0]["asset"]
+    assert a["price"] is not None and a["price"] > 0
+    assert a["market_cap"] is None
