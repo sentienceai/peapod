@@ -133,22 +133,28 @@ test('the tabs offer only what the build publishes', () => {
   }
 });
 
-test('the tokens carry their logos, not just their initials', () => {
+test('a logo goes where the ticker is written, and a letter where it is not', () => {
   /*
-   * THE FAILURE THIS CATCHES. 433 logo files are vendored and the map covers almost every
-   * token any page displays, and for a while every tile on the site drew two letters anyway:
-   * the map was loaded by one page, and two pages built their tiles by hand instead of
-   * calling the helper that adds the image. Initials are the FALLBACK for a token with no
-   * file; a page where every tile is initials means the map never arrived.
+   * BOTH HALVES OF THIS ARE FAILURES THAT SHIPPED.
+   *
+   * First the map never arrived: 433 vendored files, and every tile on the site drawing two
+   * letters because two pages built tiles by hand instead of calling the helper.
+   *
+   * Then the logos arrived everywhere, including the "top assets" column — three 22px chips
+   * overlapping by 6px, with no ticker written next to them. A square photograph drawn over
+   * those chips covers the only letters naming the token and leaves cropped artwork behind:
+   * the column became unreadable, and none of the frames put a picture there at all. Every
+   * identity chip in CopyTrade.dc.html and TraderModal.dc.html carries one letter.
+   *
+   * So: a stack of chips is letters; a tile with the ticker beside it may carry the logo.
    */
-  const tiles = byClass(get('rows'), 'asset-tile');
-  const imgs = get('rows').descendants().filter((/** @type {any} */ n) => n.tag === 'img');
-  assert.ok(tiles.length > 0, 'no asset tiles rendered at all');
-  assert.ok(imgs.length / tiles.length > 0.9,
-    `only ${imgs.length} of ${tiles.length} tiles carry a logo`);
-  for (const img of imgs.slice(0, 8)) {
-    // Only a filename this build produced ever reaches a URL.
-    assert.match(img.attributes.src, /^\/token-logos\/0x[0-9a-f]{40}\.(png|jpg|jpeg|webp)$/);
-    assert.equal(img.attributes.alt, '', 'the ticker is already text; the logo is decorative');
+  const stack = byClass(get('rows'), 'chipstack');
+  assert.ok(stack.length > 5, 'the top-assets column is gone');
+  const chips = stack.flatMap((/** @type {any} */ s) => byClass(s, 'asset-tile'));
+  assert.ok(chips.length > 5, 'no chips in the stack');
+  for (const chip of chips) {
+    assert.equal(chip.descendants().filter((/** @type {any} */ n) => n.tag === 'img').length, 0,
+      `a logo is drawn over a chip that nothing names: ${chip.title}`);
+    assert.equal(chip.textContent.length, 1, `a stacked chip carries ${chip.textContent}`);
   }
 });

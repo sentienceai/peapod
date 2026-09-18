@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <script src="./vendor/react.js"></script>
+<script src="./vendor/react-dom.js"></script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Schibsted+Grotesk:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+  <style>
+    .pp { --surface: #FFFFFF; --surface-2: #FAFBF9; --sunken: #F7F8F6; --hover: #F5F7F3; --muted-bg: #F2F4F0; --muted-bg-2: #EEF1EC; --grid: #F0F2EE; --line-soft: #EEF0EC; --line: #E6E9E3; --up-line: #E1F2E6; --line-strong: #D6DAD2; --line-strong-2: #C9CEC5; --faint: #B7BCB2; --subtle: #8A9082; --placeholder: #6B7166; --muted: #5F6559; --fg: #11140F; --fg-strong: #000000; --up: #067A2F; --down: #C8360F; --warn: #8A6100; --meme: #6D4FE0; --up-bg: #EAF8EE; --up-bg-2: #F3FBF5; --up-track: #C9E9D2; --down-bg: #FDECE7; --meme-bg: #F1EDFF; --inv-bg: #11140F; --inv-fg: #FFFFFF; --inv-hover: #2A2E25; color-scheme: light; color: var(--fg); transition: background-color 250ms ease, color 250ms ease; }
+    .pp.theme-dark { --surface: #111310; --surface-2: #161914; --sunken: #0B0C0A; --hover: #1A1D17; --muted-bg: #1C1F19; --muted-bg-2: #20241D; --grid: #161914; --line-soft: #1E221B; --line: #272B23; --up-line: #1C3323; --line-strong: #394033; --line-strong-2: #4A5143; --faint: #596052; --subtle: #858C7E; --placeholder: #7D8476; --muted: #A3AA9B; --fg: #EEF1EA; --fg-strong: #FFFFFF; --up: #4BD17A; --down: #FF7A57; --warn: #F2C14E; --meme: #B4A2FF; --up-bg: #12281A; --up-bg-2: #0F1D13; --up-track: #1F3A27; --down-bg: #2E1710; --meme-bg: #231D3A; --inv-bg: #EEF1EA; --inv-fg: #0B0C0A; --inv-hover: #FFFFFF; color-scheme: dark; }
+    .pp.theme-dark .dark { box-shadow: inset 0 0 0 1px #22261E; }
+    .theme-toggle:hover { border-color: var(--line-strong) !important; }
+    body { margin: 0; font-family: "Schibsted Grotesk", "Helvetica Neue", sans-serif; -webkit-font-smoothing: antialiased; }
+    button { font-family: inherit; cursor: pointer; }
+    button:disabled { cursor: not-allowed; }
+    input { font-family: inherit; }
+    input::placeholder { color: var(--placeholder); }
+    .ghost:hover { background: var(--muted-bg); }
+    .quick:hover { color: var(--fg); }
+    .wz-range { accent-color: var(--fg); }
+  </style>
+</helmet>
+<div class="{{themeClass}}" style="width: 640px; height: 1000px; box-sizing: border-box; background: transparent; display: flex; flex-direction: column; align-items: stretch;">
+  <div role="dialog" aria-modal="true" aria-label="{{title}}" style="box-sizing: border-box; border-radius: 20px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); box-shadow: 0 30px 80px -20px rgba(17,20,15,0.35); overflow: hidden; display: flex; flex-direction: column;">
+
+    <div style="box-sizing: border-box; padding: 20px 20px 16px 24px; display: flex; align-items: flex-start; gap: 12px;">
+      <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 4px;">
+        <span style="font-size: 19px; font-weight: 700; letter-spacing: -0.01em;">{{title}}</span>
+        <span style="font-size: 14px; color: var(--muted);">{{subtitle}}</span>
+      </div>
+      <button class="ghost" aria-label="Close" onClick="{{close}}" style="width: 36px; height: 36px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--fg); display: flex; align-items: center; justify-content: center;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12"></path><path d="M18 6L6 18"></path></svg>
+      </button>
+    </div>
+
+    <sc-if value="{{isStep1}}" hint-placeholder-val="{{ true }}">
+      <div style="box-sizing: border-box; padding: 16px 24px; border-top: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft); display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px;">
+        <sc-for list="{{stats}}" as="s" hint-placeholder-count="3">
+          <div style="display: flex; flex-direction: column; gap: 4px;">
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.05em; color: var(--muted);">{{s.label}}</span>
+            <span style="{{s.style}}">{{s.value}}</span>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="box-sizing: border-box; padding: 16px 24px 0; display: flex; flex-direction: column; gap: 16px;">
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; padding: 4px; border-radius: 12px; background: var(--muted-bg);">
+          <sc-for list="{{modes}}" as="m" hint-placeholder-count="2">
+            <button onClick="{{m.pick}}" aria-pressed="{{m.pressed}}" style="{{m.style}}">{{m.label}}</button>
+          </sc-for>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.05em; color: var(--muted);">WALLETS</span>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+            <sc-for list="{{wallets}}" as="w" hint-placeholder-count="1">
+              <span style="height: 40px; box-sizing: border-box; padding: 0 6px 0 6px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); display: flex; align-items: center; gap: 8px;">
+                <span style="{{w.avatarStyle}}">{{w.initials}}</span>
+                <span style="font-size: 14px; font-weight: 600;">{{w.name}}</span>
+                <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--muted);">{{w.short}}</span>
+                <button class="ghost" onClick="{{w.remove}}" aria-label="{{w.removeLabel}}" style="width: 26px; height: 26px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); display: flex; align-items: center; justify-content: center;">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12"></path><path d="M18 6L6 18"></path></svg>
+                </button>
+              </span>
+            </sc-for>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <label style="flex-grow: 1; height: 42px; box-sizing: border-box; padding: 0 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); display: flex; align-items: center;">
+              <span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0);">Add another trader address</span>
+              <input type="text" value="{{addr}}" onChange="{{onAddr}}" placeholder="Add another trader address (0x…)" style="flex-grow: 1; min-width: 0; border: 0; outline: none; background: transparent; color: var(--fg); font-family: 'JetBrains Mono', monospace; font-size: 13px;">
+            </label>
+            <button class="ghost" onClick="{{addWallet}}" style="height: 42px; padding: 0 16px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>
+              Add
+            </button>
+          </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+          <div style="display: flex; align-items: baseline; justify-content: space-between;">
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.05em; color: var(--muted);">SIMULATED RETURN · 30D</span>
+            <div style="display: flex; gap: 14px; font-size: 12px; color: var(--muted);">
+              <span style="display: flex; align-items: center; gap: 6px;"><span style="width: 12px; height: 2px; background: var(--faint); display: block;"></span>Trader</span>
+              <span style="display: flex; align-items: center; gap: 6px;"><span style="{{youKey}}"></span>You</span>
+            </div>
+          </div>
+          <span style="{{retStyle}}">{{ret}}</span>
+          <svg width="100%" height="150" viewBox="0 0 592 150" preserveAspectRatio="none" style="margin-top: 8px; display: block;" aria-label="Simulated return chart">
+            <defs>
+              <pattern id="wz-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                <line x1="0" y1="0" x2="0" y2="6" style="stroke: {{youColor}};" stroke-width="1" stroke-opacity="0.35"></line>
+              </pattern>
+              <pattern id="wz-dots" width="18" height="18" patternUnits="userSpaceOnUse">
+                <circle cx="1" cy="1" r="1" style="fill: var(--line-strong);"></circle>
+              </pattern>
+            </defs>
+            <rect x="0" y="0" width="592" height="150" fill="url(#wz-dots)"></rect>
+            <path d="{{band}}" fill="url(#wz-hatch)"></path>
+            <path d="{{traderLine}}" fill="none" style="stroke: var(--faint);" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke"></path>
+            <path d="{{youLine}}" fill="none" style="stroke: {{youColor}};" stroke-width="2.25" stroke-linejoin="round" vector-effect="non-scaling-stroke"></path>
+          </svg>
+        </div>
+      </div>
+
+      <div style="box-sizing: border-box; padding: 0 24px; border-top: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft); display: flex; gap: 24px;">
+        <sc-for list="{{tabs}}" as="t" hint-placeholder-count="3">
+          <button onClick="{{t.pick}}" style="{{t.style}}">{{t.label}}</button>
+        </sc-for>
+      </div>
+
+      <div style="box-sizing: border-box; padding: 16px 24px; display: flex; flex-direction: column; gap: 8px;">
+        <sc-for list="{{rows}}" as="r" hint-placeholder-count="4">
+          <div style="min-height: 64px; box-sizing: border-box; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line-soft); background: var(--surface-2); display: flex; align-items: center; gap: 16px;">
+            <sc-if value="{{r.hasDot}}" hint-placeholder-val="{{ false }}">
+              <span style="{{r.dotStyle}}">{{r.dot}}</span>
+            </sc-if>
+            <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px;">
+              <span style="font-size: 15px; font-weight: 600;">{{r.label}}</span>
+              <span style="font-size: 13px; color: var(--muted);">{{r.desc}}</span>
+            </div>
+            <sc-if value="{{r.isRange}}" hint-placeholder-val="{{ true }}">
+              <div style="width: 196px; height: 38px; flex-shrink: 0; box-sizing: border-box; padding: 3px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); display: flex; align-items: stretch; gap: 3px;">
+                <div style="position: relative; width: 112px; flex-shrink: 0; border-radius: 5px; background: var(--muted-bg); overflow: hidden;">
+                  <div style="{{r.fillStyle}}"></div>
+                  <div style="{{r.handleStyle}}"></div>
+                  <input class="wz-range" type="range" aria-label="{{r.label}}" min="{{r.min}}" max="{{r.max}}" step="{{r.step}}" value="{{r.val}}" onChange="{{r.onRange}}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: ew-resize;">
+                </div>
+                <div style="flex-grow: 1; box-sizing: border-box; padding-right: 6px; display: flex; align-items: center; justify-content: flex-end; gap: 3px; font-family: 'JetBrains Mono', monospace;">
+                  <span style="font-size: 14px; font-weight: 500;">{{r.num}}</span>
+                  <span style="font-size: 11px; color: var(--muted);">{{r.unit}}</span>
+                </div>
+              </div>
+            </sc-if>
+            <sc-if value="{{r.isToggle}}" hint-placeholder-val="{{ false }}">
+              <button onClick="{{r.toggle}}" aria-pressed="{{r.pressed}}" aria-label="{{r.label}}" style="{{r.trackStyle}}">
+                <span style="width: 20px; height: 20px; border-radius: 10px; background: #FFFFFF; box-shadow: 0 1px 2px rgba(0,0,0,0.25); display: block;"></span>
+              </button>
+            </sc-if>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{isStep2}}" hint-placeholder-val="{{ false }}">
+      <div style="box-sizing: border-box; padding: 0 24px 20px; display: flex; flex-direction: column; gap: 18px;">
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; padding: 4px; border-radius: 12px; background: var(--muted-bg);">
+          <sc-for list="{{funds}}" as="f" hint-placeholder-count="2">
+            <button onClick="{{f.pick}}" aria-pressed="{{f.pressed}}" style="{{f.style}}">{{f.label}}</button>
+          </sc-for>
+        </div>
+
+        <sc-if value="{{isNewWallet}}" hint-placeholder-val="{{ true }}">
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <span style="font-size: 14px; font-weight: 600;">Fund copy trading wallet from</span>
+            <button class="ghost" style="height: 48px; box-sizing: border-box; padding: 0 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); color: var(--fg); font-size: 15px; font-weight: 500; display: flex; align-items: center; gap: 10px; text-align: left;">
+              <span style="flex-grow: 1;">Wallet #1</span>
+              <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--muted);">0x4B1E…77A2</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
+            </button>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <label for="wz-amount" style="font-size: 14px; font-weight: 600;">Amount</label>
+            <div style="height: 52px; box-sizing: border-box; padding: 0 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); display: flex; align-items: center; gap: 10px;">
+              <input id="wz-amount" type="text" inputmode="decimal" value="{{amount}}" onChange="{{onAmount}}" placeholder="0.00" style="flex-grow: 1; min-width: 0; border: 0; outline: none; background: transparent; color: var(--fg); font-family: 'JetBrains Mono', monospace; font-size: 18px;">
+              <div style="display: flex; gap: 2px; padding: 3px; border-radius: 8px; background: var(--muted-bg);">
+                <sc-for list="{{tokens}}" as="tk" hint-placeholder-count="2">
+                  <button onClick="{{tk.pick}}" aria-pressed="{{tk.pressed}}" style="{{tk.style}}">
+                    <span style="{{tk.iconStyle}}">{{tk.icon}}</span>
+                    {{tk.label}}
+                  </button>
+                </sc-for>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; justify-content: space-between; font-size: 13px;">
+              <span style="color: var(--muted);">Available: <b style="color: var(--fg); font-weight: 600;">{{available}} {{token}}</b></span>
+              <div style="display: flex; gap: 4px;">
+                <sc-for list="{{quick}}" as="q" hint-placeholder-count="4">
+                  <button class="quick" onClick="{{q.pick}}" style="height: 28px; padding: 0 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--muted); font-family: 'JetBrains Mono', monospace; font-size: 12px;">{{q.label}}</button>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{isExisting}}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <span style="font-size: 18px; font-weight: 700;">Connect your wallet</span>
+            <p style="margin: 0; font-size: 14px; line-height: 1.5; color: var(--muted);">Already have a Robinhood Chain wallet holding at least [X] USDG or ETH? Connect it here to create a trading key. Your funds stay in your wallet.</p>
+            <button onClick="{{connect}}" style="{{connectStyle}}">{{connectLabel}}</button>
+          </div>
+        </sc-if>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{isDone}}" hint-placeholder-val="{{ false }}">
+      <div style="box-sizing: border-box; padding: 12px 24px 24px; display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center;">
+        <span style="{{doneIconStyle}}">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7"></path></svg>
+        </span>
+        <span style="font-family: 'Instrument Serif', Georgia, serif; font-size: 36px; line-height: 1.05; letter-spacing: -0.02em;">{{doneTitle}}</span>
+        <span style="max-width: 440px; font-size: 14px; line-height: 1.5; color: var(--muted);">New trades will mirror into your copy wallet within seconds. You can pause or stop any time from the Copy trade page.</span>
+        <div style="width: 100%; margin-top: 6px; border-radius: 12px; border: 1px solid var(--line-soft); background: var(--surface-2); display: flex; flex-direction: column;">
+          <sc-for list="{{summary}}" as="x" hint-placeholder-count="4">
+            <div style="{{x.style}}">
+              <span style="color: var(--muted);">{{x.label}}</span>
+              <span style="font-family: 'JetBrains Mono', monospace; font-weight: 500;">{{x.value}}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <div style="height: 72px; flex-shrink: 0; box-sizing: border-box; padding: 0 20px 0 24px; border-top: 1px solid var(--line-soft); display: flex; align-items: center; gap: 10px;">
+      <sc-if value="{{showProgress}}" hint-placeholder-val="{{ true }}">
+        <div style="width: 110px; height: 4px; border-radius: 2px; background: var(--muted-bg); overflow: hidden;">
+          <div style="{{progressStyle}}"></div>
+        </div>
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--muted);">{{progressLabel}}</span>
+      </sc-if>
+      <div style="flex-grow: 1;"></div>
+      <sc-if value="{{showSecondary}}" hint-placeholder-val="{{ true }}">
+        <button class="ghost" onClick="{{secondary}}" style="height: 42px; padding: 0 18px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); font-size: 15px; font-weight: 600;">{{secondaryLabel}}</button>
+      </sc-if>
+      <button onClick="{{primary}}" disabled="{{primaryDisabled}}" style="{{primaryStyle}}">{{primaryLabel}}</button>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"trader":{"editor":null},"onClose":{"editor":null},"onStart":{"editor":null},"theme":{"editor":null},"onToggleTheme":{"editor":null},"defaultTheme":{"editor":"enum","options":["light","dark"],"default":"light"},"accent":{"editor":"color","default":"#00B843","options":["#00B843","#2F6BFF","#E8A400"]},"$preview":{"width":640,"height":1000}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {
+      step: 1, mode: 'copy', tab: 'config', fund: 'new', token: 'USDG', amount: '', connected: false, addr: '', extra: [],
+      maxAlloc: 10, memes: false, newOnly: true, slippage: 1, stopLoss: 15, takeProfit: 30, inactive: 7, notify: true, off: {}
+    };
+    let savedTheme = null;
+    try { savedTheme = window.localStorage.getItem('peapod-theme'); } catch (e) { savedTheme = null; }
+    this.state.theme = savedTheme === 'dark' || savedTheme === 'light' ? savedTheme : (props.defaultTheme === 'dark' ? 'dark' : 'light');
+  }
+  componentDidMount() {
+    this._onThemeStore = (e) => {
+      if (e.key === 'peapod-theme' && (e.newValue === 'dark' || e.newValue === 'light')) this.setState({ theme: e.newValue });
+    };
+    window.addEventListener('storage', this._onThemeStore);
+  }
+  componentWillUnmount() {
+    window.removeEventListener('storage', this._onThemeStore);
+  }
+  themeVals() {
+    const theme = this.props.theme === 'dark' || this.props.theme === 'light' ? this.props.theme : this.state.theme;
+    const isDark = theme === 'dark';
+    const toggleTheme = () => {
+      const next = isDark ? 'light' : 'dark';
+      try { window.localStorage.setItem('peapod-theme', next); } catch (e) { /* storage unavailable */ }
+      if (this.props.onToggleTheme) this.props.onToggleTheme(next);
+      else this.setState({ theme: next });
+    };
+    const slot = 'width: 34px; height: 34px; border-radius: 17px; display: flex; align-items: center; justify-content: center; transition: background-color 200ms ease, color 200ms ease; ';
+    return {
+      theme, isDark, toggleTheme,
+      setTheme: (next) => this.setState({ theme: next }),
+      themeClass: isDark ? 'pp theme-dark' : 'pp',
+      themeAria: isDark ? 'Switch to day mode' : 'Switch to night mode',
+      sunStyle: slot + (isDark ? 'background: transparent; color: #6E7567;' : 'background: #F4EFE3; color: #1E4D2B; box-shadow: 0 1px 3px rgba(17,20,15,0.18);'),
+      moonStyle: slot + (isDark ? 'background: #0B0C0A; color: #EFE6C8; box-shadow: 0 0 0 1px #2E3329;' : 'background: transparent; color: #8A9082;')
+    };
+  }
+  renderVals() {
+    const accent = this.props.accent ?? '#00B843';
+    const red = '#E5532E';
+    const t = this.props.trader ?? { name: 'pea_whale', addr: '0x7a3f91d0e2b45c17a8e0d6f4b9c258f0c21e', pnl: 1284390.42, roi: 212.4, acct: 2410552, win: 64.2, assets: 'TNE', seed: 11 };
+    const st = this.state;
+    const counter = st.mode === 'counter';
+    const set = (patch) => this.setState(patch);
+    const cents = (v) => (v < 0 ? '-' : '') + '$' + Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const shortOf = (a) => a.slice(0, 6) + '…' + a.slice(-4);
+    const verb = counter ? 'Countertrade' : 'Copytrade';
+
+    const title = st.step === 3 ? (counter ? 'Countertrade is live' : 'Copy trade is live') : verb + ' ' + shortOf(t.addr);
+    const subtitle = st.step === 1 ? 'Configure your trading preferences' : st.step === 2 ? 'Configure your copytrading wallet details.' : 'Everything is set up.';
+
+    const stats = [
+      { label: 'PORTFOLIO VALUE', value: cents(t.acct), style: 'font-size: 17px; font-weight: 600;' },
+      { label: '30D PNL', value: '+' + cents(t.pnl), style: 'font-size: 17px; font-weight: 600; color: var(--up);' },
+      { label: 'WIN RATE', value: t.win.toFixed(1) + '%', style: 'font-size: 17px; font-weight: 600; color: ' + (t.win >= 50 ? 'var(--up)' : 'var(--down)') + ';' }
+    ];
+
+    const seg = (on, tone) => 'height: 38px; border: 0; border-radius: 8px; font-size: 14px; font-weight: 600; ' + (on
+      ? (tone === 'red' ? 'background: var(--down-bg); color: var(--down); box-shadow: inset 0 0 0 1px rgba(229,83,46,0.35);'
+        : tone === 'green' ? 'background: var(--up-bg); color: var(--up); box-shadow: inset 0 0 0 1px rgba(0,184,67,0.35);'
+        : 'background: var(--surface); color: var(--fg); box-shadow: 0 1px 2px rgba(17,20,15,0.12);')
+      : 'background: transparent; color: var(--muted);');
+    const modes = [['copy', 'Copytrade', 'green'], ['counter', 'Countertrade', 'red']].map(([id, label, tone]) => ({
+      label, pressed: String(st.mode === id), pick: () => set({ mode: id }), style: seg(st.mode === id, tone)
+    }));
+
+    const allWallets = [{ name: t.name, addr: t.addr, base: true }].concat(st.extra.map((a) => ({ name: 'Wallet', addr: a, base: false })));
+    const wallets = allWallets.map((w, i) => ({
+      name: w.base ? w.name : 'Trader ' + (i + 1), short: shortOf(w.addr),
+      initials: w.base ? w.name.replace('0x', '').slice(0, 2).toUpperCase() : String(i + 1),
+      avatarStyle: 'width: 28px; height: 28px; border-radius: 8px; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; ' + (w.base ? 'background: ' + accent + '; color: #0A0B09;' : 'background: var(--muted-bg); color: var(--fg);'),
+      removeLabel: 'Remove ' + shortOf(w.addr),
+      remove: () => { if (w.base) return; set({ extra: st.extra.filter((a) => a !== w.addr) }); }
+    }));
+    const addWallet = () => {
+      const a = (st.addr || '').trim();
+      if (/^0x[0-9a-fA-F]{6,}$/.test(a) && st.extra.indexOf(a) < 0) set({ extra: st.extra.concat([a]), addr: '' });
+    };
+
+    // simulated chart
+    let x = t.seed * 41 + 7;
+    const n = 60, tv = [];
+    let v = 0;
+    for (let i = 0; i < n; i++) {
+      x = (x * 9301 + 49297) % 233280;
+      const r = x / 233280;
+      v += i < 10 ? r * 0.4 : i < 30 ? r * 1.6 : (r - 0.35) * 0.5;
+      tv.push(v);
+    }
+    const top = Math.max.apply(null, tv) || 1;
+    const scale = 0.35 + (st.maxAlloc / 100) * 1.3;
+    const trader = tv.map((q) => q / top);
+    const you = trader.map((q) => (counter ? -q : q) * scale);
+    const lo = Math.min(0, Math.min.apply(null, you)), hi = Math.max(1, Math.max.apply(null, you));
+    const Y = (q) => (8 + (hi - q) / (hi - lo) * 134).toFixed(1);
+    const X = (i) => (i * 592 / (n - 1)).toFixed(1);
+    const traderPts = trader.map((q, i) => X(i) + ',' + Y(q));
+    const youPts = you.map((q, i) => X(i) + ',' + Y(q));
+    const traderLine = 'M' + traderPts.join(' L');
+    const youLine = 'M' + youPts.join(' L');
+    const band = 'M' + traderPts.join(' L') + ' L' + youPts.slice().reverse().join(' L') + ' Z';
+    const retVal = (t.roi / 100) * 30 * scale;
+    const youColor = counter ? red : accent;
+    const ret = (counter ? '-' : '+') + retVal.toFixed(1) + '%';
+
+    const tabs = [['config', 'Configuration'], ['assets', 'Assets'], ['settings', 'Settings']].map(([id, label]) => ({
+      label, pick: () => set({ tab: id }),
+      style: 'height: 48px; padding: 0; border: 0; background: transparent; font-family: "JetBrains Mono", monospace; font-size: 12px; font-weight: 500; letter-spacing: 0.05em; text-transform: uppercase; border-bottom: 2px solid ' + (st.tab === id ? youColor : 'transparent') + '; color: ' + (st.tab === id ? 'var(--fg)' : 'var(--muted)') + ';'
+    }));
+
+    const track = (on) => 'width: 44px; height: 26px; flex-shrink: 0; padding: 3px; box-sizing: border-box; border: 0; border-radius: 13px; display: flex; justify-content: ' + (on ? 'flex-end' : 'flex-start') + '; background: ' + (on ? youColor : 'var(--line-strong)') + ';';
+    const base = { hasDot: false, dot: '', dotStyle: '', isRange: false, isToggle: false, min: 0, max: 0, step: 1, val: 0, num: '', unit: '', fillStyle: '', handleStyle: '', onRange: null, pressed: 'false', trackStyle: '', toggle: null };
+    const range = (label, desc, key, min, max, step, fmt, unit) => {
+      const pct = Math.max(0, Math.min(100, (st[key] - min) / (max - min) * 100));
+      return Object.assign({}, base, {
+        label, desc, isRange: true, min, max, step, val: st[key], num: fmt(st[key]), unit,
+        fillStyle: 'position: absolute; top: 0; bottom: 0; left: 0; width: ' + pct.toFixed(1) + '%; background: color-mix(in srgb, ' + youColor + ' 32%, transparent);',
+        handleStyle: 'position: absolute; top: 6px; bottom: 6px; left: calc(' + pct.toFixed(1) + '% - ' + (pct > 96 ? 6 : 2) + 'px); width: 4px; border-radius: 2px; background: ' + youColor + '; box-shadow: 0 0 0 1px color-mix(in srgb, ' + youColor + ' 40%, transparent);',
+        onRange: (e) => set({ [key]: Number(e.target.value) })
+      });
+    };
+    const toggle = (label, desc, key) => Object.assign({}, base, {
+      label, desc, isToggle: true, pressed: String(!!st[key]), trackStyle: track(!!st[key]),
+      toggle: () => set({ [key]: !st[key] })
+    });
+
+    const syms = { T: ['TSLA', 'Stock'], N: ['NVDA', 'Stock'], H: ['HOOD', 'Stock'], A: ['AAPL', 'Stock'], S: ['SPY', 'Stock'], G: ['GLD', 'Stock'], E: ['ROBIN', 'Memecoin'], B: ['SQUAWK', 'Memecoin'], P: ['FEATHER', 'Memecoin'], W: ['WORM', 'Memecoin'], K: ['NEST', 'Memecoin'] };
+    const dotBg = { Stock: '#D9E4FF', Memecoin: '#EBE4FF' };
+
+    let rows;
+    if (st.tab === 'config') {
+      rows = [
+        range('Max size per trade', 'Caps each copied buy as a share of your copy wallet.', 'maxAlloc', 1, 50, 1, (q) => String(q), '%'),
+        toggle('Include memecoin trades', 'Also mirror this trader’s Pons memecoin buys and sells.', 'memes'),
+        toggle('Only copy new positions', 'Skip holdings the trader already had before you started.', 'newOnly'),
+        range('Max worse entry', 'Skip a trade if your price is this much worse than theirs.', 'slippage', 0.5, 10, 0.5, (q) => q.toFixed(1), '%')
+      ];
+    } else if (st.tab === 'assets') {
+      rows = t.assets.split('').filter((k) => syms[k]).map((k) => {
+        const [sym, kind] = syms[k];
+        const on = !st.off[sym];
+        return Object.assign({}, base, {
+          hasDot: true, dot: sym.charAt(0),
+          dotStyle: 'width: 32px; height: 32px; flex-shrink: 0; border-radius: 16px; background: ' + dotBg[kind] + '; color: #0A0B09; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center;',
+          label: sym, desc: kind + (kind === 'Memecoin' && !st.memes ? ' · turn on memecoin trades to copy' : ' · held by this trader'),
+          isToggle: true, pressed: String(on), trackStyle: track(on),
+          toggle: () => set({ off: Object.assign({}, st.off, { [sym]: on }) })
+        });
+      });
+    } else {
+      rows = [
+        range('Stop loss', 'Pause copying if your copy wallet falls this far.', 'stopLoss', 5, 50, 1, (q) => '-' + q, '%'),
+        range('Take profit', 'Pause copying once your copy wallet is up this much.', 'takeProfit', 10, 200, 5, (q) => '+' + q, '%'),
+        range('Pause if inactive', 'Stop if the trader makes no trades for this long.', 'inactive', 1, 30, 1, (q) => String(q), 'days'),
+        toggle('Trade alerts', 'Notify me every time a trade is copied.', 'notify')
+      ];
+    }
+
+    const funds = [['new', 'Create new'], ['existing', 'Use existing']].map(([id, label]) => ({
+      label, pressed: String(st.fund === id), pick: () => set({ fund: id }), style: seg(st.fund === id, 'plain')
+    }));
+    const tokenInfo = { USDG: { bal: 2500, dp: 2, icon: 'G', bg: '#1F6FEB', fg: '#FFFFFF' }, ETH: { bal: 0.842, dp: 4, icon: '\u039E', bg: '#E7E1FF', fg: '#3C3C9E' } };
+    const tok = tokenInfo[st.token];
+    const availableNum = tok.bal;
+    const quick = [['25%', 0.25], ['50%', 0.5], ['75%', 0.75], ['MAX', 1]].map(([label, f]) => ({
+      label, pick: () => set({ amount: (availableNum * f).toFixed(tok.dp) })
+    }));
+    const tokens = ['USDG', 'ETH'].map((id) => ({
+      label: id, icon: tokenInfo[id].icon, pressed: String(st.token === id),
+      pick: () => set({ token: id, amount: '' }),
+      iconStyle: 'width: 18px; height: 18px; border-radius: 9px; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; background: ' + tokenInfo[id].bg + '; color: ' + tokenInfo[id].fg + ';',
+      style: 'height: 30px; padding: 0 8px 0 5px; border: 0; border-radius: 6px; font-family: "JetBrains Mono", monospace; font-size: 12px; font-weight: 500; display: flex; align-items: center; gap: 6px; ' + (st.token === id ? 'background: var(--surface); color: var(--fg); box-shadow: 0 1px 2px rgba(17,20,15,0.12);' : 'background: transparent; color: var(--muted);')
+    }));
+    const amt = parseFloat(String(st.amount).replace(/,/g, '')) || 0;
+
+    const btn = (enabled, tone) => 'height: 42px; min-width: 104px; padding: 0 20px; border: 0; border-radius: 10px; font-size: 15px; font-weight: 700; ' + (enabled
+      ? 'background: ' + (tone === 'red' ? red : accent) + '; color: ' + (tone === 'red' ? '#FFFFFF' : '#0A0B09') + ';'
+      : 'background: var(--muted-bg); color: var(--subtle);');
+
+    const ready2 = st.fund === 'new' ? amt > 0 : st.connected;
+    const tone = counter ? 'red' : 'green';
+    let primary, primaryLabel, primaryDisabled, secondary, secondaryLabel;
+    if (st.step === 1) {
+      primary = () => set({ step: 2 }); primaryLabel = 'Continue'; primaryDisabled = false;
+      secondary = () => this.props.onClose && this.props.onClose(); secondaryLabel = 'Cancel';
+    } else if (st.step === 2) {
+      primary = () => { if (!ready2) return; set({ step: 3 }); if (this.props.onStart) this.props.onStart({ name: t.name, mode: st.mode }); };
+      primaryLabel = 'Start'; primaryDisabled = !ready2;
+      secondary = () => set({ step: 1 }); secondaryLabel = 'Back';
+    } else {
+      primary = () => this.props.onClose && this.props.onClose(); primaryLabel = 'Done'; primaryDisabled = false;
+      secondary = null; secondaryLabel = '';
+    }
+
+    const summary = [
+      ['Mode', counter ? 'Countertrade' : 'Copytrade'],
+      ['Funding', st.fund === 'new' ? amt.toLocaleString('en-US', { minimumFractionDigits: tok.dp, maximumFractionDigits: tok.dp }) + ' ' + st.token : 'Existing wallet'],
+      ['Max size per trade', st.maxAlloc + '%'],
+      ['Stop loss / take profit', '-' + st.stopLoss + '% / +' + st.takeProfit + '%']
+    ].map(([label, value], i) => ({ label, value, style: 'height: 44px; box-sizing: border-box; padding: 0 16px; display: flex; align-items: center; justify-content: space-between; font-size: 14px; ' + (i ? 'border-top: 1px solid var(--line-soft);' : '') }));
+
+    return Object.assign(this.themeVals(), {
+      accent, title, subtitle, stats, modes, wallets, addWallet,
+      addr: st.addr, onAddr: (e) => set({ addr: e.target.value }),
+      ret, retStyle: 'font-size: 22px; font-weight: 700; letter-spacing: -0.01em; color: ' + (counter ? 'var(--down)' : 'var(--up)') + ';',
+      youColor, youKey: 'width: 12px; height: 2px; display: block; background: ' + youColor + ';',
+      traderLine, youLine, band, tabs, rows,
+      funds, quick, tokens, token: st.token, amount: st.amount, available: availableNum.toLocaleString('en-US', { minimumFractionDigits: tok.dp, maximumFractionDigits: tok.dp }),
+      onAmount: (e) => set({ amount: e.target.value.replace(/[^0-9.,]/g, '') }),
+      isNewWallet: st.fund === 'new', isExisting: st.fund === 'existing',
+      connect: () => set({ connected: true }),
+      connectLabel: st.connected ? 'Wallet connected · 0x4B1E…77A2' : 'Connect wallet',
+      connectStyle: 'height: 48px; width: 100%; border: 0; border-radius: 10px; font-size: 15px; font-weight: 700; ' + (st.connected ? 'background: var(--up-bg); color: var(--up);' : 'background: ' + accent + '; color: #0A0B09;'),
+      isStep1: st.step === 1, isStep2: st.step === 2, isDone: st.step === 3,
+      doneTitle: counter ? 'Now countertrading ' + t.name : 'Now copying ' + t.name,
+      doneIconStyle: 'width: 60px; height: 60px; border-radius: 30px; display: flex; align-items: center; justify-content: center; ' + (counter ? 'background: var(--down-bg); color: var(--down);' : 'background: var(--up-bg); color: var(--up);'),
+      summary,
+      showProgress: st.step < 3,
+      progressLabel: st.step + '/2',
+      progressStyle: 'height: 4px; border-radius: 2px; width: ' + (st.step === 1 ? '50%' : '100%') + '; background: ' + youColor + '; transition: width 250ms ease;',
+      showSecondary: st.step < 3,
+      primary, primaryLabel, primaryDisabled, secondary, secondaryLabel,
+      primaryStyle: btn(!primaryDisabled, tone),
+      close: () => this.props.onClose && this.props.onClose()
+    });
+  }
+}
+</script>
+</body>
+</html>

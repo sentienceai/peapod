@@ -84,7 +84,10 @@
 
 /* ── grid section ───────────────────────────────────────────────────────────────────────── */
 .ct-grid-section { box-sizing: border-box; padding: 20px 40px 32px; display: flex; flex-direction: column; gap: 14px; }
-.ct-grid-head { display: flex; align-items: center; }
+.ct-grid-head { display: flex; align-items: center; gap: 12px; }
+/* The page's one sentence about the score, beside the count. */
+.ct-score-why { flex-direction: row; align-items: baseline; gap: 6px; padding: 4px 10px; }
+.ct-score-why .unwired-needs { font-size: 12px; }
 .ct-count { font-size: 14px; color: var(--muted); }
 .ct-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
 .ct-empty {
@@ -97,68 +100,102 @@
    position:relative + the covering open-button underneath is what lets a card be one big
    click target while still carrying two of its own real buttons (copy-address, Copy trade) —
    see the file header in lib/copy-page.js for why this beats a <button> nested in a <button>. */
-.ct-card { position: relative; }
-.ct-card-open {
-  position: absolute; inset: 0; z-index: 0; width: 100%; height: 100%;
-  padding: 0; border: 0; background: transparent; cursor: pointer;
+/* CopyTrade.dc.html's card, measured: 20px radius, its two-shadow float, and a surface of its
+   own — this used to be a bare `position: relative` with no radius, no background and no
+   shadow, so the "cards" were whatever their children happened to paint. */
+.ct-card {
+  border-radius: var(--radius-card); background: var(--surface);
+  box-shadow: var(--shadow-card);
+  display: flex; flex-direction: column; overflow: hidden;
 }
-.ct-card-head, .ct-card-body, .ct-card-foot { position: relative; z-index: 1; }
+/* The head and body ARE the open button, as in the frame. The old cover button sat behind the
+   content at z-index 0 and caught nothing a mouse ever sent. */
+.ct-card-open {
+  flex-grow: 1; padding: 0; border: 0; background: transparent; color: var(--fg);
+  font: inherit; text-align: left; display: flex; flex-direction: column; cursor: pointer;
+}
+.ct-card:hover { box-shadow: var(--shadow-card-hover); }
 
 .ct-card-head {
-  height: 58px; box-sizing: border-box; padding: 0 16px; display: flex; align-items: center; gap: 10px;
+  height: 58px; flex-shrink: 0; width: 100%; box-sizing: border-box; padding: 0 16px;
+  display: flex; align-items: center; gap: 10px;
 }
-.ct-card-head .medal { flex-shrink: 0; }
-.ct-card-head .avatar { width: 32px; height: 32px; border-radius: 10px; font-size: 11px; }
+.ct-card-head .avatar { width: 36px; height: 36px; border-radius: 11px; font-size: 12px; }
 .ct-card-id { flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
-.ct-card-addr { font-size: 14px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; }
-/* Overlapped tiles, the board's compact stack — no gap here, lib/copy-page.js sets each
-   tile's -7px overlap inline (the one piece of per-item geometry not worth a CSS rule). */
-.ct-tokens { display: flex; align-items: center; min-width: 0; overflow: visible; }
-/* The ring is drawn as a box-shadow rather than a border so it doesn't change the tile's own
-   22×22 box (a border would need the tile 4px smaller to still measure 22px outside it). */
-.ct-token-tile { box-shadow: 0 0 0 2px var(--surface); }
+/* One line, ellipsised. Wrapping pushed the token chips out of the 58px head and over the
+   card's own body — which is how the chips ended up sitting on top of the address. */
+.ct-card-addr {
+  font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis; display: block;
+}
+/* Overlapped chips, the frame's 22px circles with a 2px ring and one letter each; the -6px
+   overlap is set per chip in lib/copy-page.js. */
+.ct-tokens { display: flex; align-items: center; min-width: 0; }
+.ct-token-tile { border: 2px solid var(--surface); box-sizing: border-box; }
 .ct-more { margin-left: 6px; font-size: 11px; color: var(--muted); flex-shrink: 0; }
 .ct-ago {
   flex-shrink: 0; height: 22px; padding: 0 7px; border-radius: 11px; background: var(--muted-bg);
   color: var(--muted); font-size: 10px; display: inline-flex; align-items: center; gap: 5px;
 }
 
-.ct-card-body { box-sizing: border-box; padding: 0 16px 12px; display: flex; align-items: stretch; gap: 10px; }
-.ct-card-stats { width: 100px; flex-shrink: 0; display: flex; flex-direction: column; justify-content: center; gap: 10px; }
+.ct-card-body {
+  flex-grow: 1; width: 100%; box-sizing: border-box; padding: 0 16px 8px;
+  display: flex; align-items: stretch; gap: 10px;
+}
+.ct-card-stats { width: 108px; flex-shrink: 0; display: flex; flex-direction: column; justify-content: center; gap: 8px; }
 .ct-stat { display: flex; flex-direction: column; gap: 1px; }
-.ct-stat-value { font-family: var(--font-mono); font-size: 15px; font-weight: 500; }
+.ct-stat-value { font-family: var(--font-mono); font-size: 17px; font-weight: 500; }
 .ct-stat-label { font-size: 11px; color: var(--muted); }
-.ct-card-body .spark { flex-grow: 1; min-width: 0; height: 84px; align-self: center; }
+.ct-card-body .spark { flex-grow: 1; min-width: 0; height: 88px; align-self: center; }
 
 /* Fixed height, never auto: every card in a row must stand the same height regardless of how
    long its own footnote is, so the .ev-foot line below is clipped with an ellipsis rather than
    wrapped — a wrapped line is what pushed this footer under the Copy button in the first
    place. .ev already centres itself as a flex item (base.css), so the button stays centred
    beside it at any content length. */
-.ct-card-foot {
-  /* Two rows, not one. The frame put a copy score and a row of ticks here; this build has
-     the chance band instead, which is a figure, a track, a verdict and a footnote — and a
-     slot saying what a copy score would need. Sharing one 72px row squeezed the band down
-     to a sliver, which is the one thing on the card that carries an argument. */
-  flex-shrink: 0; box-sizing: border-box; padding: 10px 12px 10px 16px;
-  border-top: 1px solid var(--line-soft); background: var(--surface-2);
-  display: flex; flex-direction: column; align-items: stretch; gap: 8px; overflow: hidden;
+/* The chance strip: the one row CopyTrade.dc.html does not have, because the frame closes its
+   card with a copy score and this build cannot publish one. It is the width of the card and
+   the height of the evidence inside it. */
+.ct-card-ev {
+  flex-shrink: 0; box-sizing: border-box; padding: 6px 16px 8px;
+  border-top: 1px solid var(--line-soft);
 }
-.ct-card-foot .ev { min-width: 0; }
-/* Second row: what a copy score needs, and the button, side by side. */
-.ct-card-foot-act { display: flex; align-items: center; gap: 10px; }
-.ct-card-foot-act .unwired { flex: 1 1 auto; min-width: 0; }
-/* In a card the compact slot has a button beside it, so its two parts stack and the sentence
-   wraps rather than ellipsing: a slot whose whole job is to name a dependency must not be the
-   thing that gets cut off. */
-.ct-card-foot-act .unwired--compact { flex-direction: column; align-items: flex-start; gap: 1px; }
-.ct-card-foot-act .unwired--compact .unwired-needs { white-space: normal; line-height: 1.3; }
-.ct-card-foot .btn-copy { flex: 0 0 auto; }
-.ct-card-foot .ev-head,
-.ct-card-foot .ev-verdict,
-.ct-card-foot .ev-foot {
+/* Four stacked lines cost 89px on a card the frame closes in 50. The verdict moves up beside
+   the win rate — they are one sentence read together anyway ("55.6%, and that is beyond
+   chance") — which buys a row back without dropping a figure. */
+.ct-card-ev .ev {
+  display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 8px; row-gap: 3px;
+}
+.ct-card-ev .ev-head { grid-area: 1 / 1; }
+.ct-card-ev .ev-verdict { grid-area: 1 / 2; justify-self: end; }
+.ct-card-ev .ev-track { grid-area: 2 / 1 / 2 / -1; }
+.ct-card-ev .ev-foot { grid-area: 3 / 1 / 3 / -1; }
+.ct-card-ev .ev-head, .ct-card-ev .ev-verdict, .ct-card-ev .ev-foot {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+
+/* The frame's foot, measured: 50px, padding 0 8px 0 16px, the pale up-tint, a 12px gap, and
+   the Copy button hard right. */
+.ct-card-foot {
+  height: 50px; flex-shrink: 0; box-sizing: border-box; padding: 0 8px 0 16px;
+  background: var(--up-bg-2); border-top: 1px solid var(--up-line);
+  display: flex; align-items: center; gap: 12px;
+}
+/* The score treatment, at the frame's sizes, with no score in it: a 16px figure, a 12px
+   "/100", and ten 3×16px bars. Every bar is the unlit track colour, because there is nothing
+   to light them with. */
+.ct-score {
+  /* flex-direction: row explicitly — .unwired is a column, and inheriting that put the ten
+     bars on a second line underneath the figure instead of beside it. */
+  flex-grow: 1; min-width: 0; display: flex; flex-direction: row; align-items: center;
+  gap: 12px; padding: 0; border: 0; background: none;
+}
+.ct-score-fig { display: flex; align-items: baseline; gap: 2px; }
+.ct-score-value { font-size: 16px; font-weight: 700; color: var(--muted); }
+.ct-score-of { font-size: 12px; color: var(--muted); }
+.ct-score-bars { display: flex; gap: 2px; }
+.ct-score-bars i { width: 3px; height: 16px; border-radius: 2px; background: var(--up-track); }
+
 /* A verdict is not a signed figure (rule 2): "Beyond chance" only ever gets MORE WEIGHT, never
    a direction's colour. base.css's .ev-verdict is already var(--muted); this is the one step
    up from it in the same neutral channel. */

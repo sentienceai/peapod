@@ -146,6 +146,10 @@ input::placeholder { color: var(--placeholder); }
   font-size: 14px; font-weight: 700;
 }
 .seg button[aria-pressed='true'] { background: var(--surface); color: var(--fg); box-shadow: var(--shadow-segment); }
+/* A segment that cannot be pressed says so by looking spent, not by silently ignoring the
+   click — the asset page's holder filter is the frame's control over data nobody has yet. */
+.seg button:disabled { color: var(--faint); cursor: not-allowed; }
+.seg button:disabled[aria-pressed='true'] { box-shadow: none; }
 
 .tabs { display: flex; gap: 4px; }
 .tabs button {

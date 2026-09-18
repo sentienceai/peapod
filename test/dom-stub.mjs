@@ -265,6 +265,13 @@ class Node {
     return this.descendants().includes(other);
   }
 
+  /**
+   * A no-op, because there is nothing to scroll: the stub has no viewport. It exists because
+   * the page calls it on whichever row is active, and a stub without it turns "the palette
+   * moved its selection" into a TypeError.
+   */
+  scrollIntoView() {}
+
   /** Focus, as the browser tracks it, so focus return can be asserted. */
   focus() {
     const d = /** @type {any} */ (globalThis.document);

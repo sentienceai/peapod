@@ -60,7 +60,8 @@ export function mountChrome(host, opts = {}) {
   /** @type {HTMLButtonElement} */ (search).type = 'button';
   search.setAttribute('aria-label', 'Search assets or addresses');
   search.append(icon(17, ICONS.search));
-  search.append(node('span', undefined, 'Search assets, addresses or names'));
+  // The same words the palette's own field uses: there are no names to match here.
+  search.append(node('span', undefined, 'Search a ticker or an address'));
   search.append(node('span', 'keycap', '/'));
   search.onclick = () => openSearch(opts.onSearch ? { onPick: opts.onSearch } : {});
   host.append(search);

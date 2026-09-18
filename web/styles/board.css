@@ -127,8 +127,9 @@
    is legible against the one behind. The ring is a shadow rather than a border: a border
    would make each tile 2px bigger and the two-letter label would no longer be centred. */
 .chipstack { display: flex; align-items: center; }
-.chipstack .asset-tile { width: 24px; height: 24px; border-radius: 12px; font-size: 10px; }
-.chipstack .asset-tile + .asset-tile { margin-left: -8px; }
+/* The frames' identity chip everywhere it appears: 22px, one letter, overlapped by 6px with a
+   2px ring of the surface behind it so a stack still reads as separate circles. */
+.chipstack .asset-tile + .asset-tile { margin-left: -6px; }
 .chipstack .asset-tile { box-shadow: 0 0 0 2px var(--surface); }
 .row:hover .chipstack .asset-tile { box-shadow: 0 0 0 2px var(--hover); }
 .chipstack-more { margin-left: 6px; font-size: 11px; color: var(--muted); font-family: var(--font-mono); }

@@ -136,22 +136,55 @@ test('the setup window ends where the backend does', async () => {
   assert.match(src, /has been copied, countered, or simulated/i);
 });
 
-test('the tokens carry their logos, not just their initials', () => {
+test('a logo goes where the ticker is written, and a letter where it is not', () => {
   /*
-   * THE FAILURE THIS CATCHES. 433 logo files are vendored and the map covers almost every
-   * token any page displays, and for a while every tile on the site drew two letters anyway:
-   * the map was loaded by one page, and two pages built their tiles by hand instead of
-   * calling the helper that adds the image. Initials are the FALLBACK for a token with no
-   * file; a page where every tile is initials means the map never arrived.
+   * The card head stacks three 22px chips overlapping by 6px and writes no ticker beside
+   * them, so the letter on each chip is the only thing naming that token. Logos were drawn
+   * over exactly those letters for a pass: cropped artwork, no ticker, and — because the
+   * address was wrapping — a chip sitting on top of the address line. CopyTrade.dc.html
+   * draws a letter in every one of these. The logo belongs on the market rows, the asset
+   * header and the holdings rows, where the ticker is written next to it.
    */
-  const tiles = byClass(get('copy-main'), 'asset-tile');
-  const imgs = get('copy-main').descendants().filter((/** @type {any} */ n) => n.tag === 'img');
-  assert.ok(tiles.length > 0, 'no asset tiles rendered at all');
-  assert.ok(imgs.length / tiles.length > 0.9,
-    `only ${imgs.length} of ${tiles.length} tiles carry a logo`);
-  for (const img of imgs.slice(0, 8)) {
-    // Only a filename this build produced ever reaches a URL.
-    assert.match(img.attributes.src, /^\/token-logos\/0x[0-9a-f]{40}\.(png|jpg|jpeg|webp)$/);
-    assert.equal(img.attributes.alt, '', 'the ticker is already text; the logo is decorative');
+  const chips = byClass(get('copy-main'), 'ct-token-tile');
+  assert.ok(chips.length > 5, 'the cards carry no token chips');
+  for (const chip of chips) {
+    assert.equal(chip.descendants().filter((/** @type {any} */ n) => n.tag === 'img').length, 0,
+      'a logo is drawn over a chip that nothing names');
+    assert.equal(chip.textContent.length, 1, `a stacked chip carries ${chip.textContent}`);
   }
+  // And the head does not wrap: one line, one row of chips, inside 58px.
+  const addr = byClass(get('copy-main'), 'ct-card-addr')[0];
+  assert.ok(!/\n/.test(addr.textContent) && addr.textContent.length <= 14,
+    `the address line is ${addr.textContent}`);
+});
+
+test('a card opens the trader, and the frame\'s foot is the frame\'s foot', async () => {
+  /*
+   * THE BUG THIS EXISTS FOR. The card's open control was a transparent button stretched
+   * across the card at z-index 0, with the head, body and foot painted over it at z-index 1.
+   * Every real click landed on the content and stopped there: the cards on /copy-trade opened
+   * nothing at all for a whole release. It passed every test, because a test clicks the
+   * element it looked up — `openBtn.onclick()` — and never asks the browser what is on top.
+   *
+   * So this pins the STRUCTURE the frame uses, which is what made it work: the head and the
+   * body are inside the button, and nothing else is.
+   */
+  const card = cards()[0];
+  const open = byClass(card, 'ct-card-open')[0];
+  assert.ok(open, 'the card has no open control');
+  assert.equal(open.tag, 'button');
+  assert.ok(byClass(open, 'ct-card-head').length === 1 && byClass(open, 'ct-card-body').length === 1,
+    'the head and body are not inside the open button, so a click on them does nothing');
+  assert.equal(byClass(open, 'ct-card-foot').length, 0, 'the foot is inside the open button');
+  assert.equal(open.descendants().filter((/** @type {any} */ n) => n.tag === 'button').length, 0,
+    'a button nested inside the open button');
+
+  // CopyTrade.dc.html's foot: the score treatment on the left, the button hard right.
+  const foot = byClass(card, 'ct-card-foot')[0];
+  const score = byClass(foot, 'ct-score')[0];
+  assert.ok(score, 'the score slot is not in the foot');
+  assert.equal(byClass(score, 'ct-score-bars')[0].children.length, 10, 'the frame draws ten bars');
+  assert.equal(byClass(score, 'ct-score-value')[0].textContent, '—', 'a score appeared');
+  assert.match(score.className, /\bunwired\b/, 'the score slot is not marked unwired');
+  assert.ok(byClass(foot, 'btn-copy').length === 1, 'the Copy button left the foot');
 });

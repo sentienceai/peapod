@@ -22,7 +22,7 @@ import { markSample } from './sample.js';
 import { subsidyNote } from './findings.js';
 import { sparkline } from './spark.js';
 import {
-  ago, assetTile, compact, copyButton, el, icon, node, pct, shortAddr, signed, signedPct,
+  ago, compact, copyButton, el, icon, letterChip, node, pct, shortAddr, signed, signedPct,
 } from './format.js';
 
 const PAGE = 12;
@@ -100,9 +100,10 @@ function assetChips(r) {
   const shown = r.tokens.slice(0, 3);
   shown.forEach((/** @type {string} */ symbol, /** @type {number} */ i) => {
     const a = state.assets.find((x) => x.symbol === symbol);
-    // assetTile(), not a hand-rolled span: the logo lives in that helper, and a tile built
-    // here is a tile that silently never gets one.
-    const chip = assetTile(symbol, a?.kind ?? 'stock');
+    // A LETTER, NOT A LOGO. These three chips overlap and nothing beside them names the
+    // token, so a logo drawn over the letters leaves cropped artwork and no ticker — see
+    // format.js's letterChip(). The logo belongs where the ticker is written next to it.
+    const chip = letterChip(symbol, a?.kind ?? 'stock');
     chip.style.zIndex = String(shown.length - i);
     chip.title = a ? `${a.symbol} — ${a.name}` : symbol;
     wrap.append(chip);

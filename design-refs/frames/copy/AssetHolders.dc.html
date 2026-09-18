@@ -1,0 +1,406 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <script src="./vendor/react.js"></script>
+<script src="./vendor/react-dom.js"></script>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Schibsted+Grotesk:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+  <style>
+    .pp { --surface: #FFFFFF; --surface-2: #FAFBF9; --sunken: #F7F8F6; --hover: #F5F7F3; --muted-bg: #F2F4F0; --muted-bg-2: #EEF1EC; --grid: #F0F2EE; --line-soft: #EEF0EC; --line: #E6E9E3; --up-line: #E1F2E6; --line-strong: #D6DAD2; --line-strong-2: #C9CEC5; --faint: #B7BCB2; --subtle: #8A9082; --placeholder: #6B7166; --muted: #5F6559; --fg: #11140F; --fg-strong: #000000; --up: #067A2F; --down: #C8360F; --warn: #8A6100; --meme: #6D4FE0; --up-bg: #EAF8EE; --up-bg-2: #F3FBF5; --up-track: #C9E9D2; --down-bg: #FDECE7; --meme-bg: #F1EDFF; --inv-bg: #11140F; --inv-fg: #FFFFFF; --inv-hover: #2A2E25; color-scheme: light; color: var(--fg); transition: background-color 250ms ease, color 250ms ease; }
+    .pp.theme-dark { --surface: #111310; --surface-2: #161914; --sunken: #0B0C0A; --hover: #1A1D17; --muted-bg: #1C1F19; --muted-bg-2: #20241D; --grid: #161914; --line-soft: #1E221B; --line: #272B23; --up-line: #1C3323; --line-strong: #394033; --line-strong-2: #4A5143; --faint: #596052; --subtle: #858C7E; --placeholder: #7D8476; --muted: #A3AA9B; --fg: #EEF1EA; --fg-strong: #FFFFFF; --up: #4BD17A; --down: #FF7A57; --warn: #F2C14E; --meme: #B4A2FF; --up-bg: #12281A; --up-bg-2: #0F1D13; --up-track: #1F3A27; --down-bg: #2E1710; --meme-bg: #231D3A; --inv-bg: #EEF1EA; --inv-fg: #0B0C0A; --inv-hover: #FFFFFF; color-scheme: dark; }
+    .pp.theme-dark .dark { box-shadow: inset 0 0 0 1px #22261E; }
+    .theme-toggle:hover { border-color: var(--line-strong) !important; }
+    body { margin: 0; font-family: "Schibsted Grotesk", "Helvetica Neue", sans-serif; -webkit-font-smoothing: antialiased; }
+    button { font-family: inherit; cursor: pointer; }
+    .ghost:hover { background: var(--muted-bg); }
+    .ah-row:hover { background: var(--hover) !important; }
+    .bubble { transition: transform 160ms ease, opacity 200ms ease, box-shadow 160ms ease; }
+    .bubble:hover { transform: scale(1.06); box-shadow: 0 12px 28px -10px rgba(11,12,10,0.35); z-index: 5; }
+  </style>
+</helmet>
+<div class="{{themeClass}}" style="position: relative; width: 1400px; height: 1380px; box-sizing: border-box; border-radius: 20px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); box-shadow: 0 24px 80px rgba(17,20,15,0.18); display: flex; flex-direction: column; overflow: hidden;">
+
+  <div style="height: 52px; flex-shrink: 0; box-sizing: border-box; padding: 0 10px 0 20px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 4px;">
+    <div style="flex-grow: 1; display: flex; align-items: center; gap: 6px; font-size: 16px;">
+      <span style="color: var(--muted);">Assets</span>
+      <span style="color: var(--faint);">/</span>
+      <span style="font-weight: 600;">{{a.sym}}</span>
+    </div>
+    <button class="theme-toggle" onClick="{{toggleTheme}}" aria-label="{{themeAria}}" title="{{themeAria}}" style="width: 84px; height: 44px; flex-shrink: 0; box-sizing: border-box; padding: 4px; border-radius: 22px; border: 1px solid var(--line); background: var(--muted-bg); display: flex; align-items: center; justify-content: space-between;">
+      <span style="{{sunStyle}}"><svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" style="fill: currentColor; stroke: currentColor;"><circle cx="12" cy="12" r="4.5" stroke="none"></circle><path d="M12 2.5v2.4M12 19.1v2.4M2.5 12h2.4M19.1 12h2.4M5.3 5.3l1.7 1.7M17 17l1.7 1.7M5.3 18.7L7 17M17 7l1.7-1.7" fill="none" stroke-width="2.2" stroke-linecap="round"></path></svg></span>
+      <span style="{{moonStyle}}"><svg width="19" height="19" viewBox="0 0 24 24" aria-hidden="true" style="fill: currentColor;"><path d="M20.6 14.3A8.6 8.6 0 1 1 9.7 3.4a7 7 0 0 0 10.9 10.9z"></path></svg></span>
+    </button>
+    <button class="ghost" aria-label="Close" onClick="{{close}}" style="width: 40px; height: 40px; border: 0; border-radius: 10px; background: transparent; color: var(--fg); display: flex; align-items: center; justify-content: center;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12"></path><path d="M18 6L6 18"></path></svg>
+    </button>
+  </div>
+
+  <div style="flex-grow: 1; min-height: 0; box-sizing: border-box; padding: 12px; display: flex; flex-direction: column; gap: 12px;">
+
+    <div style="height: 200px; flex-shrink: 0; box-sizing: border-box; border-radius: 14px; border: 1px solid var(--line); display: grid; grid-template-columns: minmax(0, 1fr) 560px;">
+      <div style="box-sizing: border-box; padding: 20px 24px; display: flex; flex-direction: column; justify-content: space-between;">
+        <div style="display: flex; align-items: center; gap: 14px;">
+          <span style="{{iconStyle}}">{{letter}}</span>
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span style="font-size: 26px; font-weight: 700; letter-spacing: -0.02em;">{{a.sym}}</span>
+              <span style="{{tagStyle}}">{{a.type}}</span>
+            </div>
+            <span style="font-size: 14px; color: var(--muted);">{{a.name}} · Robinhood Chain</span>
+          </div>
+          <div style="flex-grow: 1;"></div>
+          <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px;">
+            <span style="font-size: 34px; font-weight: 600; letter-spacing: -0.02em;">{{price}}</span>
+            <span style="{{chgStyle}}">{{chg}}</span>
+          </div>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px;">
+          <sc-for list="{{stats}}" as="s" hint-placeholder-count="4">
+            <div style="padding: 10px 12px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--line-soft); display: flex; flex-direction: column; gap: 2px;">
+              <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.05em; color: var(--muted);">{{s.label}}</span>
+              <span style="{{s.style}}">{{s.value}}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+      <div style="box-sizing: border-box; padding: 16px 20px; border-left: 1px solid var(--line-soft); display: flex; flex-direction: column; gap: 6px;">
+        <div style="display: flex; align-items: center; justify-content: space-between;">
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: 0.05em; color: var(--muted);">PRICE</span>
+          <div style="display: flex; gap: 2px;">
+            <sc-for list="{{ranges}}" as="r" hint-placeholder-count="4">
+              <button onClick="{{r.pick}}" style="{{r.style}}">{{r.label}}</button>
+            </sc-for>
+          </div>
+        </div>
+        <svg width="518" height="130" viewBox="0 0 518 130" preserveAspectRatio="none" style="display: block;" aria-label="Price chart">
+          <path d="{{priceArea}}" style="fill: {{lineColor}};" fill-opacity="0.08"></path>
+          <path d="{{priceLine}}" fill="none" style="stroke: {{lineColor}};" stroke-width="2" stroke-linejoin="round"></path>
+        </svg>
+      </div>
+    </div>
+
+    <div style="height: 640px; flex-shrink: 0; display: grid; grid-template-columns: 894px minmax(0, 1fr); gap: 12px;">
+      <div style="box-sizing: border-box; border-radius: 14px; border: 1px solid var(--line); display: flex; flex-direction: column;">
+        <div style="height: 64px; flex-shrink: 0; box-sizing: border-box; padding: 0 16px 0 18px; border-bottom: 1px solid var(--line-soft); display: flex; align-items: center; gap: 12px;">
+          <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 2px;">
+            <span style="font-size: 16px; font-weight: 700;">Holder cluster</span>
+            <span style="font-size: 12px; color: var(--muted);">Each bubble is a wallet holding {{a.sym}}. Bigger bubble, bigger position. Click one to open the wallet.</span>
+          </div>
+          <div style="display: flex; gap: 2px; padding: 3px; border-radius: 9px; background: var(--muted-bg);">
+            <sc-for list="{{filters}}" as="f" hint-placeholder-count="3">
+              <button onClick="{{f.pick}}" style="{{f.style}}">{{f.label}}</button>
+            </sc-for>
+          </div>
+        </div>
+        <div style="position: relative; flex-grow: 1; margin: 8px; border-radius: 10px; overflow: hidden; background-color: var(--surface-2); background-image: radial-gradient(var(--line) 1px, transparent 1px); background-size: 22px 22px;">
+          <sc-for list="{{bubbles}}" as="b" hint-placeholder-count="20">
+            <button class="bubble" onClick="{{b.open}}" aria-label="{{b.aria}}" title="{{b.aria}}" style="{{b.style}}">
+              <sc-if value="{{b.showName}}" hint-placeholder-val="{{ false }}">
+                <span style="{{b.nameStyle}}">{{b.label}}</span>
+              </sc-if>
+              <sc-if value="{{b.showPct}}" hint-placeholder-val="{{ false }}">
+                <span style="{{b.pctStyle}}">{{b.pct}}</span>
+              </sc-if>
+            </button>
+          </sc-for>
+          <div style="position: absolute; left: 12px; bottom: 12px; box-sizing: border-box; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); display: flex; align-items: center; gap: 14px; font-size: 12px; color: var(--muted);">
+            <span style="display: flex; align-items: center; gap: 6px;"><span style="width: 10px; height: 10px; border-radius: 5px; background: color-mix(in srgb, var(--up) 25%, var(--surface)); border: 1.5px solid var(--up); display: block;"></span>In profit</span>
+            <span style="display: flex; align-items: center; gap: 6px;"><span style="width: 10px; height: 10px; border-radius: 5px; background: color-mix(in srgb, var(--down) 25%, var(--surface)); border: 1.5px solid var(--down); display: block;"></span>Underwater</span>
+            <span style="display: flex; align-items: center; gap: 6px;"><span style="width: 10px; height: 10px; border-radius: 5px; border: 2px solid var(--fg); display: block; box-sizing: border-box;"></span>Leaderboard trader</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="box-sizing: border-box; border-radius: 14px; border: 1px solid var(--line); display: flex; flex-direction: column; overflow: hidden;">
+        <div style="height: 64px; flex-shrink: 0; box-sizing: border-box; padding: 0 18px; border-bottom: 1px solid var(--line-soft); display: flex; align-items: center; justify-content: space-between;">
+          <span style="font-size: 16px; font-weight: 700;">Top holders</span>
+          <span style="font-size: 12px; color: var(--muted);">{{holderCount}} shown</span>
+        </div>
+        <div style="height: 32px; flex-shrink: 0; box-sizing: border-box; padding: 0 18px; border-bottom: 1px solid var(--line-soft); display: grid; grid-template-columns: 28px minmax(0, 1fr) 96px 80px; column-gap: 10px; align-items: center; font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted);">
+          <span>#</span><span>Wallet</span><span style="text-align: right;">Position</span><span style="text-align: right;">PnL</span>
+        </div>
+        <div style="flex-grow: 1; min-height: 0; overflow: auto;">
+          <sc-for list="{{topRows}}" as="h" hint-placeholder-count="12">
+            <button class="ah-row" onClick="{{h.open}}" style="width: 100%; height: 44px; box-sizing: border-box; padding: 0 18px; border: 0; border-bottom: 1px solid var(--line-soft); background: transparent; color: var(--fg); font: inherit; text-align: left; display: grid; grid-template-columns: 28px minmax(0, 1fr) 96px 80px; column-gap: 10px; align-items: center;">
+              <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--muted);">{{h.rank}}</span>
+              <span style="display: flex; align-items: center; gap: 8px; min-width: 0;">
+                <span style="{{h.avatarStyle}}">{{h.initials}}</span>
+                <span style="font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{h.name}}</span>
+              </span>
+              <span style="text-align: right; font-family: 'JetBrains Mono', monospace; font-size: 13px;">{{h.value}}</span>
+              <span style="{{h.pnlStyle}}">{{h.pnl}}</span>
+            </button>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+
+    <div style="flex-grow: 1; min-height: 0; box-sizing: border-box; border-radius: 14px; border: 1px solid var(--line); display: flex; flex-direction: column; overflow: hidden;">
+      <div style="height: 52px; flex-shrink: 0; box-sizing: border-box; padding: 0 18px; border-bottom: 1px solid var(--line-soft); display: flex; align-items: center; justify-content: space-between;">
+        <span style="font-size: 16px; font-weight: 700;">Recent {{a.sym}} trades</span>
+        <span style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted);"><span style="width: 7px; height: 7px; border-radius: 4px; background: {{accent}}; display: block;"></span>Live from Robinhood Chain</span>
+      </div>
+      <div style="height: 32px; flex-shrink: 0; box-sizing: border-box; padding: 0 18px; border-bottom: 1px solid var(--line-soft); display: grid; grid-template-columns: 90px minmax(0, 1.4fr) 80px repeat(3, minmax(0, 1fr)); column-gap: 12px; align-items: center; font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted);">
+        <span>Time</span><span>Wallet</span><span>Side</span><span style="text-align: right;">Amount</span><span style="text-align: right;">Price</span><span style="text-align: right;">Value</span>
+      </div>
+      <sc-for list="{{trades}}" as="t" hint-placeholder-count="7">
+        <div style="height: 40px; flex-shrink: 0; box-sizing: border-box; padding: 0 18px; border-bottom: 1px solid var(--line-soft); display: grid; grid-template-columns: 90px minmax(0, 1.4fr) 80px repeat(3, minmax(0, 1fr)); column-gap: 12px; align-items: center; font-size: 13px;">
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--muted);">{{t.time}}</span>
+          <button onClick="{{t.open}}" style="justify-self: start; padding: 0; border: 0; background: transparent; color: var(--fg); font: inherit; font-weight: 600; text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 3px;">{{t.name}}</button>
+          <span><span style="{{t.sideStyle}}">{{t.side}}</span></span>
+          <span style="text-align: right; font-family: 'JetBrains Mono', monospace;">{{t.amount}}</span>
+          <span style="text-align: right; font-family: 'JetBrains Mono', monospace;">{{t.price}}</span>
+          <span style="text-align: right; font-family: 'JetBrains Mono', monospace;">{{t.value}}</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+  <sc-if value="{{profileOpen}}" hint-placeholder-val="{{ false }}">
+    <div style="position: absolute; z-index: 60; top: 0; right: 0; bottom: 0; left: 0; border-radius: 20px; background: rgba(11, 12, 10, 0.45);">
+      <div style="position: absolute; top: -1px; left: -1px;">
+        <dc-import name="TraderModal" trader="{{profile}}" on-close="{{closeProfile}}" theme="{{theme}}" on-toggle-theme="{{setThemeAll}}" accent="{{accent}}" hint-size="1400px,1380px"></dc-import>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"asset":{"editor":null},"onClose":{"editor":null},"onOpenTrader":{"editor":null},"theme":{"editor":null},"onToggleTheme":{"editor":null},"defaultTheme":{"editor":"enum","options":["light","dark"],"default":"light"},"accent":{"editor":"color","default":"#00B843","options":["#00B843","#2F6BFF","#E8A400"]},"$preview":{"width":1400,"height":1380}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { filter: 'all', range: '1M', profile: null };
+    let savedTheme = null;
+    try { savedTheme = window.localStorage.getItem('peapod-theme'); } catch (e) { savedTheme = null; }
+    this.state.theme = savedTheme === 'dark' || savedTheme === 'light' ? savedTheme : (props.defaultTheme === 'dark' ? 'dark' : 'light');
+  }
+  componentDidMount() {
+    this._onThemeStore = (e) => {
+      if (e.key === 'peapod-theme' && (e.newValue === 'dark' || e.newValue === 'light')) this.setState({ theme: e.newValue });
+    };
+    window.addEventListener('storage', this._onThemeStore);
+  }
+  componentWillUnmount() {
+    window.removeEventListener('storage', this._onThemeStore);
+  }
+  themeVals() {
+    const theme = this.props.theme === 'dark' || this.props.theme === 'light' ? this.props.theme : this.state.theme;
+    const isDark = theme === 'dark';
+    const toggleTheme = () => {
+      const next = isDark ? 'light' : 'dark';
+      try { window.localStorage.setItem('peapod-theme', next); } catch (e) { /* storage unavailable */ }
+      if (this.props.onToggleTheme) this.props.onToggleTheme(next);
+      else this.setState({ theme: next });
+    };
+    const slot = 'width: 34px; height: 34px; border-radius: 17px; display: flex; align-items: center; justify-content: center; transition: background-color 200ms ease, color 200ms ease; ';
+    return {
+      theme, isDark, toggleTheme,
+      setTheme: (next) => this.setState({ theme: next }),
+      themeClass: isDark ? 'pp theme-dark' : 'pp',
+      themeAria: isDark ? 'Switch to day mode' : 'Switch to night mode',
+      sunStyle: slot + (isDark ? 'background: transparent; color: #6E7567;' : 'background: #F4EFE3; color: #1E4D2B; box-shadow: 0 1px 3px rgba(17,20,15,0.18);'),
+      moonStyle: slot + (isDark ? 'background: #0B0C0A; color: #EFE6C8; box-shadow: 0 0 0 1px #2E3329;' : 'background: transparent; color: #8A9082;')
+    };
+  }
+  renderVals() {
+    const accent = this.props.accent ?? '#00B843';
+    const st = this.state;
+    const hexOf = (s, len) => { let x = s * 131 + 7, out = ''; for (let i = 0; i < len; i++) { x = (x * 9301 + 49297) % 233280; out += '0123456789abcdef'[Math.floor(x / 233280 * 16)]; } return out; };
+    const TRADERS = [
+      { name: 'pea_whale', pnl: 1284390, roi: 212.4, vol: 48204118, acct: 2410552, win: 64.2, trades: 412, assets: 'TNE', seed: 11, score: 95 },
+      { name: '0x19bd…04af', pnl: 902115, roi: 88.1, vol: 31702440, acct: 1930871, win: 58.0, trades: 97, assets: 'EPW', seed: 23, score: 94 },
+      { name: 'thetaGang', pnl: 641208, roi: 140.9, vol: 22011930, acct: 1104280, win: 61.4, trades: 38, assets: 'NH', seed: 37, score: 94 },
+      { name: '0x5510…ad3c', pnl: 488760, roi: 47.3, vol: 40519002, acct: 1520330, win: 52.1, trades: 590, assets: 'TNEAB', seed: 41, score: 93 },
+      { name: 'nvda_maxi', pnl: 402033, roi: 95.6, vol: 12803577, acct: 840112, win: 71.0, trades: 23, assets: 'N', seed: 53, score: 93 },
+      { name: '0x3c9a…e5d8', pnl: 311480, roi: 33.0, vol: 18904721, acct: 1250004, win: 47.7, trades: 44, assets: 'EBK', seed: 67, score: 93 },
+      { name: 'slowbid', pnl: 276912, roi: 61.2, vol: 9402286, acct: 431023, win: 72.7, trades: 11, assets: 'SG', seed: 71, score: 93 },
+      { name: 'delta0', pnl: 198305, roi: 21.7, vol: 27109954, acct: 1110870, win: 49.3, trades: 259, assets: 'TNHA', seed: 83, score: 92 },
+      { name: '0xf2a4…6e1b', pnl: 154870, roi: 44.8, vol: 6203318, acct: 500216, win: 66.0, trades: 9, assets: 'BW', seed: 97, score: 91 },
+      { name: 'ghostfill', pnl: 121044, roi: 18.2, vol: 14618775, acct: 790442, win: 69.5, trades: 59, assets: 'TEBS', seed: 101, score: 90 },
+      { name: '0x0d6e…b3a9', pnl: 98740, roi: 12.9, vol: 8841002, acct: 612998, win: 55.0, trades: 20, assets: 'GS', seed: 109, score: 89 },
+      { name: 'rh_degen', pnl: 87311, roi: 30.4, vol: 5120449, acct: 184390, win: 48.0, trades: 25, assets: 'EPWK', seed: 113, score: 88 },
+      { name: 'hoodlum', pnl: 79420, roi: 26.8, vol: 7310220, acct: 402118, win: 57.3, trades: 64, assets: 'HTA', seed: 127, score: 88 },
+      { name: '0x7c21…9d0e', pnl: 71205, roi: 58.1, vol: 3902114, acct: 150930, win: 62.5, trades: 16, assets: 'KPE', seed: 131, score: 87 },
+      { name: 'gld_bug', pnl: 64880, roi: 9.4, vol: 11204338, acct: 921004, win: 74.1, trades: 27, assets: 'GS', seed: 137, score: 87 },
+      { name: '0xa3e8…41c7', pnl: 58312, roi: 41.7, vol: 4418870, acct: 196222, win: 51.9, trades: 108, assets: 'NTWB', seed: 149, score: 86 },
+      { name: 'late_bid', pnl: -42110, roi: -12.4, vol: 2904118, acct: 298331, win: 38.2, trades: 71, assets: 'TZ', seed: 151, score: 41 },
+      { name: '0x44af…e7c2', pnl: -88204, roi: -31.0, vol: 6100982, acct: 196402, win: 29.5, trades: 203, assets: 'EBW', seed: 157, score: 22 }
+    ];
+    TRADERS.forEach((t, i) => {
+      t.rank = i + 1;
+      t.addr = t.name.indexOf('0x') === 0 ? t.name.slice(0, 6) + hexOf(t.seed, 30) + t.name.slice(-4) : '0x' + hexOf(t.seed, 38);
+    });
+    const ASSETS = [
+      { sym: 'TSLA', name: 'Tesla', type: 'Stock', price: 342.18, chg: 2.41, key: 'T', vol: 48.2e6, holders: 18420 },
+      { sym: 'NVDA', name: 'Nvidia', type: 'Stock', price: 186.05, chg: 1.12, key: 'N', vol: 41.6e6, holders: 16904 },
+      { sym: 'HOOD', name: 'Robinhood', type: 'Stock', price: 118.37, chg: 4.06, key: 'H', vol: 22.9e6, holders: 12210 },
+      { sym: 'AAPL', name: 'Apple', type: 'Stock', price: 238.92, chg: -0.31, key: 'A', vol: 19.4e6, holders: 11380 },
+      { sym: 'AMZN', name: 'Amazon', type: 'Stock', price: 231.44, chg: 0.25, key: 'Z', vol: 12.8e6, holders: 8420 },
+      { sym: 'META', name: 'Meta Platforms', type: 'Stock', price: 758.10, chg: -0.88, key: 'F', vol: 10.1e6, holders: 6120 },
+      { sym: 'MSTR', name: 'Strategy', type: 'Stock', price: 342.77, chg: 5.12, key: 'M', vol: 9.7e6, holders: 5930 },
+      { sym: 'COIN', name: 'Coinbase', type: 'Stock', price: 318.52, chg: 3.30, key: 'C', vol: 8.2e6, holders: 5210 },
+      { sym: 'SPY', name: 'S&P 500 ETF', type: 'ETF', price: 662.10, chg: -0.18, key: 'S', vol: 16.3e6, holders: 9870 },
+      { sym: 'GLD', name: 'Gold ETF', type: 'ETF', price: 311.40, chg: 0.64, key: 'G', vol: 5.4e6, holders: 3410 },
+      { sym: 'ETH', name: 'Ether', type: 'Crypto', price: 4212.60, chg: -0.84, key: 'E', vol: 61.2e6, holders: 40210 },
+      { sym: 'USDG', name: 'Global Dollar', type: 'Stablecoin', price: 1.0, chg: 0.0, key: '', vol: 88.4e6, holders: 52300 },
+      { sym: 'ROBIN', name: 'Robin', type: 'Memecoin', price: 0.004182, chg: 18.6, key: 'E', vol: 7.9e6, holders: 21840 },
+      { sym: 'SQUAWK', name: 'Squawk', type: 'Memecoin', price: 0.0000871, chg: -6.2, key: 'B', vol: 3.1e6, holders: 9640 },
+      { sym: 'FEATHER', name: 'Feather', type: 'Memecoin', price: 0.0312, chg: 41.0, key: 'P', vol: 5.6e6, holders: 14020 },
+      { sym: 'WORM', name: 'Worm', type: 'Memecoin', price: 0.00219, chg: 3.3, key: 'W', vol: 2.2e6, holders: 7310 },
+      { sym: 'NEST', name: 'Nest', type: 'Memecoin', price: 0.1874, chg: -2.7, key: 'K', vol: 1.8e6, holders: 4980 }
+    ];
+    ASSETS.forEach((a, i) => { a.seed = 300 + i * 17; });
+    const TYPE_BG = { Stock: '#D9E4FF', ETF: '#FFE0DA', Crypto: '#E7E1FF', Stablecoin: '#DDF0FF', Memecoin: '#EBE4FF' };
+    const fmtPrice = (v) => v >= 100 ? '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : v >= 1 ? '$' + v.toFixed(2) : v >= 0.01 ? '$' + v.toFixed(4) : '$' + v.toPrecision(3);
+    const fmtCompact = (v) => { const a = Math.abs(v), s = v < 0 ? '-' : ''; return s + '$' + (a >= 1e6 ? (a / 1e6).toFixed(2) + 'M' : a >= 1e3 ? (a / 1e3).toFixed(1) + 'K' : a.toFixed(0)); };
+    const shortAddr = (a) => a.slice(0, 6) + '…' + a.slice(-4);
+    const a = this.props.asset ?? ASSETS[0];
+    let lc = a.seed * 7 + 11;
+    const rnd = () => { lc = (lc * 9301 + 49297) % 233280; return lc / 233280; };
+    const qty = (v) => v >= 1e9 ? (v / 1e9).toFixed(2) + 'B' : v >= 1e6 ? (v / 1e6).toFixed(2) + 'M' : v >= 1e3 ? (v / 1e3).toFixed(1) + 'K' : v.toFixed(v < 10 ? 3 : 1);
+
+    const spread = { Stock: [-18, 60], ETF: [-8, 25], Crypto: [-20, 50], Stablecoin: [-0.2, 0.4], Memecoin: [-60, 220] }[a.type];
+    const named = TRADERS.filter((t) => a.key && t.assets.indexOf(a.key) >= 0);
+    const holders = named.map((t) => ({
+      name: t.name, addr: t.addr, named: true, trader: t,
+      value: t.acct * (0.12 + rnd() * 0.3), pnlPct: t.pnl >= 0 ? Math.abs(spread[0]) * 0.2 + rnd() * spread[1] : spread[0] + rnd() * 10
+    }));
+    const synth = Math.max(16, 30 - named.length);
+    for (let i = 0; i < synth; i++) {
+      const addr = '0x' + hexOf(a.seed * 3 + i * 29, 38);
+      const r = rnd();
+      holders.push({ name: shortAddr(addr), addr, named: false, trader: null, value: 4000 * Math.exp(rnd() * 4.6), pnlPct: spread[0] + r * (spread[1] - spread[0]) });
+    }
+    holders.sort((x, y) => y.value - x.value);
+    holders.forEach((h, i) => {
+      if (!h.trader) {
+        const r = rnd();
+        h.trader = {
+          name: h.name, addr: h.addr, pnl: h.value * (h.pnlPct / 100) * 1.6, roi: h.pnlPct * 0.8,
+          vol: h.value * (12 + r * 30), acct: h.value / (0.25 + r * 0.5), win: 38 + r * 34, trades: 4 + Math.floor(r * 220),
+          assets: (a.key || 'T') + (a.type === 'Memecoin' ? 'PW' : 'NT'), seed: 400 + a.seed + i, score: 40 + Math.floor(r * 55), rank: 20 + i
+        };
+      }
+    });
+
+    const openTrader = (t) => this.setState({ profile: Object.assign({}, t) });
+    const close = () => { if (this.props.onClose) this.props.onClose(); };
+
+    // bubble packing
+    const W = 876, H = 544;
+    const maxV = holders[0].value;
+    const placed = [];
+    holders.forEach((h) => {
+      const r = 14 + Math.sqrt(h.value / maxV) * 74;
+      for (let s = 0; s < 3000; s++) {
+        const ang = s * 0.42;
+        const dist = s * 0.9;
+        const x = W / 2 + Math.cos(ang) * dist * 1.5;
+        const y = H / 2 + Math.sin(ang) * dist * 0.85;
+        if (x - r < 6 || x + r > W - 6 || y - r < 6 || y + r > H - 56) continue;
+        let ok = true;
+        for (let k = 0; k < placed.length; k++) {
+          const p = placed[k];
+          if (Math.hypot(p.x - x, p.y - y) < p.r + r + 5) { ok = false; break; }
+        }
+        if (ok) { placed.push({ x, y, r, h }); break; }
+      }
+    });
+    const pctText = (p) => (p >= 0 ? '+' : '') + p.toFixed(Math.abs(p) >= 100 ? 0 : 1) + '%';
+    const bubbles = placed.map((p) => {
+      const up = p.h.pnlPct >= 0;
+      const tone = up ? 'var(--up)' : 'var(--down)';
+      const dim = (st.filter === 'profit' && !up) || (st.filter === 'loss' && up);
+      const d = Math.round(p.r * 2);
+      const label = p.h.named ? p.h.name : p.h.name.slice(0, 6);
+      return {
+        aria: (p.h.named ? p.h.name : 'Wallet ' + p.h.name) + ', ' + fmtCompact(p.h.value) + ' position, ' + pctText(p.h.pnlPct),
+        showName: p.r >= 30, showPct: p.r >= 20,
+        label: label.length > 11 ? label.slice(0, 10) + '…' : label, pct: pctText(p.h.pnlPct),
+        nameStyle: 'max-width: ' + (d - 12) + 'px; font-size: ' + (p.r > 55 ? 13 : 11) + 'px; font-weight: ' + (p.h.named ? 700 : 500) + '; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--fg);',
+        pctStyle: 'font-family: "JetBrains Mono", monospace; font-size: ' + (p.r > 55 ? 13 : 10) + 'px; font-weight: 500; color: ' + tone + ';',
+        style: 'position: absolute; left: ' + Math.round(p.x - p.r) + 'px; top: ' + Math.round(p.y - p.r) + 'px; width: ' + d + 'px; height: ' + d + 'px; box-sizing: border-box; padding: 0; border-radius: 50%; '
+          + 'border: ' + (p.h.named ? '2.5px solid var(--fg)' : '1.5px solid ' + tone) + '; '
+          + 'background: color-mix(in srgb, ' + tone + ' ' + (p.h.named ? 30 : 16) + '%, var(--surface)); '
+          + 'display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; opacity: ' + (dim ? 0.18 : 1) + ';',
+        open: () => openTrader(p.h.trader)
+      };
+    });
+
+    const avatarStyle = (h) => 'width: 24px; height: 24px; flex-shrink: 0; border-radius: 7px; font-size: 9px; font-weight: 700; display: flex; align-items: center; justify-content: center; ' + (h.named ? 'background: ' + accent + '; color: #0A0B09;' : 'background: var(--muted-bg); color: var(--fg);');
+    const topRows = holders.slice(0, 20).map((h, i) => ({
+      rank: String(i + 1), name: h.named ? h.name : h.name,
+      initials: h.named ? h.name.replace('0x', '').slice(0, 2).toUpperCase() : h.addr.slice(2, 4).toUpperCase(),
+      avatarStyle: avatarStyle(h),
+      value: fmtCompact(h.value),
+      pnl: pctText(h.pnlPct),
+      pnlStyle: 'text-align: right; font-family: "JetBrains Mono", monospace; font-size: 13px; color: ' + (h.pnlPct >= 0 ? 'var(--up)' : 'var(--down)') + ';',
+      open: () => openTrader(h.trader)
+    }));
+
+    const total = holders.reduce((s, h) => s + h.value, 0);
+    const inProfit = holders.filter((h) => h.pnlPct >= 0).length;
+    const avgPnl = holders.reduce((s, h) => s + h.pnlPct * h.value, 0) / total;
+    const stats = [
+      { label: 'HOLDERS', value: a.holders.toLocaleString('en-US'), style: 'font-size: 16px; font-weight: 600;' },
+      { label: '24H VOLUME', value: fmtCompact(a.vol), style: 'font-size: 16px; font-weight: 600;' },
+      { label: 'IN PROFIT', value: Math.round(inProfit / holders.length * 100) + '%', style: 'font-size: 16px; font-weight: 600; color: var(--up);' },
+      { label: 'AVG ENTRY', value: fmtPrice(a.price / (1 + avgPnl / 100)), style: 'font-size: 16px; font-weight: 600;' }
+    ];
+
+    const n = 60, vals = [];
+    let v = 0;
+    const drift = a.chg >= 0 ? 0.15 : -0.12;
+    for (let i = 0; i < n; i++) { v += (rnd() - 0.5) * (a.type === 'Memecoin' ? 3 : 1.4) + drift; vals.push(v); }
+    const mn = Math.min.apply(null, vals), mx = Math.max.apply(null, vals);
+    const pts = vals.map((q, i) => (i * 518 / (n - 1)).toFixed(1) + ',' + (6 + (mx - q) / (mx - mn || 1) * 118).toFixed(1));
+    const priceLine = 'M' + pts.join(' L');
+    const lineColor = a.chg >= 0 ? accent : '#E5532E';
+
+    const ranges = ['1D', '1W', '1M', '1Y'].map((label) => ({
+      label, pick: () => this.setState({ range: label }),
+      style: 'height: 26px; padding: 0 8px; border: 0; border-radius: 6px; font-family: "JetBrains Mono", monospace; font-size: 11px; font-weight: 500; ' + (st.range === label ? 'background: var(--muted-bg); color: var(--fg);' : 'background: transparent; color: var(--muted);')
+    }));
+    const filters = [['all', 'All'], ['profit', 'In profit'], ['loss', 'Underwater']].map(([id, label]) => ({
+      label, pick: () => this.setState({ filter: id }),
+      style: 'height: 30px; padding: 0 10px; border: 0; border-radius: 7px; font-size: 13px; font-weight: 600; ' + (st.filter === id ? 'background: var(--surface); color: var(--fg); box-shadow: 0 1px 2px rgba(17,20,15,0.12);' : 'background: transparent; color: var(--muted);')
+    }));
+
+    const times = ['12s ago', '48s ago', '2m ago', '3m ago', '7m ago', '11m ago', '18m ago'];
+    const trades = times.map((time, i) => {
+      const h = holders[Math.floor(rnd() * Math.min(holders.length, 14))];
+      const buy = rnd() > 0.4;
+      const val = 800 + rnd() * 60000;
+      const px = a.price * (1 + (rnd() - 0.5) * 0.004);
+      return {
+        time, name: h.name, side: buy ? 'Buy' : 'Sell',
+        sideStyle: 'height: 22px; padding: 0 8px; border-radius: 6px; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; ' + (buy ? 'background: var(--up-bg); color: var(--up);' : 'background: var(--down-bg); color: var(--down);'),
+        amount: qty(val / px) + ' ' + a.sym, price: fmtPrice(px), value: fmtCompact(val),
+        open: () => openTrader(h.trader)
+      };
+    });
+
+    return Object.assign(this.themeVals(), {
+      accent, a, close,
+      profileOpen: !!st.profile, profile: st.profile,
+      closeProfile: () => this.setState({ profile: null }),
+      setThemeAll: (next) => { this.setState({ theme: next }); if (this.props.onToggleTheme) this.props.onToggleTheme(next); },
+      stats, ranges, filters, bubbles, topRows, trades,
+      holderCount: String(Math.min(20, holders.length)),
+      letter: a.sym.charAt(0),
+      iconStyle: 'width: 52px; height: 52px; border-radius: 26px; font-size: 20px; font-weight: 700; display: flex; align-items: center; justify-content: center; color: #0A0B09; background: ' + TYPE_BG[a.type] + ';',
+      tagStyle: 'height: 22px; padding: 0 8px; border-radius: 6px; font-size: 12px; font-weight: 600; display: flex; align-items: center; ' + (a.type === 'Memecoin' ? 'background: var(--meme-bg); color: var(--meme);' : 'background: var(--muted-bg); color: var(--muted);'),
+      price: fmtPrice(a.price),
+      chg: (a.chg >= 0 ? '+' : '') + a.chg.toFixed(2) + '% today',
+      chgStyle: 'font-size: 14px; font-weight: 600; color: ' + (a.chg > 0 ? 'var(--up)' : a.chg < 0 ? 'var(--down)' : 'var(--muted)') + ';',
+      priceLine, priceArea: priceLine + ' L518,130 L0,130 Z', lineColor
+    });
+  }
+}
+</script>
+</body>
+</html>

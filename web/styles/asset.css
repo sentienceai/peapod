@@ -106,7 +106,7 @@
 .as-cluster-stage {
   position: relative; flex-grow: 1; min-height: 380px; margin: 8px;
   display: grid; place-items: center;
-  border-radius: var(--radius-control-sm); overflow: hidden;
+  border-radius: var(--radius-button); overflow: hidden;
   background-color: var(--surface-2);
   background-image: radial-gradient(var(--line) 1px, transparent 1px);
   background-size: 22px 22px;
@@ -273,7 +273,44 @@
    qualifies it should never be read as two separate facts. */
 .as-head-price-note { font-size: 11px; color: var(--muted); text-align: right; display: block; }
 
-/* With no holders to draw, the stage is 380px of dotted nothing above a one-line slot. It
-   keeps its shape — this is where the cluster goes — at a height that reads as a waiting
-   panel rather than as a rendering failure. */
-.as-cluster-stage:has(> .unwired) { min-height: 200px; }
+/* ── the cluster with nothing in it yet ──────────────────────────────────────────────────
+   AssetHolders.dc.html's panel, drawn empty: the ghosts stand where bubbles will be packed,
+   the legend is the key to what they will mean, and the slot in the middle says what has to
+   land first. All one size and all dashed — see lib/asset-page.js — because the frame sizes
+   a bubble by position and tints it by whether the wallet is up, and a ghost that varied
+   would be a distribution nobody measured. */
+.as-cluster-ghosts {
+  position: absolute; inset: 0; box-sizing: border-box; padding: 26px 22px 56px;
+  display: flex; flex-wrap: wrap; align-content: center; justify-content: center;
+  gap: 18px 22px; pointer-events: none;
+}
+.as-ghost {
+  width: 76px; height: 76px; border-radius: 38px;
+  border: 1px dashed var(--line-strong); background: var(--surface);
+  opacity: 0.55;
+}
+.as-cluster-stage > .unwired { position: relative; z-index: 1; background: var(--surface); }
+.as-cluster-legend {
+  position: absolute; left: 12px; bottom: 12px; box-sizing: border-box; padding: 8px 12px;
+  border-radius: var(--radius-control-sm); border: 1px solid var(--line); background: var(--surface);
+  display: flex; align-items: center; gap: 14px; font-size: 12px; color: var(--muted);
+}
+.as-legend-item { display: flex; align-items: center; gap: 6px; }
+.as-legend-swatch { width: 10px; height: 10px; border-radius: 5px; box-sizing: border-box; display: block; }
+.as-legend-swatch--up { background: var(--up-bg); border: 1.5px solid var(--up); }
+.as-legend-swatch--down { background: var(--down-bg); border: 1.5px solid var(--down); }
+.as-legend-swatch--ranked { border: 2px solid var(--fg); }
+
+/* The rows the top-holders table will hold, in the frame's four columns. */
+.as-holder-ghosts { display: flex; flex-direction: column; }
+.as-holder-ghost {
+  height: 44px; box-sizing: border-box; padding: 0 16px;
+  border-bottom: 1px solid var(--line-soft);
+  display: grid; grid-template-columns: 26px minmax(0, 1fr) 96px 78px; column-gap: 12px;
+  align-items: center;
+}
+.as-ghost-bar { height: 8px; border-radius: 4px; background: var(--muted-bg-2); display: block; }
+.as-ghost-bar--n { width: 14px; }
+.as-ghost-bar--w { width: 62%; }
+.as-ghost-bar--p { justify-self: end; width: 70%; }
+.as-ghost-bar--r { justify-self: end; width: 60%; }

@@ -38,7 +38,7 @@ import { openProfile } from './profile.js';
 import { openSetup } from './copy-setup.js';
 import { sparkline } from './spark.js';
 import {
-  node, el, icon, ICONS, compact, pct, signed, signedPct, shortAddr, ago, copyButton, assetTile,
+  node, el, icon, ICONS, compact, pct, signed, signedPct, shortAddr, ago, letterChip,
 } from './format.js';
 import { mountChrome, mountFoot } from './chrome.js';
 
@@ -182,7 +182,26 @@ function renderHero(top3) {
   decor.append(fan);
 }
 
-/** @param {BoardRow} row */
+/**
+ * One grid card, at CopyTrade.dc.html's own numbers: 20px radius, the frame's two-shadow
+ * float, a 58px head, a body whose stat column is 108px, and a 50px foot carrying the score
+ * treatment and the Copy button.
+ *
+ * THE HEAD AND BODY ARE THE BUTTON. They used to be a transparent button stretched behind the
+ * card at z-index 0 with the content at z-index 1 on top of it — which meant every real click
+ * landed on the content and the card opened NOTHING. (A programmatic .click() on the cover
+ * still worked, so the tests were happy and the page was dead.) The frame wraps head and body
+ * in one real button and leaves the foot outside it, so the Copy button is not a button inside
+ * a button. The copy-address control the old head carried moved out for the same reason; the
+ * frame's card does not have one, and the address is copyable on the leaderboard row and in
+ * the profile this card opens.
+ *
+ * ONE ROW THE FRAME DOES NOT HAVE: the chance strip between body and foot. The frame closes
+ * the card with a copy score; this build cannot publish one, and the figure that carries the
+ * argument here is whether the win rate is distinguishable from chance. So the card is 256px
+ * rather than 212px, and every element inside it is the frame's own size.
+ * @param {BoardRow} row
+ */
 function buildCard(row) {
   const card = node('div', 'ct-card');
 
@@ -190,25 +209,21 @@ function buildCard(row) {
   openBtn.type = 'button';
   openBtn.setAttribute('aria-label', `Open profile for ${shortAddr(row.address)}`);
   openBtn.onclick = () => openProfile(row.address, openBtn);
-  card.append(openBtn);
 
   const head = node('div', 'ct-card-head');
-  head.append(node('span', `medal${row.rank <= 3 ? ` medal--${row.rank}` : ''}`, String(row.rank)));
-  head.append(node('span', 'avatar mono', row.address.slice(2, 4).toUpperCase()));
+  head.append(node('span', `avatar mono${row.rank <= 3 ? ` avatar--rank-${row.rank}` : ''}`,
+    row.address.slice(2, 4).toUpperCase()));
 
   const idCol = node('div', 'ct-card-id');
-  const addrLine = node('span', 'mono ct-card-addr');
-  addrLine.append(document.createTextNode(shortAddr(row.address)));
-  addrLine.append(copyButton(row.address, 'address'));
-  idCol.append(addrLine);
-  // Tiles only, overlapped, never the full token() chip (tile + ticker text) — this slot is
-  // ~134px wide and a ticker per token is exactly what ran the header past the card's edge.
-  // The full ticker belongs in the profile this card opens, not repeated here three times.
+  idCol.append(node('span', 'mono ct-card-addr', shortAddr(row.address)));
+  // The frame's identity chips: a 22px circle per token, overlapped by 6px, carrying ONE
+  // letter. No logo goes here — see format.js's letterChip(): the image covers the letter
+  // that is the only thing naming the token in a stack with no ticker beside it.
   const tokRow = node('div', 'ct-tokens');
   const shownTokens = row.tokens.slice(0, 3);
   shownTokens.forEach((sym, i) => {
-    const tile = assetTile(sym, state.tokenKind.get(sym) ?? 'stock', 'ct-token-tile');
-    if (i > 0) tile.style.marginLeft = '-7px';
+    const tile = letterChip(sym, state.tokenKind.get(sym) ?? 'stock', 'ct-token-tile');
+    if (i > 0) tile.style.marginLeft = '-6px';
     tokRow.append(tile);
   });
   if (row.tokens.length > shownTokens.length) {
@@ -217,12 +232,11 @@ function buildCard(row) {
   idCol.append(tokRow);
   head.append(idCol);
 
-  head.append(node('span', 'spacer'));
   const agoChip = node('span', 'ct-ago mono');
   agoChip.append(icon(11, ICONS.clock));
   agoChip.append(document.createTextNode(ago(row.lastTs, state.tapeEnd)));
   head.append(agoChip);
-  card.append(head);
+  openBtn.append(head);
 
   const body = node('div', 'ct-card-body');
   const stats = node('div', 'ct-card-stats');
@@ -236,24 +250,56 @@ function buildCard(row) {
   stats.append(volStat);
   body.append(stats);
   body.append(sparkline(row.series, { width: 200, height: 88 }));
-  card.append(body);
+  openBtn.append(body);
+  card.append(openBtn);
+
+  const ev = node('div', 'ct-card-ev');
+  ev.append(chanceRow(row));
+  card.append(ev);
 
   const foot = node('div', 'ct-card-foot');
-  foot.append(chanceRow(row));
-  // The copy score the frame put here has no definition and no data — see the file header.
-  // The slot stays, because the feature is coming and the gap should be visible, and it says
-  // what it needs rather than showing a number.
-  const act = node('div', 'ct-card-foot-act');
-  act.append(unwired('copyScore', { compact: true }));
+  foot.append(scoreSlot());
+  // "Copy" in the frame, where pressing it copies. Here it opens the setup wizard and
+  // nothing is placed, so the label says setup. Everything else about the button — 34px,
+  // 82px minimum, 8px radius, hard right in a 50px foot — is the frame's.
   const copyBtn = /** @type {HTMLButtonElement} */ (node('button', 'btn-copy', 'Set up copy'));
   copyBtn.type = 'button';
   copyBtn.setAttribute('aria-label', `Set up copying ${shortAddr(row.address)}`);
   copyBtn.onclick = () => openSetup(row.address);
-  act.append(copyBtn);
-  foot.append(act);
+  foot.append(copyBtn);
   card.append(foot);
 
   return card;
+}
+
+/**
+ * The frame's copy score, with no score in it.
+ *
+ * CopyTrade.dc.html draws a 16px figure, a 12px "/100" and ten 3×16px bars lit up to the
+ * score's tenth. This build has no copy score: there is no published definition of what one
+ * would measure, and a score for COPYING has to be measured against copies — the slippage and
+ * delay a follower actually got — which needs execution. So the treatment is the frame's, at
+ * the frame's sizes, with the figure as an em dash and every bar unlit. Nothing here is a
+ * number, and the slot is an `unwired` one like every other gap on the site, which is what
+ * keeps it out of the page's wired text.
+ */
+function scoreSlot() {
+  const slot = node('div', 'unwired ct-score');
+  slot.dataset.needs = 'definition execution';
+  slot.dataset.metric = 'copyScore';
+  slot.title = 'No copy score is published. A score has to say what it measures before it can '
+    + 'be shown, and a score for copying has to be measured against copies: the slippage and '
+    + 'delay a follower actually got.';
+  const fig = node('span', 'ct-score-fig');
+  fig.append(node('b', 'ct-score-value', '—'), node('span', 'ct-score-of', '/100'));
+  slot.append(fig);
+  const bars = node('span', 'ct-score-bars');
+  bars.setAttribute('aria-hidden', 'true');
+  for (let i = 0; i < 10; i += 1) bars.append(node('i'));
+  slot.append(bars);
+  slot.append(node('span', 'sr-only',
+    'Copy score: not published — needs a definition and execution'));
+  return slot;
 }
 
 function renderGrid() {
@@ -420,6 +466,12 @@ async function init() {
   const gridHead = node('div', 'ct-grid-head');
   countEl = node('span', 'ct-count');
   gridHead.append(countEl);
+  // Said once, in words, where a sighted reader meets the grid: every card's score is a dash
+  // and ten unlit bars, and this is why. The slot is an `unwired` one, so it is excluded from
+  // the page's wired text exactly like the per-card slots are.
+  const why = unwired('copyScore');
+  why.className = 'unwired ct-score-why';
+  gridHead.append(node('span', 'spacer'), why);
   gridSection.append(gridHead);
   gridEl = node('div', 'ct-grid');
   gridSection.append(gridEl);

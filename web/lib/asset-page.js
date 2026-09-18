@@ -276,16 +276,51 @@ function buildHolderPanels(d) {
   const headText = node('div', 'as-cluster-headtext');
   headText.append(node('h2', undefined, 'Holder cluster'));
   headText.append(node('p', undefined,
-    `Each bubble will be a wallet holding ${d.symbol}, sized by position.`));
+    `Each bubble will be a wallet holding ${d.symbol}. Bigger bubble, bigger position.`));
   head.append(headText);
+  // The frame's filter segment, inert. It is here because the panel's shape is the frame's
+  // and this is part of that shape; it is disabled because there is nothing to filter, and a
+  // control that looks live and does nothing is worse than one that says why it cannot.
+  const seg = node('div', 'seg as-cluster-filter');
+  for (const label of ['All', 'In profit', 'Underwater']) {
+    const b = /** @type {HTMLButtonElement} */ (node('button', undefined, label));
+    b.type = 'button';
+    b.setAttribute('aria-pressed', String(label === 'All'));
+    b.disabled = true;
+    b.title = 'Needs the transfer index';
+    seg.append(b);
+  }
+  head.append(seg);
   cluster.append(head);
+
   const stage = node('div', 'as-cluster-stage');
+  /*
+   * GHOST BUBBLES, ALL THE SAME SIZE. The panel keeps the frame's shape — the dotted stage,
+   * the bubbles, the legend — while saying what it is waiting for. They are uniform on
+   * purpose: the frame sizes each bubble by position and tints it by whether that wallet is
+   * up, so ghosts of varied sizes would be a distribution nobody measured. Same size, no
+   * label, no tint, dashed: this is where the cluster goes, and there is nothing in it yet.
+   */
+  const ghosts = node('div', 'as-cluster-ghosts');
+  ghosts.setAttribute('aria-hidden', 'true');
+  for (let i = 0; i < 18; i += 1) ghosts.append(node('span', 'as-ghost'));
+  stage.append(ghosts);
   stage.append(unwired('holders'));
+
+  // The frame's legend, which is the key to the thing the stage will draw.
+  const legend = node('div', 'as-cluster-legend');
+  for (const [cls, label] of [['up', 'In profit'], ['down', 'Underwater'], ['ranked', 'Leaderboard trader']]) {
+    const item = node('span', 'as-legend-item');
+    item.append(node('span', `as-legend-swatch as-legend-swatch--${cls}`), document.createTextNode(label));
+    legend.append(item);
+  }
+  stage.append(legend);
   cluster.append(stage);
 
   const holders = node('section', 'as-holders panel');
   const hHead = node('div', 'as-holders-head');
   hHead.append(node('h2', undefined, 'Top holders'));
+  hHead.append(node('span', 'as-holders-count', 'Ranked by position'));
   holders.append(hHead);
   const thead = node('div', 'as-thead');
   thead.append(node('span', undefined, '#'), node('span', undefined, 'Wallet'),
@@ -293,6 +328,16 @@ function buildHolderPanels(d) {
   holders.append(thead);
   const body = node('div', 'as-tbody');
   body.append(unwired('holders'));
+  // The rows the table will hold, drawn as the frame's rows with nothing in them.
+  const rows = node('div', 'as-holder-ghosts');
+  rows.setAttribute('aria-hidden', 'true');
+  for (let i = 0; i < 8; i += 1) {
+    const r = node('div', 'as-holder-ghost');
+    r.append(node('span', 'as-ghost-bar as-ghost-bar--n'), node('span', 'as-ghost-bar as-ghost-bar--w'),
+      node('span', 'as-ghost-bar as-ghost-bar--p'), node('span', 'as-ghost-bar as-ghost-bar--r'));
+    rows.append(r);
+  }
+  body.append(rows);
   holders.append(body);
 
   return [cluster, holders];

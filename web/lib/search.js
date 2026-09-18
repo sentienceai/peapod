@@ -192,8 +192,31 @@ async function runSearch(q) {
   if (seq !== state.seq) return; // a later keystroke's answer has already landed
   state.results = res;
   state.active = 0;
+  state.tab = tabFor(res, q);
   renderTabs();
   renderList();
+}
+
+/**
+ * Which tab a query's answer belongs on.
+ *
+ * WHAT THIS FIXES. The palette opened on Assets and stayed there. Type an address and the
+ * header read "Assets 0 · Traders 30" over an empty list and a "no matches" line — the hits
+ * existed, on a tab nobody was told to press. Every address search in the build looked like a
+ * search that did not work, which is exactly what it was.
+ *
+ * The rule: anything that looks like the start of an address goes to Traders; otherwise the
+ * tab that has results wins, and a tie keeps whichever tab the reader is on. A tab the reader
+ * chose by hand is not overruled while they keep typing on it, unless it empties out.
+ * @param {{assets: any[], traders: any[], direct: string|null}} res @param {string} q
+ */
+function tabFor(res, q) {
+  const traders = res.traders.length + (res.direct ? 1 : 0);
+  if (!q) return state.tab;
+  if (/^0x/i.test(q.trim())) return traders ? 'traders' : state.tab;
+  if (state.tab === 'assets' && !res.assets.length && traders) return 'traders';
+  if (state.tab === 'traders' && !traders && res.assets.length) return 'assets';
+  return state.tab;
 }
 
 /** @param {'assets' | 'traders'} id */
@@ -266,7 +289,11 @@ function build() {
   field.append(icon(20, ICONS.search));
   inputEl = /** @type {HTMLInputElement} */ (node('input'));
   inputEl.type = 'search';
-  inputEl.placeholder = 'Search assets, addresses or trader names';
+  // NOT "or trader names". There are no names here: /api/assets ships a symbol and a kind
+  // and no name field, and no address on this chain carries a label this build can read. A
+  // placeholder that asks for a name and answers every name with "no matches" reads as a
+  // search that is broken rather than one that was never given names to match.
+  inputEl.placeholder = 'Search a ticker or an address';
   inputEl.setAttribute('aria-label', 'Search assets or addresses');
   inputEl.setAttribute('role', 'combobox');
   inputEl.setAttribute('aria-expanded', 'true');
@@ -312,7 +339,8 @@ function build() {
   emptyQEl = node('span', 'search-empty-q');
   title.append(emptyQEl);
   emptyEl.append(title,
-    node('div', 'search-empty-hint', 'Try a ticker like TSLA, a name, or paste a full 0x address.'));
+    node('div', 'search-empty-hint',
+      'Try a ticker like TSLA, or the first characters of an address.'));
   panelEl.append(emptyEl);
 
   const foot = node('div', 'search-foot');

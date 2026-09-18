@@ -127,3 +127,48 @@ test('the tokens carry their logos, not just their initials', () => {
     assert.equal(img.attributes.alt, '', 'the ticker is already text; the logo is decorative');
   }
 });
+
+test('the empty cluster keeps the frame\'s shape and stays empty', () => {
+  /*
+   * AssetHolders.dc.html draws a packed cluster of wallet bubbles, a legend naming what their
+   * colours mean, a filter over them and a top-holders table. None of it can run on a swap
+   * tape — a holder may never have swapped — so for a pass this panel was a dotted box with
+   * one line of text in it, which reads as a page that failed to render rather than one
+   * waiting on an index.
+   *
+   * The shape is the frame's. What fills it must not be: every ghost is the same size (the
+   * frame sizes a bubble by position, so ghosts that varied would be a distribution nobody
+   * measured), carries no label, and takes no sign colour. The legend and the filter are the
+   * frame's own, and the filter cannot be pressed.
+   */
+  const stage = byClass(main(), 'as-cluster-stage')[0];
+  assert.ok(stage, 'the cluster stage is gone');
+  const ghosts = byClass(stage, 'as-ghost');
+  assert.ok(ghosts.length >= 12, `only ${ghosts.length} placeholder bubbles`);
+  for (const g of ghosts) {
+    assert.equal(g.textContent, '', `a placeholder bubble carries text: ${g.textContent}`);
+    assert.equal(String(g.className).includes('up') || String(g.className).includes('down'), false,
+      'a placeholder bubble takes a sign colour');
+  }
+  assert.equal(byClass(stage, 'as-ghost')[0].className, byClass(stage, 'as-ghost').at(-1).className,
+    'the placeholder bubbles are not all the same');
+
+  // The legend that names the two colours, and the filter, both from the frame.
+  const legend = byClass(stage, 'as-legend-swatch');
+  assert.equal(legend.length, 3, 'the frame\'s three-part legend is not here');
+  const filter = byClass(main(), 'as-cluster-filter')[0];
+  assert.ok(filter, 'the frame\'s All / In profit / Underwater filter is missing');
+  const buttons = filter.byTag('button');
+  assert.equal(buttons.length, 3);
+  for (const b of buttons) {
+    assert.equal(b.disabled, true, 'a filter over holders nobody has is pressable');
+    assert.match(b.title, /transfer index/i, 'the disabled control does not say why');
+  }
+
+  // The table keeps its four columns and its rows stay blank.
+  const head = byClass(main(), 'as-thead')[0].textContent;
+  for (const col of ['#', 'Wallet', 'Position', 'PnL']) assert.ok(head.includes(col));
+  const rows = byClass(main(), 'as-holder-ghost');
+  assert.ok(rows.length >= 6, 'the top-holders table shows no rows at all, not even empty ones');
+  for (const r of rows) assert.equal(r.textContent, '', 'a placeholder row carries a figure');
+});
