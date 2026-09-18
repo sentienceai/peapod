@@ -18,7 +18,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { byClass, openPage, signChannels } from './page.mjs';
+import { byClass, openPage, placeholders, signChannels } from './page.mjs';
 import { index, view } from './store.mjs';
 
 const { get } = await openPage('leaderboard', 'board');
@@ -157,4 +157,9 @@ test('a logo goes where the ticker is written, and a letter where it is not', ()
       `a logo is drawn over a chip that nothing names: ${chip.title}`);
     assert.equal(chip.textContent.length, 1, `a stacked chip carries ${chip.textContent}`);
   }
+});
+
+test('nothing in the rows says "undefined"', () => {
+  const junk = [...placeholders(get('rows')), ...placeholders(get('podium'))];
+  assert.deepEqual(junk, [], `placeholders on the leaderboard:\n  ${junk.join('\n  ')}`);
 });

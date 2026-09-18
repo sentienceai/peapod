@@ -63,10 +63,8 @@ test('every holder figure is a slot naming the transfer index, and carries no nu
     assert.match(s.textContent, /transfer index/i, `a slot does not say what it needs: ${s.textContent}`);
     assert.ok(!/[$%]|\d[.,]\d/.test(s.textContent), `a slot carries a figure: ${s.textContent}`);
   }
-  // Nothing drawn where the cluster would be: no bubbles, no holder rows.
-  assert.equal(byClass(main(), 'as-bubble').length, 0, 'invented holder bubbles are on the page');
-  assert.equal(byClass(main(), 'as-trow').length, 0, 'invented holder rows are on the page');
-  // And no figure outside a slot claims to know the holder side.
+  // And no figure outside a slot claims to know the holder side. The cluster below draws
+  // MEASURED positions, which is a different quantity and says so — see the cluster test.
   const text = wiredText(main());
   for (const banned of ['IN PROFIT', 'AVG ENTRY', 'HOLDERS', 'Top holders shown']) {
     assert.ok(!text.includes(banned), `"${banned}" appears as a measured figure`);
@@ -128,47 +126,68 @@ test('the tokens carry their logos, not just their initials', () => {
   }
 });
 
-test('the empty cluster keeps the frame\'s shape and stays empty', () => {
+test('the cluster is measured positions, and never called holders', async () => {
   /*
-   * AssetHolders.dc.html draws a packed cluster of wallet bubbles, a legend naming what their
-   * colours mean, a filter over them and a top-holders table. None of it can run on a swap
-   * tape — a holder may never have swapped — so for a pass this panel was a dotted box with
-   * one line of text in it, which reads as a page that failed to render rather than one
-   * waiting on an index.
-   *
-   * The shape is the frame's. What fills it must not be: every ghost is the same size (the
-   * frame sizes a bubble by position, so ghosts that varied would be a distribution nobody
-   * measured), carries no label, and takes no sign colour. The legend and the filter are the
-   * frame's own, and the filter cannot be pressed.
+   * WHAT THIS PANEL MAY CLAIM. The build folds the swap tape into a net position per wallet:
+   * units bought on-chain minus units sold, with a FIFO cost for what is left. That is a
+   * floor on what those wallets hold and it is not a holder list — a wallet can be handed
+   * units by transfer, bridge or issuance, and a swap tape cannot see any of it. The panel
+   * says so in its own words, the figures come from the endpoint, and the three all-holder
+   * figures in the header stay unwired.
    */
-  const stage = byClass(main(), 'as-cluster-stage')[0];
-  assert.ok(stage, 'the cluster stage is gone');
-  const ghosts = byClass(stage, 'as-ghost');
-  assert.ok(ghosts.length >= 12, `only ${ghosts.length} placeholder bubbles`);
-  for (const g of ghosts) {
-    assert.equal(g.textContent, '', `a placeholder bubble carries text: ${g.textContent}`);
-    assert.equal(String(g.className).includes('up') || String(g.className).includes('down'), false,
-      'a placeholder bubble takes a sign colour');
-  }
-  assert.equal(byClass(stage, 'as-ghost')[0].className, byClass(stage, 'as-ghost').at(-1).className,
-    'the placeholder bubbles are not all the same');
+  const d = await endpoint('TSLA');
+  const positions = d.positions ?? [];
+  assert.ok(positions.length > 8, `the build shipped ${positions.length} positions`);
 
-  // The legend that names the two colours, and the filter, both from the frame.
-  const legend = byClass(stage, 'as-legend-swatch');
-  assert.equal(legend.length, 3, 'the frame\'s three-part legend is not here');
-  const filter = byClass(main(), 'as-cluster-filter')[0];
-  assert.ok(filter, 'the frame\'s All / In profit / Underwater filter is missing');
-  const buttons = filter.byTag('button');
-  assert.equal(buttons.length, 3);
-  for (const b of buttons) {
-    assert.equal(b.disabled, true, 'a filter over holders nobody has is pressable');
-    assert.match(b.title, /transfer index/i, 'the disabled control does not say why');
+  const bubbles = byClass(main(), 'as-bubble');
+  assert.equal(bubbles.length, positions.length, 'the cluster is not drawing what the build measured');
+  const addresses = new Set(positions.map((/** @type {any} */ p) => p.address));
+  for (const b of bubbles) {
+    const said = b.attributes['aria-label'];
+    const head = /0x[0-9a-f]{4}/.exec(said)?.[0];
+    assert.ok([...addresses].some((/** @type {any} */ a) => a.startsWith(head)),
+      `a bubble names an address the build did not measure: ${said}`);
   }
 
-  // The table keeps its four columns and its rows stay blank.
-  const head = byClass(main(), 'as-thead')[0].textContent;
-  for (const col of ['#', 'Wallet', 'Position', 'PnL']) assert.ok(head.includes(col));
-  const rows = byClass(main(), 'as-holder-ghost');
-  assert.ok(rows.length >= 6, 'the top-holders table shows no rows at all, not even empty ones');
-  for (const r of rows) assert.equal(r.textContent, '', 'a placeholder row carries a figure');
+  // Every row is a position from the endpoint, in its order, with its own figures.
+  const rows = byClass(main(), 'as-trow');
+  assert.equal(rows.length, positions.length);
+  const { compact } = await import('../web/lib/format.js');
+  for (const [i, row] of rows.slice(0, 6).entries()) {
+    const p = positions[i];
+    assert.ok(row.textContent.includes(compact(p.value)),
+      `row ${i + 1} does not carry the endpoint's position: ${row.textContent}`);
+    if (Number.isFinite(p.pnl_pct)) {
+      const mag = Math.abs(p.pnl_pct);
+      assert.ok(row.textContent.includes(`${mag < 0.1 ? mag.toFixed(2) : mag.toFixed(1)}%`),
+        `row ${i + 1} does not carry the endpoint's cost comparison: ${row.textContent}`);
+    }
+  }
+
+  // The words. "Holder" is what this is NOT, and the panel has to say which.
+  const text = wiredText(main());
+  assert.match(text, /bought .* on-chain/i, 'the panel does not say where these positions come from');
+  assert.match(text, /transferred or bridged in are invisible/i,
+    'the panel does not say what it cannot see');
+  assert.ok(!/Holder cluster|Top holders/i.test(text),
+    'the panel still calls measured positions holders');
+  // And the all-holder figures are still slots.
+  const metrics = slots(main()).map((/** @type {any} */ x) => x.dataset.metric);
+  for (const m of ['holders', 'inProfit', 'avgEntry']) assert.ok(metrics.includes(m));
+});
+
+test('the filter over the cluster is live, and names both directions', () => {
+  const seg = byClass(main(), 'as-cluster-filter')[0];
+  assert.ok(seg, 'the frame\'s filter is missing');
+  const buttons = seg.byTag('button');
+  assert.deepEqual(buttons.map((/** @type {any} */ b) => b.textContent), ['All', 'In profit', 'Underwater']);
+  for (const b of buttons) assert.equal(b.disabled, false, 'the filter is inert over data that exists');
+  const lit = byClass(main(), 'as-bubble').filter((/** @type {any} */ b) => b.attributes.opacity !== '0.18');
+  buttons[1].onclick?.({});
+  const afterProfit = byClass(main(), 'as-bubble').filter((/** @type {any} */ b) => b.attributes.opacity !== '0.18');
+  assert.ok(afterProfit.length < lit.length, 'filtering to "in profit" dimmed nothing');
+  buttons[0].onclick?.({});
+  // The legend is the key to the two colours and the ring, all three of them.
+  const legend = byClass(main(), 'as-legend-swatch');
+  assert.equal(legend.length, 3);
 });

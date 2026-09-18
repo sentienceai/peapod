@@ -131,13 +131,18 @@ export class Api {
    * name they saw on the board.
    * @param {string} q @param {number} limit
    */
-  search(q, limit = 10) {
+  search(q, limit = 50) {
     const term = String(q || '').toLowerCase();
-    if (!/^0x[0-9a-f]{2,40}$/.test(term)) return [];
+    // One hex digit is enough to ask with: the range lookup is the same index seek whether
+    // it narrows to a sixteenth of the table or to one row, and the limit caps what comes
+    // back. Demanding two silently answered "0x0" — a perfectly good prefix — with nothing.
+    if (!/^0x[0-9a-f]{1,40}$/.test(term)) return [];
+    // win_rate travels with the row because the palette prints it beside the count, and a
+    // second query per row to fetch it would be 200 round-trips for one keystroke.
     return this.db.prepare(
-      'SELECT addr, realized, round_trips, status FROM address '
+      'SELECT addr, realized, round_trips, win_rate, status FROM address '
       + 'WHERE addr >= ? AND addr < ? ORDER BY round_trips DESC, realized DESC LIMIT ?')
-      .all(term, `${term}￿`, Math.min(Number(limit) || 10, 50));
+      .all(term, `${term}￿`, Math.min(Math.max(Number(limit) || 50, 1), 500));
   }
 
   close() { this.db.close(); }
@@ -156,7 +161,11 @@ export function route(api, url) {
     status, body: JSON.stringify(o), type: 'application/json' });
 
   if (parts[0] === 'manifest') return json(api.manifest());
-  if (parts[0] === 'search') return json({ results: api.search(url.searchParams.get('q') || '') });
+  if (parts[0] === 'search') {
+    // The palette asks for as many as it will page through; the method clamps it at 500.
+    const limit = Number(url.searchParams.get('limit') || 50);
+    return json({ results: api.search(url.searchParams.get('q') || '', limit) });
+  }
   if (parts[0] === 'leaderboard') {
     const body = parts[1] === 'index'
       ? api.leaderboard('index', 'index') : api.leaderboard(parts[1], parts[2]);

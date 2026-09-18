@@ -156,6 +156,31 @@ function renderTabs() {
   }
 }
 
+/**
+ * How many rows exist in the DOM at once.
+ *
+ * The seam hands back everything that matched — every token whose ticker contains the query,
+ * and up to 500 addresses straight out of the store's index. Building five hundred rows on
+ * each keystroke is a palette that stutters while you type, so a page of them is rendered and
+ * the rest arrive as the list is scrolled, or as the arrow keys walk past the end of what is
+ * built. The COUNT on the tab is always the true total, never the number rendered: a reader
+ * who types three characters and sees "Traders 412" knows what is there.
+ */
+const WINDOW = 60;
+
+/** Append the next page of rows, if there are any left. */
+function growList() {
+  const list = currentList();
+  const from = listEl.children.length;
+  if (from >= list.length) return;
+  const to = Math.min(from + WINDOW, list.length);
+  for (let i = from; i < to; i += 1) {
+    const item = list[i];
+    listEl.append(state.tab === 'assets' ? assetRow(/** @type {AssetHit} */ (item), i)
+      : traderRow(/** @type {TraderHit & {direct?: boolean}} */ (item), i));
+  }
+}
+
 function renderList() {
   const list = currentList();
   state.active = Math.min(state.active, Math.max(0, list.length - 1));
@@ -170,10 +195,7 @@ function renderList() {
   }
   emptyEl.hidden = true;
   listEl.hidden = false;
-  list.forEach((item, i) => {
-    listEl.append(state.tab === 'assets' ? assetRow(/** @type {AssetHit} */ (item), i)
-      : traderRow(/** @type {TraderHit & {direct?: boolean}} */ (item), i));
-  });
+  growList();
   updateActive();
 }
 
@@ -234,6 +256,8 @@ function onKeydown(e) {
   if (e.key === 'ArrowDown') {
     e.preventDefault();
     state.active = Math.min(state.active + 1, Math.max(0, list.length - 1));
+    // The selection may have stepped past the rendered page; build the next one under it.
+    while (state.active >= listEl.children.length && listEl.children.length < list.length) growList();
     updateActive();
   } else if (e.key === 'ArrowUp') {
     e.preventDefault();
@@ -330,6 +354,11 @@ function build() {
   listEl.id = 'search-listbox';
   listEl.setAttribute('role', 'listbox');
   listEl.setAttribute('aria-label', 'Results');
+  // Near the bottom, build the next page. 240px of runway means the rows are there before
+  // the scroll reaches them on any normal flick.
+  listEl.addEventListener('scroll', () => {
+    if (listEl.scrollTop + listEl.clientHeight >= listEl.scrollHeight - 240) growList();
+  });
   panelEl.append(listEl);
 
   emptyEl = node('div', 'search-empty');

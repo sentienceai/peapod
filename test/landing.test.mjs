@@ -19,7 +19,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-import { byClass, openPage } from './page.mjs';
+import { byClass, openPage, placeholders } from './page.mjs';
 
 const { get } = await openPage('index', 'landing');
 const html = await readFile(new URL('../web/index.html', import.meta.url), 'utf8');
@@ -95,4 +95,11 @@ test('what is not live says so beside what is being sold', () => {
   const cta = /<button[^>]*lp-btn[^>]*>[^<]*early access[^<]*<\/button>/i.exec(text);
   assert.ok(cta, 'the early-access button is gone');
   assert.match(cta[0], /\bdisabled\b/, 'the early-access button takes a click and does nothing');
+});
+
+test('nothing on the page says "undefined"', () => {
+  // The market tiles printed "#undefined" on every card and had no title: `rank` and
+  // `name` came from the mock and exist on no endpoint this build serves.
+  const junk = placeholders(get('landing-main'));
+  assert.deepEqual(junk, [], `placeholders left on the landing page:\n  ${junk.join('\n  ')}`);
 });

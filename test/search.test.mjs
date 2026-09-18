@@ -85,3 +85,50 @@ test('nothing matches, and it says so once', async () => {
   assert.match(empty.textContent, /zzzzzznotathing/, 'the empty state does not name the query');
   closeSearch();
 });
+
+test('the list is the whole answer, not the first thirty of it', async () => {
+  /*
+   * BOTH SIDES WERE SLICED TO 30 in lib/data.js, and the trader side only ever looked at the
+   * ranked rows the page already had — the top 1,000 of the 25,357 addresses that closed a
+   * round-trip, out of 113,315 the tape has a record for. /api/search had existed the whole
+   * time, unused: a prefix lookup on the address table's primary key.
+   *
+   * So a one-character prefix has to come back with more than a page of addresses, and the
+   * palette has to page through them rather than truncate. The count on the tab is the true
+   * total; the DOM holds a window of it.
+   */
+  const { search } = await import('../web/lib/data.js');
+  const res = await search('0x1');
+  assert.ok(res.traders.length > 100,
+    `a prefix search returned ${res.traders.length} addresses — it is reading the board, not the store`);
+
+  await typeQuery('0x1');
+  const tab = byClass(panel(), 'search-tab').find((/** @type {any} */ t) => /Traders/.test(t.textContent));
+  const shown = Number(tab.textContent.replace(/\D+/g, ''));
+  assert.equal(shown, res.traders.length, 'the tab count is the number rendered, not the number found');
+  const first = rows().length;
+  assert.ok(first > 0 && first < res.traders.length, 'the whole answer was built into the DOM at once');
+
+  // Scrolling builds the next page — the list is windowed, not cut.
+  const list = panel().descendants().find((/** @type {any} */ n) => String(n.className).includes('search-list'));
+  list.scrollTop = 10_000;
+  list.clientHeight = 400;
+  list.scrollHeight = 500;
+  list.listeners.filter((/** @type {any} */ l) => l.type === 'scroll').forEach((/** @type {any} */ l) => l.fn({}));
+  assert.ok(rows().length > first, `the list did not grow past ${first} rows`);
+});
+
+test('an address the board never ranked is still findable', async () => {
+  /*
+   * Most of this chain never closed a round-trip, and the leaderboard is the top 1,000 of
+   * those that did. A search that can only see the board answers "no matches" for the other
+   * hundred thousand addresses, which is the opposite of what a search is for. The profile
+   * those rows open says exactly what it knows about them.
+   */
+  const { sample: pick } = await import('./store.mjs');
+  const quiet = pick({ where: 'round_trips = 0', limit: 1 })[0];
+  const { search } = await import('../web/lib/data.js');
+  const res = await search(quiet.address.slice(0, 8));
+  assert.ok(res.traders.some((/** @type {any} */ t) => t.address === quiet.address),
+    'an address with no round-trips is missing from its own prefix search');
+});

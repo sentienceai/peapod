@@ -112,8 +112,13 @@ function qty(n) {
  * with it. It comes back with the transfer index, out of that file, unchanged.
  */
 
+const CLUSTER_FILTERS = /** @type {const} */ ([
+  ['all', 'All'], ['profit', 'In profit'], ['underwater', 'Underwater'],
+]);
+
 const state = {
   symbol: FALLBACK_SYMBOL,
+  /** @type {'all' | 'profit' | 'underwater'} */ clusterFilter: 'all',
   /** The raw ?symbol= the URL asked for, kept only so the notice can name it. Null once it
       resolved to something real, so the notice disappears the moment the symbol is valid. */
   /** @type {string | null} */ requested: null,
@@ -256,88 +261,291 @@ function buildHeader(d) {
   return panel;
 }
 
+
+const SVGNS = 'http://www.w3.org/2000/svg';
+/** @param {string} tag @param {Record<string, string | number>} attrs */
+function svgNode(tag, attrs = {}) {
+  const n = document.createElementNS(SVGNS, tag);
+  for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, String(v));
+  return n;
+}
+
+/** The cluster's own coordinate space, scaled by the CSS to whatever box the panel gives it. */
+const CLUSTER_W = 640;
+const CLUSTER_H = 360;
+/** A floor, or the tail of a top-heavy distribution is sub-pixel and unclickable. */
+const MIN_R = 14;
+const MAX_R = 62;
+
 /**
- * The holder side of the page, which this build cannot answer.
+ * Places every circle with no overlap by walking a fixed outward spiral from the centre and
+ * taking the first spot that clears the walls and everything placed before it. Deterministic:
+ * the same positions land in the same spots on every render, so two screenshots of the same
+ * build are comparable. Ported from design-refs/new-frontend, which had the whole packer —
+ * what it never had was a measured list to feed it.
+ * @param {any[]} list biggest first
+ */
+function packBubbles(list, height = CLUSTER_H) {
+  const max = Math.max(...list.map((h) => h.value), 1);
+  /**
+   * One pass at a given overall scale. Returns null if any circle could not be placed, so
+   * the caller can try again smaller rather than stacking the leftovers in the middle.
+   * @param {number} scale
+   */
+  const attempt = (scale) => {
+    /** @type {{x: number, y: number, r: number, holder: any}[]} */
+    const placed = [];
+    for (const holder of list) {
+      // Area, not radius: r ∝ √share, so the disc is proportional to the position rather
+      // than the top wallet reading four times the one it is twice the size of.
+      const r = (MIN_R + Math.sqrt(Math.max(0, holder.value) / max) * (MAX_R - MIN_R)) * scale;
+      let spot = null;
+      for (let step = 0; step < 6000 && !spot; step += 1) {
+        const angle = step * 0.42;
+        const dist = step * 0.55;
+        const x = CLUSTER_W / 2 + Math.cos(angle) * dist;
+        const y = height / 2 + Math.sin(angle) * dist * 0.62;
+        if (x - r < 6 || x + r > CLUSTER_W - 6 || y - r < 6 || y + r > height - 6) continue;
+        if (placed.every((p) => Math.hypot(p.x - x, p.y - y) >= p.r + r + 3)) spot = { x, y };
+      }
+      if (!spot) return null;
+      placed.push({ x: spot.x, y: spot.y, r, holder });
+    }
+    return placed;
+  };
+  /*
+   * SHRINK UNTIL THEY ALL FIT, rather than stacking the ones that did not.
+   *
+   * The reference build's packer gave up after 3,000 spiral steps and dropped the circle at
+   * the centre, which is invisible when the set is top-heavy (its own mock always was) and
+   * obvious here: measured positions in one token are often all within a factor of two, so a
+   * dozen near-equal circles piled up in the middle and the outer ones were cut by the box.
+   * Every circle scales by the same factor, so the area ratios — the one thing the cluster
+   * has to preserve — survive the shrink.
+   */
+  for (const scale of [1, 0.9, 0.8, 0.7, 0.6, 0.5]) {
+    const placed = attempt(scale);
+    if (placed) return placed;
+  }
+  return attempt(0.4) ?? [];
+}
+
+/**
+ * Shrinks and re-centres the packed set so its own bounding box lands inside the viewBox.
+ * Every circle scales by the same factor, so the area ratios — the one thing the cluster has
+ * to preserve — do not change.
+ * @param {{x: number, y: number, r: number, holder: any}[]} placed
+ * @param {number} w @param {number} h @param {number} [margin]
+ */
+function fitToBox(placed, w, h, margin = 10) {
+  if (placed.length === 0) return placed;
+  let minX = Infinity; let maxX = -Infinity; let minY = Infinity; let maxY = -Infinity;
+  for (const p of placed) {
+    minX = Math.min(minX, p.x - p.r); maxX = Math.max(maxX, p.x + p.r);
+    minY = Math.min(minY, p.y - p.r); maxY = Math.max(maxY, p.y + p.r);
+  }
+  const scale = Math.min((w - margin * 2) / Math.max(1, maxX - minX),
+    (h - margin * 2) / Math.max(1, maxY - minY), 1);
+  const cx = (minX + maxX) / 2; const cy = (minY + maxY) / 2;
+  return placed.map((p) => ({
+    x: w / 2 + (p.x - cx) * scale, y: h / 2 + (p.y - cy) * scale, r: p.r * scale, holder: p.holder,
+  }));
+}
+
+/**
+ * One bubble. Colour is the sign of what the position is worth against what it cost, and
+ * nothing else; a wallet that also ranks on the leaderboard gets a heavier neutral ring,
+ * which is a second fact rather than a stronger opinion about the first.
+ * @param {{x: number, y: number, r: number, holder: any}} p
+ * @param {'all' | 'profit' | 'underwater'} filter
+ */
+function buildBubble(p, filter) {
+  const h = p.holder;
+  const known = Number.isFinite(h.pnl_pct);
+  const up = known && h.pnl_pct >= 0;
+  const dim = known && ((filter === 'profit' && !up) || (filter === 'underwater' && up));
+  const tone = !known ? 'var(--muted)' : up ? 'var(--up)' : 'var(--down)';
+  const say = `${h.ranked ? 'Leaderboard trader ' : 'Wallet '}${shortAddr(h.address)}: `
+    + `${qty(h.units)} ${state.symbol} unsold, worth ${compact(h.value)} at the last trade`
+    + (known ? `, ${h.pnl_pct >= 0 ? 'up' : 'down'} ${Math.abs(h.pnl_pct).toFixed(1)}% on what it paid.` : '.');
+
+  const g = svgNode('g', {
+    class: 'as-bubble', tabindex: '0', role: 'button', 'aria-label': say, opacity: dim ? 0.18 : 1,
+  });
+  const title = svgNode('title', {});
+  title.textContent = say;
+  g.append(title);
+  g.append(svgNode('circle', {
+    cx: p.x.toFixed(1), cy: p.y.toFixed(1), r: p.r.toFixed(1),
+    fill: `color-mix(in srgb, ${tone} ${h.ranked ? 30 : 16}%, var(--surface))`,
+    stroke: h.ranked ? 'var(--fg)' : tone, 'stroke-width': h.ranked ? 2.5 : 1.5,
+  }));
+  // 40, not the reference's 34: an 11px elided address is ~74px wide, and a 34px radius is
+  // 68px across — every label on a circle that size hung over its own edge.
+  if (p.r >= 40) {
+    const label = svgNode('text', {
+      x: p.x.toFixed(1), y: (p.y - 5).toFixed(1), 'text-anchor': 'middle', class: 'as-bubble-label',
+    });
+    label.textContent = shortAddr(h.address);
+    g.append(label);
+  }
+  if (p.r >= 20 && known) {
+    const pctEl = svgNode('text', {
+      x: p.x.toFixed(1), y: (p.r >= 40 ? p.y + 11 : p.y + 3.5).toFixed(1),
+      'text-anchor': 'middle', class: `as-bubble-pct ${up ? 'up' : 'down'}`,
+    });
+    /*
+     * All three channels inside the circle too: the glyph, the sign and the colour. A figure
+     * that keeps two of the three on one surface and three on another is a rule nobody can
+     * rely on, and the glyph is the channel a colour-blind reader is left with. It is a
+     * <tspan class="mark">, the same element the HTML figures use, so the same check covers
+     * both — an SVG figure is not a place where the rule quietly stops applying.
+     */
+    const mag = Math.abs(h.pnl_pct);
+    const mark = svgNode('tspan', { class: 'mark' });
+    mark.textContent = up ? '▲' : '▼';
+    pctEl.append(mark, document.createTextNode(
+      `${up ? '+' : '−'}${mag < 0.1 ? mag.toFixed(2) : mag.toFixed(1)}%`));
+    g.append(pctEl);
+  }
+  const open = () => openProfile(h.address, /** @type {any} */ (g));
+  g.addEventListener('click', open);
+  g.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+  });
+  return g;
+}
+
+/**
+ * The position side of the page: what the swap tape can say about who is holding, and what
+ * it cannot.
  *
- * The frame draws a bubble cluster of wallets and a top-holders table, and lib/mock.js
- * still generates both. They need an ERC-20 transfer index: a holder may never have
- * swapped, so the swap tape the rest of this page is built from cannot see them at all. A
- * cluster of invented wallets on a page whose other figures are measured is the one thing
- * this site refuses — a plausible number with no source is worse than a visible gap — so
- * the panels keep their headings and say what they are waiting for.
+ * WHAT THE BUBBLES ARE. Per wallet: units of this token bought on-chain minus units sold,
+ * with a FIFO cost for the units still unsold, computed by the build over the same window
+ * everything else on this page comes from. A bubble's area is what that position is worth at
+ * the last trade; its tint is that value against what the wallet paid; a heavier ring says
+ * the wallet also ranks on the leaderboard.
  *
- * The packing, bubble and legend code above is left intact and unused on purpose: it is
- * what this renders the day the index lands, and deleting it would mean writing it twice.
+ * WHAT THEY ARE NOT. Holders. A wallet can hold units that were transferred, bridged or
+ * issued to it, and a swap tape cannot see any of that — so this is a floor on what these
+ * wallets hold, and there are holders it cannot see at all. A wallet whose on-chain selling
+ * exceeded its on-chain buying is not drawn: its supply came from somewhere invisible here,
+ * and a negative bubble would be a claim about a short position nobody measured.
+ *
+ * That is also why the header's HOLDERS, HOLDERS IN PROFIT and AVG ENTRY stay unwired: each
+ * is a statement about everyone who holds the token, which needs an ERC-20 transfer index.
+ * This panel is careful to say "bought on-chain" everywhere it would be easier to say "holds".
  * @param {AssetDetail} d
  */
 function buildHolderPanels(d) {
+  const positions = /** @type {any[]} */ (/** @type {any} */ (d).positions ?? []);
   const cluster = node('section', 'as-cluster panel');
   const head = node('div', 'as-cluster-head');
   const headText = node('div', 'as-cluster-headtext');
-  headText.append(node('h2', undefined, 'Holder cluster'));
+  headText.append(node('h2', undefined, 'Position cluster'));
   headText.append(node('p', undefined,
-    `Each bubble will be a wallet holding ${d.symbol}. Bigger bubble, bigger position.`));
+    `Each bubble is a wallet that bought ${d.symbol} on-chain, sized by what it has not sold. `
+    + 'Units transferred or bridged in are invisible to a swap tape, so this is a floor on '
+    + 'what these wallets hold and not a holder list.'));
   head.append(headText);
-  // The frame's filter segment, inert. It is here because the panel's shape is the frame's
-  // and this is part of that shape; it is disabled because there is nothing to filter, and a
-  // control that looks live and does nothing is worse than one that says why it cannot.
+
   const seg = node('div', 'seg as-cluster-filter');
-  for (const label of ['All', 'In profit', 'Underwater']) {
+  for (const [id, label] of CLUSTER_FILTERS) {
     const b = /** @type {HTMLButtonElement} */ (node('button', undefined, label));
     b.type = 'button';
-    b.setAttribute('aria-pressed', String(label === 'All'));
-    b.disabled = true;
-    b.title = 'Needs the transfer index';
+    b.setAttribute('aria-pressed', String(state.clusterFilter === id));
+    b.disabled = positions.length === 0;
+    if (positions.length === 0) b.title = 'Needs the transfer index';
+    b.onclick = () => { state.clusterFilter = id; render(); };
     seg.append(b);
   }
   head.append(seg);
   cluster.append(head);
 
   const stage = node('div', 'as-cluster-stage');
-  /*
-   * GHOST BUBBLES, ALL THE SAME SIZE. The panel keeps the frame's shape — the dotted stage,
-   * the bubbles, the legend — while saying what it is waiting for. They are uniform on
-   * purpose: the frame sizes each bubble by position and tints it by whether that wallet is
-   * up, so ghosts of varied sizes would be a distribution nobody measured. Same size, no
-   * label, no tint, dashed: this is where the cluster goes, and there is nothing in it yet.
-   */
-  const ghosts = node('div', 'as-cluster-ghosts');
-  ghosts.setAttribute('aria-hidden', 'true');
-  for (let i = 0; i < 18; i += 1) ghosts.append(node('span', 'as-ghost'));
-  stage.append(ghosts);
-  stage.append(unwired('holders'));
+  if (positions.length === 0) {
+    // A store built before the positions landed: the panel keeps the frame's shape and says
+    // what it is waiting for rather than drawing an empty box.
+    const ghosts = node('div', 'as-cluster-ghosts');
+    ghosts.setAttribute('aria-hidden', 'true');
+    for (let i = 0; i < 18; i += 1) ghosts.append(node('span', 'as-ghost'));
+    stage.append(ghosts, unwired('holders'));
+  } else {
+    const svg = svgNode('svg', {
+      viewBox: `0 0 ${CLUSTER_W} ${CLUSTER_H}`, width: '100%', height: '100%',
+      preserveAspectRatio: 'xMidYMid meet', class: 'as-cluster-svg',
+    });
+    svg.setAttribute('role', 'img');
+    svg.setAttribute('aria-label',
+      `${positions.length} wallets holding ${d.symbol} from on-chain buys, sized by position`);
+    // Packed and fitted into the box ABOVE the legend, so a bubble never sits under it.
+    const LEGEND = 46;
+    for (const p of fitToBox(packBubbles(positions, CLUSTER_H - LEGEND), CLUSTER_W, CLUSTER_H - LEGEND)) {
+      svg.append(buildBubble(p, state.clusterFilter));
+    }
+    stage.append(svg);
 
-  // The frame's legend, which is the key to the thing the stage will draw.
-  const legend = node('div', 'as-cluster-legend');
-  for (const [cls, label] of [['up', 'In profit'], ['down', 'Underwater'], ['ranked', 'Leaderboard trader']]) {
-    const item = node('span', 'as-legend-item');
-    item.append(node('span', `as-legend-swatch as-legend-swatch--${cls}`), document.createTextNode(label));
-    legend.append(item);
+    const legend = node('div', 'as-legend');
+    for (const [cls, label] of [['up', 'Up on cost'], ['down', 'Down on cost'],
+      ['board', 'Leaderboard trader']]) {
+      const item = node('span', 'as-legend-item');
+      item.append(node('span', `as-legend-swatch as-legend-swatch--${cls}`),
+        document.createTextNode(label));
+      legend.append(item);
+    }
+    stage.append(legend);
   }
-  stage.append(legend);
   cluster.append(stage);
 
   const holders = node('section', 'as-holders panel');
   const hHead = node('div', 'as-holders-head');
-  hHead.append(node('h2', undefined, 'Top holders'));
-  hHead.append(node('span', 'as-holders-count', 'Ranked by position'));
+  hHead.append(node('h2', undefined, 'Largest positions'));
+  hHead.append(node('span', 'as-holders-count',
+    positions.length ? `${positions.length} shown` : 'Ranked by position'));
   holders.append(hHead);
   const thead = node('div', 'as-thead');
   thead.append(node('span', undefined, '#'), node('span', undefined, 'Wallet'),
-    node('span', 'right', 'Position'), node('span', 'right', 'PnL'));
+    node('span', 'right', 'Position'), node('span', 'right', 'vs cost'));
   holders.append(thead);
+
   const body = node('div', 'as-tbody');
-  body.append(unwired('holders'));
-  // The rows the table will hold, drawn as the frame's rows with nothing in them.
-  const rows = node('div', 'as-holder-ghosts');
-  rows.setAttribute('aria-hidden', 'true');
-  for (let i = 0; i < 8; i += 1) {
-    const r = node('div', 'as-holder-ghost');
-    r.append(node('span', 'as-ghost-bar as-ghost-bar--n'), node('span', 'as-ghost-bar as-ghost-bar--w'),
-      node('span', 'as-ghost-bar as-ghost-bar--p'), node('span', 'as-ghost-bar as-ghost-bar--r'));
-    rows.append(r);
+  if (positions.length === 0) {
+    body.append(unwired('holders'));
+    const rows = node('div', 'as-holder-ghosts');
+    rows.setAttribute('aria-hidden', 'true');
+    for (let i = 0; i < 8; i += 1) {
+      const r = node('div', 'as-holder-ghost');
+      r.append(node('span', 'as-ghost-bar as-ghost-bar--n'), node('span', 'as-ghost-bar as-ghost-bar--w'),
+        node('span', 'as-ghost-bar as-ghost-bar--p'), node('span', 'as-ghost-bar as-ghost-bar--r'));
+      rows.append(r);
+    }
+    body.append(rows);
+  } else {
+    positions.forEach((h, i) => {
+      const row = /** @type {HTMLButtonElement} */ (node('button', 'as-trow'));
+      row.type = 'button';
+      row.setAttribute('aria-label', `Open ${shortAddr(h.address)}`);
+      row.onclick = () => openProfile(h.address, row);
+      row.append(node('span', 'as-td mono', String(i + 1)));
+      const who = node('span', 'as-td as-wallet');
+      who.append(node('span', 'avatar mono', h.address.slice(2, 4).toUpperCase()));
+      who.append(node('span', 'mono', shortAddr(h.address)));
+      if (h.ranked) who.append(node('span', 'as-lb', 'LB'));
+      row.append(who);
+      row.append(node('span', 'as-td right mono', compact(h.value)));
+      // A percent against cost is a signed figure and keeps all three channels; a position
+      // with no cost left to compare against prints a dash, not a zero.
+      const vs = node('span', 'as-td right');
+      if (Number.isFinite(h.pnl_pct)) {
+        vs.append(signed(h.pnl_pct, 'mono',
+          (/** @type {number} */ n) => `${Math.abs(n) < 0.1 ? n.toFixed(2) : n.toFixed(1)}%`));
+      } else {
+        vs.append(node('span', 'mono', '—'));
+      }
+      row.append(vs);
+      body.append(row);
+    });
   }
-  body.append(rows);
   holders.append(body);
 
   return [cluster, holders];

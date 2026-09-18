@@ -25,7 +25,14 @@ import {
   ago, compact, copyButton, el, icon, letterChip, node, pct, shortAddr, signed, signedPct,
 } from './format.js';
 
-const PAGE = 12;
+/*
+ * HOW MANY ROWS THE BOARD OPENS WITH. It was 12, with a "Show 12 more" under it: a leaderboard
+ * that showed a dozen places and made you press a button eleven times to reach the hundredth.
+ * The payload has always carried 1,000 rows and the endpoint serves all of them, so this was a
+ * render cap and nothing else. 100 is the top the page claims to be about; the rest is still
+ * behind the same button, 100 at a time.
+ */
+const PAGE = 100;
 
 const state = {
   /** @type {any[]} */ rows: [],

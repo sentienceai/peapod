@@ -4,15 +4,16 @@
  * The tile itself is built by format.js's assetTile(); this module owns the map, the
  * filename check and the one listener that clears an image which failed to load.
  *
- * The tile is always rendered and the image sits on top of it. Nothing is conditional on
- * the image loading, so a 404, a corrupt cache entry or a blocked request reveals the
- * tile underneath rather than leaving a gap or a broken-image glyph.
+ * The tile always renders its initials and the image is appended over them; on `load` the
+ * initials are hidden, and on `error` the image removes itself and they stay. That order is
+ * deliberate: a 404, a corrupt cache entry, a blocked request or an image that simply never
+ * arrives all leave the letters showing, and only a logo that actually painted takes their
+ * place. Layering the two and hoping the art is opaque is what drew "SBPR" for SPY.
  *
- * ONE LISTENER, NOT ONE PER IMAGE. An `error` event does not bubble, but it does
- * propagate through the capture phase, so a single capturing listener on the document
- * catches every token image on the page, including ones added later by the modal. Binding
- * per image means remembering to bind, and the failure mode of forgetting is invisible
- * until an image breaks in production.
+ * TWO LISTENERS, NOT TWO PER IMAGE. Neither `load` nor `error` bubbles, but both propagate
+ * through the capture phase, so one capturing listener each catches every token image on the
+ * page, including ones added later by the modal. Binding per image means remembering to
+ * bind, and the failure mode of forgetting is invisible until an image breaks in production.
  *
  * TICKERS, NOT ADDRESSES. The shipped data names tokens by ticker; the logo files are
  * named by contract address. The map between them is built at export time and only for
@@ -48,11 +49,20 @@ export function tokenLogo(ticker) {
   return img;
 }
 
+/** Whether an event's target is one of our logo images. @param {any} t */
+const isLogo = (t) => Boolean(t && t.tagName === 'IMG' && t.hasAttribute?.('data-token-logo'));
+
 if (typeof document !== 'undefined' && document.addEventListener) {
+  // Matched on the attribute and the tag rather than `instanceof HTMLImageElement`, so the
+  // same code path is exercised by the tests as by the browser.
   document.addEventListener('error', (e) => {
-    const t = /** @type {HTMLElement | null} */ (e.target);
-    // Matched on the attribute and the tag rather than `instanceof HTMLImageElement`,
-    // so the same code path is exercised by the tests as by the browser.
-    if (t && t.tagName === 'IMG' && t.hasAttribute?.('data-token-logo')) t.remove();
+    const t = /** @type {any} */ (e.target);
+    if (isLogo(t)) t.remove();
+  }, true);
+  document.addEventListener('load', (e) => {
+    const t = /** @type {any} */ (e.target);
+    // The class, not a style: the tile keeps its letters in the DOM (they are what comes
+    // back if the image is ever removed) and CSS stops drawing them.
+    if (isLogo(t)) t.parentNode?.classList?.add('has-logo');
   }, true);
 }

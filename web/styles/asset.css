@@ -105,7 +105,6 @@
 
 .as-cluster-stage {
   position: relative; flex-grow: 1; min-height: 380px; margin: 8px;
-  display: grid; place-items: center;
   border-radius: var(--radius-button); overflow: hidden;
   background-color: var(--surface-2);
   background-image: radial-gradient(var(--line) 1px, transparent 1px);
@@ -148,8 +147,8 @@
    LB badge has nothing to shrink but the address, and it shrinks to nothing before the grid
    track itself would ever ask it to. Position/PnL give up a few px each to make room. */
 .as-thead, .as-trow {
-  display: grid; grid-template-columns: 24px minmax(112px, 1fr) 90px 82px;
-  column-gap: 10px; align-items: center;
+  display: grid; grid-template-columns: 22px minmax(104px, 1fr) 78px 68px;
+  column-gap: 8px; align-items: center;
 }
 .as-thead {
   height: 32px; box-sizing: border-box; padding: 0 18px; border-bottom: 1px solid var(--line-soft);
@@ -171,8 +170,17 @@
 .as-trow:hover { background: var(--hover); }
 .as-td { min-width: 0; }
 .as-td.right { text-align: right; }
-.as-wallet { display: flex; align-items: center; gap: 7px; min-width: 0; overflow: hidden; }
+.as-wallet {
+  display: flex; align-items: center; gap: 7px; min-width: 0; overflow: hidden;
+  white-space: nowrap;
+}
 .as-wallet .avatar { width: 24px; height: 24px; border-radius: 7px; font-size: 9px; flex-shrink: 0; }
+/* The same fact the heavier ring carries in the cluster: this wallet also ranks. */
+.as-lb {
+  flex-shrink: 0; padding: 1px 5px; border-radius: var(--radius-control-sm);
+  border: 1px solid var(--line-strong); font-family: var(--font-mono); font-size: 9px;
+  color: var(--muted);
+}
 .as-wallet-name {
   display: flex; align-items: center; gap: 5px; min-width: 0; overflow: hidden;
   font-size: 14px; font-weight: 600;
@@ -289,7 +297,10 @@
   border: 1px dashed var(--line-strong); background: var(--surface);
   opacity: 0.55;
 }
-.as-cluster-stage > .unwired { position: relative; z-index: 1; background: var(--surface); }
+.as-cluster-stage > .unwired {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  z-index: 1; background: var(--surface);
+}
 .as-cluster-legend {
   position: absolute; left: 12px; bottom: 12px; box-sizing: border-box; padding: 8px 12px;
   border-radius: var(--radius-control-sm); border: 1px solid var(--line); background: var(--surface);

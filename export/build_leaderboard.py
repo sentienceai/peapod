@@ -37,6 +37,9 @@ SPARK_POINTS = 24
 DAY = 86400
 ASSET_SERIES_CAP = 200
 ASSET_TRADES = 50
+# How many wallets the asset page's cluster draws. The panel is one box; past roughly this
+# many circles the small ones stop being legible and start being texture.
+ASSET_POSITIONS = 28
 # What /api/asset/:symbol can spell, kept in step with web-api.mjs by hand.
 #
 # WIDE ON PURPOSE. This was [A-Za-z0-9.]{1,16}, which dropped three Pons tokens named in
@@ -378,7 +381,72 @@ def downsample(series: list, cap: int = 500) -> list:
     return out
 
 
-def assets(trades: pl.DataFrame, to_ts: int) -> list[dict]:
+def swap_positions(part: pl.DataFrame, price: float | None, ranked: set[str]) -> list[dict]:
+    """Per-wallet net position in one token, from the swap tape alone.
+
+    WHAT THIS IS, AND WHAT IT IS NOT. For each address that swapped this token in the window:
+    units bought minus units sold, and a FIFO cost for the units still unsold. That is a
+    position built out of on-chain buying, not a holding. A wallet can hold more than this —
+    anything transferred or bridged in is invisible to a swap tape — and a wallet that sold
+    units it never bought here comes out negative, which means exactly that: its supply came
+    from somewhere this build cannot see. Those are dropped rather than drawn as a short.
+
+    So the asset page may not label these "holders", and the header's HOLDERS / IN PROFIT /
+    AVG ENTRY figures stay unwired: those are statements about everyone who holds the token,
+    which still needs an ERC-20 transfer index.
+
+    FIFO, NOT AN AVERAGE BUY PRICE. A wallet that bought at 10 and 30 and sold one unit has a
+    remaining cost of 30, not 20. Averaging over every buy would price units that are gone.
+    The walk is per address and only for the ones that make the cut, so it costs a pass over
+    a few hundred rows rather than over the tape.
+    """
+    if price is None or not math.isfinite(price):
+        return []
+    g = (part.group_by("addr")
+         .agg(pl.col("qty").sum().alias("net"), pl.col("qty").abs().sum().alias("gross"))
+         .filter(pl.col("net") > 0)
+         .sort("net", descending=True)
+         .head(ASSET_POSITIONS))
+    if g.height == 0:
+        return []
+    keep = set(g["addr"].to_list())
+    lots: dict[str, list[list[float]]] = {a: [] for a in keep}
+    for addr, qty, usd in zip(part["addr"].to_list(), part["qty"].to_list(), part["usd"].to_list()):
+        if addr not in keep:
+            continue
+        q = float(qty)
+        if q > 0:
+            lots[addr].append([q, abs(float(usd)) / q if q > DUST else 0.0])
+            continue
+        # A sell eats the oldest lots first; one that eats more than was ever bought here is
+        # selling units this tape never saw arrive, and simply empties the queue.
+        left = -q
+        while left > DUST and lots[addr]:
+            lot = lots[addr][0]
+            take = min(left, lot[0])
+            lot[0] -= take
+            left -= take
+            if lot[0] <= DUST:
+                lots[addr].pop(0)
+    out = []
+    for addr, net in zip(g["addr"].to_list(), g["net"].to_list()):
+        held = sum(lot[0] for lot in lots[addr])
+        cost = sum(lot[0] * lot[1] for lot in lots[addr])
+        entry = cost / held if held > DUST else None
+        out.append({
+            "address": addr,
+            "units": float(net),
+            "value": float(net) * price,
+            # None, not zero: a wallet whose remaining units were all bought below DUST or
+            # came out of an empty queue has no entry price to compare against.
+            "entry": float(entry) if entry else None,
+            "pnl_pct": (price - entry) / entry * 100 if entry else None,
+            "ranked": addr in ranked,
+        })
+    return out
+
+
+def assets(trades: pl.DataFrame, to_ts: int, ranked: set[str] | None = None) -> list[dict]:
     """Per-asset aggregates, folded from the same window the ranking is.
 
     THE SAME WINDOW, NOT A SECOND PASS OVER THE TAPE. These rows and the leaderboard rows
@@ -403,6 +471,7 @@ def assets(trades: pl.DataFrame, to_ts: int) -> list[dict]:
     detail's is a list, and one key cannot honestly mean both.
     """
     day_ago = to_ts - DAY
+    ranked = ranked or set()
     out, skipped = [], []
     for part in trades.sort("ts").partition_by("label", maintain_order=True):
         symbol = part["label"][0]
@@ -431,6 +500,7 @@ def assets(trades: pl.DataFrame, to_ts: int) -> list[dict]:
                 series.append([int(pts[i]), float(prices[i])])
         addrs = priced["addr"].to_list()
         signed = priced["qty"].to_numpy()
+        positions = swap_positions(priced, price, ranked)
         recent = [{"ts": int(pts[i]), "address": addrs[i],
                    "side": "buy" if signed[i] > 0 else "sell",
                    "qty": float(pqty[i]), "price": float(prices[i]),
@@ -450,6 +520,7 @@ def assets(trades: pl.DataFrame, to_ts: int) -> list[dict]:
                 "trades": part.height,
             },
             "series": downsample(series, ASSET_SERIES_CAP),
+            "positions": positions,
             "trades": recent,
         })
     out.sort(key=lambda a: -a["asset"]["volume"])
@@ -688,6 +759,7 @@ def main() -> int:
     index = {"provenance": meta["provenance"], "generated_from": args.source,
              "scopes": [], "windows": [], "views": []}
     headline = {"qualifying": 0, "top": 0.0, "addresses": 0}
+    ranked_any: set[str] = set()
     buildable, detail_window = windows_for(span_h, windows)
     for name, hours in windows.items():
         if name not in buildable:
@@ -726,6 +798,10 @@ def main() -> int:
                 "provenance": meta["provenance"],
             }
             store.put_leaderboard(scope["id"], name, payload)
+            # Every address that appears on any board, for the asset page's cluster: a bubble
+            # whose wallet also ranks gets the frame's heavier ring, which is a second fact
+            # about it rather than a louder opinion about its PnL.
+            ranked_any.update(r["address"] for r in rows)
             if scope["id"] == "all" and (widest is None or hours >= widest[1]):
                 headline = {"qualifying": qualifying, "top": float(arr.max()),
                             "addresses": addresses}
@@ -765,7 +841,7 @@ def main() -> int:
         # Assets come off the same frame as the detail records, for the same reason: the
         # widest window that built is the one every other payload is written from, so an
         # asset page and the address pages that link to it cannot disagree about the window.
-        shipped_assets = store.put_assets(assets(w_all, hi), build_id)
+        shipped_assets = store.put_assets(assets(w_all, hi, ranked_any), build_id)
         print(f"        stored {shipped_assets:,} assets from the {name} window")
 
     index["scopes"] = [{"id": s["id"], "label": s["label"], "cat": s["cat"],

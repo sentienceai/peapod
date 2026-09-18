@@ -312,8 +312,21 @@ export async function assetDetail(symbol) {
     name: null,
     series: d.series ?? [],
     trades: d.trades ?? [],
-    // Not null-as-unknown: the holder side needs an ERC-20 transfer index, and every holder
-    // figure on the page renders as a slot naming that. See lib/needs.js.
+    /*
+     * POSITIONS ARE NOT HOLDERS, and the two travel separately on purpose.
+     *
+     * `positions` is what the swap tape can measure: per wallet, units bought minus units
+     * sold in this window, with a FIFO cost for the units still unsold. A wallet may hold
+     * more than this — anything transferred, bridged or issued to it is invisible here — and
+     * the build drops any wallet whose sells exceeded its buys, because those units came
+     * from somewhere this tape cannot see.
+     *
+     * `holders` stays null. A holder count, a share of holders in profit and an average
+     * entry across all holders are statements about everyone who holds the token, and those
+     * still need an ERC-20 transfer index. Every one of those figures renders as a slot
+     * naming it. See lib/needs.js.
+     */
+    positions: d.positions ?? [],
     holders: null,
     sample: false, sampleFields: [],
   };
@@ -343,19 +356,48 @@ export function tokenLogos() {
 /**
  * The search index.
  *
- * Both lists come from what the app already holds, and the panel says so: a search that
- * answers "no results" for an address simply below the board's cut is worse than one that
- * admits what it can see. A complete address is offered whether or not it is on the board,
- * because the detail endpoint knows every address that ever traded.
+ * TWO CAPS USED TO LIVE HERE, AND BOTH LOOKED LIKE A BROKEN SEARCH. Each side was sliced to
+ * 30, so a query matching sixty tokens showed thirty; and the trader side only ever filtered
+ * the ranked rows the page already held, which is the top 1,000 of 25,357 addresses that
+ * closed a round-trip — out of 113,315 the tape has a record for. /api/search has existed the
+ * whole time: a prefix lookup answered by the address table's own primary key index, over
+ * every address in the build.
+ *
+ * So: assets are filtered from the full list the page holds (221 of them — that IS all of
+ * them), and an address query goes to the endpoint, which is asked for more than anyone will
+ * scroll and clamps itself at 500. Nothing is sliced here; the palette pages what it renders.
+ *
+ * A query that is not hex cannot match an address and does not ask: there are no names in
+ * this build, for tokens or for addresses, so "tesla" has nothing to match against.
  * @param {string} query
  */
 export async function search(query) {
   const q = String(query ?? '').trim().toLowerCase();
-  const [{ rows }, list] = await Promise.all([board(), assets()]);
-  const assetHits = list.filter((/** @type {any} */ a) => !q
-    || a.symbol.toLowerCase().includes(q)
-    || String(a.name ?? '').toLowerCase().includes(q)).slice(0, 30);
-  const traderHits = rows.filter((/** @type {any} */ t) => !q || t.address.toLowerCase().includes(q)).slice(0, 30);
-  const direct = /^0x[0-9a-f]{40}$/.test(q) && !traderHits.some((/** @type {any} */ t) => t.address === q) ? q : null;
+  const list = await assets();
+  const assetHits = list.filter((/** @type {any} */ a) => !q || a.symbol.toLowerCase().includes(q));
+
+  const hex = /^0x[0-9a-f]{0,40}$/.test(q) && q.length >= 3;
+  /** @type {any[]} */
+  let traderHits = [];
+  if (!q) {
+    traderHits = (await board()).rows.slice(0, 200);
+  } else if (hex && mode() === 'api') {
+    // The store's own index, not the page's copy of the top of it.
+    const res = await get(`/api/search?q=${encodeURIComponent(q)}&limit=500`).catch(() => null);
+    traderHits = (res?.results ?? []).map((/** @type {any} */ r) => ({
+      address: r.addr,
+      realized: Number(r.realized) || 0,
+      winRate: Number(r.win_rate) || 0,
+      roundTrips: Number(r.round_trips) || 0,
+      // An address the tape saw trade but that never closed a round-trip is a real answer,
+      // and its profile says exactly that. It must not be filtered out of a search for it.
+      qualified: r.status === 'qualified',
+    }));
+  } else if (hex) {
+    traderHits = (await board()).rows.filter((/** @type {any} */ t) => t.address.toLowerCase().includes(q));
+  }
+  const direct = /^0x[0-9a-f]{40}$/.test(q)
+    && !traderHits.some((/** @type {any} */ t) => t.address === q) ? q : null;
   return { assets: assetHits, traders: traderHits, direct };
 }
+

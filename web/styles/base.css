@@ -315,6 +315,11 @@ input::placeholder { color: var(--placeholder); }
    a 32px square and the tile is 22, so without this it spills over the text beside it. */
 .asset-tile { position: relative; overflow: hidden; }
 .asset-tile img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+/* The initials are the fallback, and a fallback is not something you read THROUGH the thing
+   it fell back from: every logo file is a PNG with an alpha channel, so letters left under
+   one show through it. lib/token.js adds .has-logo when that tile's image has actually
+   painted; until then, and forever if it never does, the letters are the tile. */
+.asset-tile.has-logo .asset-tile-initials { visibility: hidden; }
 
 /* The connect control. Connected, it is the address itself — the quietest way to say the
    button did something, and the thing you would click next. */

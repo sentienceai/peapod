@@ -185,15 +185,22 @@ function renderExplore(host, row, assetList) {
 
 /**
  * One tile in the markets grid, for a stock/ETF or memecoin asset row from assets().
- * @param {any} a
+ *
+ * TWO FIELDS THAT ONLY EVER EXISTED IN THE MOCK. This drew `#${a.rank}` and `a.name`, and
+ * /api/assets carries neither: a row is symbol, kind, price, change24h, volume24h, volume,
+ * traders, trades. So every tile printed "#undefined" and had no title at all — the markets
+ * grid on the front page did not name a single token. The rank is now the token's place in
+ * the market list by 24h volume, which the endpoint already orders by and the caller passes
+ * in; the title is the ticker, because no name field exists anywhere in this build.
+ * @param {any} a @param {number} rank its position in the whole market list, 1-based
  */
-function tileForAsset(a) {
+function tileForAsset(a, rank) {
   const tile = node('div', 'lp-mtile');
   const top = node('div', 'lp-mtile-top');
   top.append(assetTile(a.symbol, a.kind, 'asset-tile--lg'));
-  top.append(node('span', 'mono lp-mtile-idx', `#${a.rank}`));
+  top.append(node('span', 'mono lp-mtile-idx', `#${rank}`));
   tile.append(top);
-  tile.append(node('span', 'lp-mtile-title', a.name));
+  tile.append(node('span', 'mono lp-mtile-title', a.symbol));
   tile.append(node('span', 'lp-mtile-sub', a.kind === 'meme' ? 'Pons memecoin' : 'Tokenized equity'));
   tile.append(node('div', 'spacer'));
   const bottom = node('div', 'lp-mtile-bottom');
@@ -231,10 +238,15 @@ function tileForWallet(r) {
  */
 function renderMarkets(assetList, boardRows) {
   const byVolume = (/** @type {any[]} */ list) => list.slice().sort((a, b) => b.volume24h - a.volume24h);
-  const stocks = byVolume(assetList.filter((/** @type {AssetRow} */ a) => a.kind === 'stock' || a.kind === 'etf')).slice(0, 5);
-  const memes = byVolume(assetList.filter((/** @type {AssetRow} */ a) => a.kind === 'meme')).slice(0, 5);
-  el('panel-stocks')?.replaceChildren(...stocks.map(tileForAsset));
-  el('panel-memes')?.replaceChildren(...memes.map(tileForAsset));
+  // One ranking over every token, so a memecoin tile saying #7 means seventh on the chain
+  // rather than seventh among memecoins.
+  const ranked = byVolume(assetList);
+  const rankOf = new Map(ranked.map((/** @type {any} */ a, i) => [a.symbol, i + 1]));
+  const tileWithRank = (/** @type {any} */ a) => tileForAsset(a, rankOf.get(a.symbol) ?? 0);
+  const stocks = ranked.filter((/** @type {AssetRow} */ a) => a.kind === 'stock' || a.kind === 'etf').slice(0, 5);
+  const memes = ranked.filter((/** @type {AssetRow} */ a) => a.kind === 'meme').slice(0, 5);
+  el('panel-stocks')?.replaceChildren(...stocks.map(tileWithRank));
+  el('panel-memes')?.replaceChildren(...memes.map(tileWithRank));
   el('panel-wallets')?.replaceChildren(...boardRows.slice(0, 5).map(tileForWallet));
 }
 

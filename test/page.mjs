@@ -68,6 +68,32 @@ export function wiredText(root) {
   return walk(root);
 }
 
+/**
+ * Anything on the page that is a placeholder a renderer left behind: "undefined", "NaN",
+ * "[object Object]", "#undefined".
+ *
+ * THE BUG THIS CATCHES. The landing page's market tiles printed "#undefined" on every card
+ * and had no title at all, for as long as the site has been on the API. They read `a.rank`
+ * and `a.name`, which existed on the mock rows and on nothing the endpoints return. Nothing
+ * failed: JavaScript hands you undefined and a template string prints it. A page that says
+ * "undefined" to a reader is a page that lost a value somewhere, and it is worth one scan.
+ * @param {any} root @returns {string[]} the offending text, trimmed to something readable
+ */
+export function placeholders(root) {
+  /** @type {string[]} */
+  const found = [];
+  /** @param {any} n */
+  const walk = (n) => {
+    if (typeof n === 'string') {
+      if (/\bundefined\b|\bNaN\b|\[object Object\]/.test(n)) found.push(n.trim().slice(0, 60));
+      return;
+    }
+    for (const c of n.children) walk(c);
+  };
+  walk(root);
+  return [...new Set(found)];
+}
+
 /** Every unwired slot under a node. @param {any} root */
 export const slots = (root) => byClass(root, 'unwired');
 

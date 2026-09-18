@@ -142,14 +142,24 @@ export function stamp(ts, opts = {}) {
  * @param {string} [extra]
  */
 export function assetTile(symbol, kind, extra) {
-  const t = node('span', `asset-tile asset-tile--${kind}${extra ? ` ${extra}` : ''}`,
-    (symbol || '?').slice(0, 2).toUpperCase());
+  const t = node('span', `asset-tile asset-tile--${kind}${extra ? ` ${extra}` : ''}`);
   t.setAttribute('aria-hidden', 'true');
-  // The initials stay underneath: 433 of the tokens have a logo file and the rest do not,
-  // and a tile that renders a broken image is worse than one that never had a logo. The
-  // image is drawn over the initials and removes itself if it fails to load — see
-  // lib/token.js, which also refuses any filename that is not one of ours before it can
-  // reach a URL.
+  /*
+   * THE INITIALS ARE REPLACED BY THE LOGO, NOT COVERED BY IT.
+   *
+   * They used to be the tile's own text with the image laid over them, on the assumption
+   * that a logo fills its square. Every vendored file is a PNG with an alpha channel, so the
+   * letters read straight through the transparent pixels: SPY drew "SBPR" (SP under the S&P
+   * mark), META drew "MΘE", AMC drew its red wordmark over blue letters. A fallback that is
+   * still visible when the thing it falls back FROM has arrived is not a fallback.
+   *
+   * So the letters go in their own element, and lib/token.js hides them the moment that
+   * tile's image fires `load`. If the image 404s or is blocked, the same module removes the
+   * image instead and the letters are still there, unhidden — which is the case they exist
+   * for. An image that neither loads nor errors (slow, offline) also leaves them showing.
+   */
+  const letters = node('span', 'asset-tile-initials', (symbol || '?').slice(0, 2).toUpperCase());
+  t.append(letters);
   const img = tokenLogo(symbol);
   if (img) t.append(img);
   return t;

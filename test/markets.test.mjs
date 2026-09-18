@@ -14,7 +14,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { byClass, openPage, signChannels } from './page.mjs';
+import { byClass, openPage, placeholders, signChannels } from './page.mjs';
 
 const { get } = await openPage('markets', 'markets-page');
 
@@ -114,4 +114,9 @@ test('the kind tabs filter, and say which is on', () => {
     assert.equal(byClass(r, 'mk-kind')[0].textContent, 'Memecoin', 'a stock survived the memecoin filter');
   }
   tabs[0].onclick?.({});
+});
+
+test('nothing in the table says "undefined"', () => {
+  const junk = placeholders(get('rows'));
+  assert.deepEqual(junk, [], `placeholders in the market rows:\n  ${junk.join('\n  ')}`);
 });
