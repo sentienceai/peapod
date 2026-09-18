@@ -8,8 +8,8 @@ import numpy as np
 import polars as pl
 import pytest
 
-from partitions import (BlockClock, day_key, days_in, partition_summary, read_days,
-                        write_days)
+from partitions import (BlockClock, compact, day_key, days_in, migrate, partition_summary,
+                        read_days, write_days)
 
 
 def ts_at(y, m, d, hh=0, mm=0, ss=0):
@@ -138,3 +138,114 @@ def test_measured_and_vendored_block_times_combine(tmp_path, monkeypatch):
     clock = BlockClock(measured, vendored)
     assert clock.ts_of(np.array([150]))[0] == 1_000_500
     assert clock.ts_of(np.array([100]))[0] == 1_000_000
+
+
+# ── the cursor, and the repair for the tree that was written without one ─────────────────
+#
+# THE BUG THESE PIN. migrate() was written as a one-off and then wired into the cycle,
+# where it re-partitioned the whole flat tape every fifteen minutes. write_days() never
+# rewrites an existing part, so each run appended a complete fresh copy of every day it
+# touched: 162 copies of each day, 43 GB of duplicate parquet on a 48.8 GB volume, from
+# flat tapes totalling 333 MB. Nothing was WRONG — read_days() dedups on (block,
+# log_index) — which is precisely why it ran for two days without anyone noticing.
+
+def flat(tmp_path, rows, part="part-00000.parquet"):
+    """A flat source tape, the shape the ingest writes."""
+    src = tmp_path / "src"
+    src.mkdir(parents=True, exist_ok=True)
+    pl.DataFrame(rows, schema={"block": pl.Int64, "log_index": pl.Int64},
+                 orient="row").write_parquet(src / part)
+    return src
+
+
+def clock_for(blocks):
+    return BlockClock(pl.DataFrame({"block": [b for b, _ in blocks],
+                                    "ts": [t for _, t in blocks]},
+                                   schema={"block": pl.Int64, "ts": pl.Int64}))
+
+
+def test_a_second_migrate_of_the_same_tape_writes_nothing(tmp_path):
+    src = flat(tmp_path, [(100, 0), (100, 1)])
+    dst = tmp_path / "days"
+    clock = clock_for([(100, 1_700_000_000)])
+    first = migrate(src, dst, clock)
+    assert first["written"] == 2 and first["new_parts"] == 1
+    again = migrate(src, dst, clock)
+    assert again["written"] == 0, "the whole tape was partitioned a second time"
+    assert again["new_parts"] == 0 and again["skipped_parts"] == 1
+    files = list((dst / "dt=2023-11-14").glob("part-*.parquet"))
+    assert len(files) == 1, f"{len(files)} copies of one day after two runs"
+
+
+def test_a_new_source_part_is_partitioned_and_the_old_ones_are_not(tmp_path):
+    src = flat(tmp_path, [(100, 0)])
+    dst = tmp_path / "days"
+    clock = clock_for([(100, 1_700_000_000), (200, 1_700_000_000)])
+    migrate(src, dst, clock)
+    pl.DataFrame([(200, 0)], schema={"block": pl.Int64, "log_index": pl.Int64},
+                 orient="row").write_parquet(src / "part-00001.parquet")
+    second = migrate(src, dst, clock)
+    assert second["new_parts"] == 1 and second["source_rows"] == 1
+    got = read_days(dst, dedup_on=("block", "log_index"))
+    assert sorted(got["block"].to_list()) == [100, 200]
+
+
+def test_a_source_part_that_grew_is_read_again_and_the_reader_dedups(tmp_path):
+    # The ingest rewrites the part it is currently filling, so a changed size means new
+    # rows in a file already seen. Re-reading it is cheap and correct; the alternative is
+    # losing whatever arrived after the last cycle.
+    src = flat(tmp_path, [(100, 0)])
+    dst = tmp_path / "days"
+    clock = clock_for([(100, 1_700_000_000)])
+    migrate(src, dst, clock)
+    pl.DataFrame([(100, 0), (100, 1)], schema={"block": pl.Int64, "log_index": pl.Int64},
+                 orient="row").write_parquet(src / "part-00000.parquet")
+    again = migrate(src, dst, clock)
+    assert again["new_parts"] == 1
+    got = read_days(dst, dedup_on=("block", "log_index"))
+    assert got.height == 2, "the overlapping row was counted twice"
+
+
+def test_a_cold_tree_still_partitions_everything(tmp_path):
+    src = flat(tmp_path, [(100, 0), (100, 1)])
+    report = migrate(src, tmp_path / "days", clock_for([(100, 1_700_000_000)]))
+    assert report["written"] == 2 and report["skipped_parts"] == 0
+
+
+def test_compaction_merges_a_day_and_keeps_every_row(tmp_path):
+    dst = tmp_path / "days"
+    clock = clock_for([(100, 1_700_000_000), (200, 1_700_000_001)])
+    # Three cycles of the old behaviour: the same rows, three times over.
+    for i in range(3):
+        src = flat(tmp_path / f"s{i}", [(100, 0), (200, 0)])
+        migrate(src, dst, clock, incremental=False)
+    day = dst / "dt=2023-11-14"
+    assert len(list(day.glob("part-*.parquet"))) == 3
+    before = read_days(dst, dedup_on=("block", "log_index"))
+    report = compact(dst)
+    assert report["parts_before"] == 3 and report["parts_after"] == 1
+    assert report["bytes_after"] < report["bytes_before"]
+    assert len(list(day.glob("part-*.parquet"))) == 1
+    after = read_days(dst, dedup_on=("block", "log_index"))
+    assert sorted(after["block"].to_list()) == sorted(before["block"].to_list())
+    assert not list(day.glob("*.tmp")), "compaction left a temporary file behind"
+
+
+def test_a_part_that_grew_contributes_only_its_new_rows(tmp_path):
+    """The ingest appends to the part it is filling, so that file comes back every cycle.
+
+    Copying all of it again is invisible — the reader dedups — and it is exactly how 43 GB
+    of duplicates accumulated. Parts are append-only in row order, so what is new is the
+    tail, and only the tail is written.
+    """
+    src = flat(tmp_path, [(100, 0)])
+    dst = tmp_path / "days"
+    clock = clock_for([(100, 1_700_000_000)])
+    migrate(src, dst, clock)
+    pl.DataFrame([(100, 0), (100, 1), (100, 2)],
+                 schema={"block": pl.Int64, "log_index": pl.Int64},
+                 orient="row").write_parquet(src / "part-00000.parquet")
+    second = migrate(src, dst, clock)
+    assert second["source_rows"] == 2, "the rows already partitioned were copied again"
+    got = read_days(dst, dedup_on=("block", "log_index"))
+    assert got.height == 3

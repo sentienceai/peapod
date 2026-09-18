@@ -68,6 +68,13 @@ if [ "${CYCLE_SKIP_INGEST:-0}" != "1" ]; then
   stage "swaps: pons"  $PY ingest/swaps_with_tx.py --universe pons  || exit 1
   stage "identity"     $PY ingest/resolve_senders.py --max-hours 0.2 || exit 1
   stage "partitions"   $PY ingest/partitions.py                    || exit 1
+  # HOUSEKEEPING, NOT INGEST. Partitioning appends a small part per cycle per day; left
+  # alone a day open for 24 hours ends up with ~96 files the reader opens to answer one
+  # window. This merges a day once it has collected 24 of them, which is about four times
+  # a day per tape, and costs rewriting that one day. It is not allowed to fail the cycle:
+  # nothing downstream needs it, and a day with too many parts is slow, not wrong.
+  stage "compact days" $PY ingest/partitions.py --compact --min-parts 24 \
+                                                                   || say "compaction skipped"
   stage "eth/usd"      $PY ingest/eth_usd.py --stage series        || exit 1
   # SUPPLY IS READ EVERY CYCLE, unlike decimals, which are read once and cached: a
   # Robinhood-issued token is minted on the way in and burned on the way out, so the number

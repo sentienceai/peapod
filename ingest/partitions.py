@@ -184,20 +184,148 @@ def partition_summary(root: Path) -> dict:
             "last": days[-1] if days else None, "rows": rows}
 
 
-def migrate(src: Path, dst: Path, clock: BlockClock) -> dict:
-    """One-off: flat part files -> day directories, with the measured/interpolated split."""
+CURSOR = "_partitioned.json"
+
+
+def _cursor(dst: Path) -> dict[str, dict]:
+    """Which source parts this tree has partitioned: size on disk and rows consumed."""
+    path = Path(dst) / CURSOR
+    if not path.exists():
+        return {}
+    try:
+        raw = json.loads(path.read_text())
+    except (ValueError, OSError):
+        return {}
+    out: dict[str, dict] = {}
+    for k, v in raw.items():
+        # The first version of this file recorded a bare size. Read either.
+        out[str(k)] = {"size": int(v), "rows": 0} if isinstance(v, int) else {
+            "size": int(v.get("size", 0)), "rows": int(v.get("rows", 0))}
+    return out
+
+
+def migrate(src: Path, dst: Path, clock: BlockClock, incremental: bool = True) -> dict:
+    """Flat part files -> day directories, with the measured/interpolated split.
+
+    ONLY THE PARTS THAT ARE NEW. This was written as a one-off migration and then wired
+    into the cycle, where it ran every fifteen minutes and re-partitioned the WHOLE tape
+    each time: write_days() never rewrites an existing part, so each run appended a fresh
+    complete copy of every day it touched. Two days of that put 43 GB of duplicate parquet
+    on a 48.8 GB volume — 162 copies of each day — while the flat tapes it was copying
+    came to 333 MB. Every figure on the site was still correct, because read_days() dedups
+    on (block, log_index), which is exactly why nothing caught it.
+
+    So the destination remembers which source parts it has consumed, by name and size. The
+    ingest appends new parts and only ever rewrites the one it is currently filling, so a
+    part whose size has changed is partitioned again and the reader's dedup absorbs the
+    overlap — a few megabytes, once, instead of the whole tape every cycle.
+    """
     parts = sorted(Path(src).glob("part-*.parquet")) or sorted(Path(src).rglob("*.parquet"))
     if not parts:
         raise FileNotFoundError(f"nothing to migrate at {src}")
-    df = pl.concat([pl.read_parquet(p) for p in parts], how="vertical_relaxed")
+    seen = _cursor(dst) if incremental else {}
+    todo = [p for p in parts if (seen.get(p.name) or {}).get("size") != p.stat().st_size]
+    if not todo:
+        return {"source_rows": 0, "written": 0, "days": 0, "measured": 0,
+                "interpolated": 0, "skipped_parts": len(parts), "new_parts": 0}
+    # ONLY THE ROWS THAT ARE NEW, EVEN INSIDE A PART THAT GREW. The ingest keeps appending
+    # to the part it is currently filling, so that one file comes back every cycle with a
+    # different size. Re-partitioning all of it would copy its whole contents again — and
+    # the reader would dedup them, so the only trace is bytes on the volume, which is the
+    # shape of the bug this whole cursor exists for. Parts are append-only in row order, so
+    # the rows already consumed are exactly the first N.
+    #
+    # DIAGONAL, NOT VERTICAL. The ingest's schema has changed once already — older parts of
+    # the RWA tape carry 13 columns where newer ones carry 15 — and "vertical_relaxed"
+    # reconciles dtypes but not a column that is simply absent, so a concat over both
+    # generations dies with "schema lengths differ". Diagonal unions the columns and fills
+    # the gaps with nulls, which is what an older part not having recorded block_hash
+    # actually means. Every consumer selects the columns it needs by name.
+    frames, consumed = [], {}
+    for p in todo:
+        one = pl.read_parquet(p)
+        already = (seen.get(p.name) or {}).get("rows", 0)
+        consumed[p.name] = one.height
+        if already and already < one.height:
+            one = one.slice(already)
+        elif already >= one.height and already:
+            continue                                # rewritten shorter; nothing new to take
+        frames.append(one)
+    if not frames:
+        return {"source_rows": 0, "written": 0, "days": 0, "measured": 0,
+                "interpolated": 0, "skipped_parts": len(parts), "new_parts": 0}
+    df = pl.concat(frames, how="diagonal_relaxed")
     blocks = df["block"].to_numpy().astype(np.int64)
     ts = clock.ts_of(blocks)
     measured = int(clock.is_measured(blocks).sum())
     written = write_days(df, Path(dst), ts)
     report = {"source_rows": df.height, "written": sum(written.values()),
               "days": len(written), "measured": measured,
-              "interpolated": int(df.height - measured)}
+              "interpolated": int(df.height - measured),
+              "skipped_parts": len(parts) - len(todo), "new_parts": len(todo)}
     (Path(dst) / "_migration.json").write_text(json.dumps(report, indent=1))
+    # Written AFTER the parts land: a crash between the two costs one part re-partitioned
+    # next cycle, which the reader's dedup absorbs. The other order would lose rows.
+    cursor = dict(seen)
+    for p in todo:
+        cursor[p.name] = {"size": p.stat().st_size, "rows": consumed.get(p.name, 0)}
+    (Path(dst) / CURSOR).write_text(json.dumps(cursor, indent=1, sort_keys=True))
+    return report
+
+
+def compact(root: Path, dedup_on: tuple[str, ...] = ("block", "log_index"),
+            min_parts: int = 2) -> dict:
+    """Rewrite each day as ONE deduped part, and drop the parts it replaces.
+
+    The repair for the tree the cycle filled with copies, and worth running on its own
+    schedule afterwards: even appending only new rows leaves a part per cycle per day, and
+    a day that has been open for 96 cycles is 96 files the reader opens to answer one
+    window.
+
+    SAFE TO INTERRUPT. The merged file is written under a temporary name and renamed into
+    place before any original is removed, so a crash leaves both the old parts and a
+    complete new one — which the reader dedups — rather than a day with a hole in it.
+    """
+    root = Path(root)
+    report = {"days": 0, "parts_before": 0, "parts_after": 0, "bytes_before": 0,
+              "bytes_after": 0, "rows": 0}
+    for day in sorted(root.glob("dt=*")):
+        parts = sorted(day.glob("part-*.parquet"))
+        # A threshold, not "more than one": merging a day costs writing that whole day
+        # again, so doing it every cycle would churn ~80 MB per tape per cycle to save a
+        # few file handles. Left to accumulate a day's worth of small parts first.
+        if len(parts) < max(2, min_parts):
+            continue
+        frames = []
+        for p in parts:
+            try:
+                frames.append(pl.read_parquet(p))
+            except Exception:                       # noqa: BLE001
+                continue                            # a part a crash left short
+        if not frames:
+            continue
+        # Diagonal for the same reason migrate() is: a day can hold parts from two
+        # generations of the ingest's schema, and the older one is missing columns rather
+        # than disagreeing about their type.
+        df = pl.concat(frames, how="diagonal_relaxed")
+        have = tuple(c for c in dedup_on if c in df.columns)
+        if have:
+            df = df.unique(subset=have)
+        before = sum(p.stat().st_size for p in parts)
+        tmp = day / ".compact.parquet.tmp"
+        df.write_parquet(tmp)
+        merged = day / "part-00000.parquet"
+        # The merged file takes the first index; everything else goes, including the file
+        # that index used to name — so it is written aside and moved in one rename.
+        for p in parts:
+            p.unlink()
+        tmp.rename(merged)
+        report["days"] += 1
+        report["parts_before"] += len(parts)
+        report["parts_after"] += 1
+        report["bytes_before"] += before
+        report["bytes_after"] += merged.stat().st_size
+        report["rows"] += df.height
     return report
 
 
@@ -208,6 +336,12 @@ def main() -> int:
 
     ap = argparse.ArgumentParser()
     ap.add_argument("--only", default=None, help="migrate one tape by name")
+    ap.add_argument("--compact", action="store_true",
+                    help="merge each day's parts into one and drop the rest")
+    ap.add_argument("--min-parts", type=int, default=2,
+                    help="only compact a day that has at least this many parts")
+    ap.add_argument("--full", action="store_true",
+                    help="re-partition every source part, ignoring the cursor")
     args = ap.parse_args()
 
     root = Path(os.environ.get("PEAPOD_LP_TERMINAL", str(Path.home() / "lp-terminal")))
@@ -228,6 +362,23 @@ def main() -> int:
         if tree.is_dir():
             tapes[tree.name] = (tree, HERE / "out" / "days" / tree.name)
 
+    if args.compact:
+        total = {"days": 0, "parts_before": 0, "parts_after": 0, "bytes_before": 0,
+                 "bytes_after": 0}
+        for name, (_src, dst) in tapes.items():
+            if args.only and args.only != name:
+                continue
+            r = compact(dst, min_parts=args.min_parts)
+            for k in total:
+                total[k] += r[k]
+            print(f"{name}: {r['days']} days, {r['parts_before']:,} parts -> "
+                  f"{r['parts_after']:,}, {r['bytes_before'] / 1e9:.2f} GB -> "
+                  f"{r['bytes_after'] / 1e9:.2f} GB, {r['rows']:,} rows kept")
+        print(f"compacted {total['days']} day(s): {total['parts_before']:,} parts -> "
+              f"{total['parts_after']:,}, freed "
+              f"{(total['bytes_before'] - total['bytes_after']) / 1e9:.2f} GB")
+        return 0
+
     for name, (src, dst) in tapes.items():
         if args.only and args.only != name:
             continue
@@ -238,10 +389,15 @@ def main() -> int:
         if not sorted(src.glob("part-*.parquet")) and not sorted(src.rglob("*.parquet")):
             print(f"{name}: no parts at {src}, skipped")
             continue
-        report = migrate(src, dst, clock)
+        report = migrate(src, dst, clock, incremental=not args.full)
         ok = report["source_rows"] == report["written"]
-        print(f"{name}: {report['source_rows']:,} rows -> {report['days']} days, "
-              f"{report['measured']:,} measured / {report['interpolated']:,} interpolated"
+        if not report["new_parts"]:
+            print(f"{name}: nothing new ({report['skipped_parts']} source parts already "
+                  f"partitioned)")
+            continue
+        print(f"{name}: {report['source_rows']:,} rows from {report['new_parts']} new "
+              f"source part(s) -> {report['days']} days, {report['measured']:,} measured / "
+              f"{report['interpolated']:,} interpolated"
               f"  {'OK' if ok else 'ROW COUNT MISMATCH'}")
         if not ok:
             return 1

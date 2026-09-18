@@ -13,7 +13,24 @@ empty state, and the first cycle fills it. Nothing has to be seeded for it to st
 **1. A service from this repo.** Railway reads `railway.json` and builds the `Dockerfile`.
 
 **2. A volume mounted at `/data`.** Settings → Volumes → New Volume → mount path `/data`.
-Size it **20 GB**. Today's footprint is about 1.1 GB (814 MB tape, 256 MB database).
+Size it **20 GB**. Today's footprint is about 1.1 GB (814 MB tape, 256 MB database), and it
+grows with the chain at roughly **150–200 MB a day**: the swap tapes, the resolved senders,
+and one small parquet part per day per tape per cycle.
+
+**What it must not do is grow with the CYCLE COUNT.** It did, once, and the volume went from
+0.8 GB to 44 GB in two days. `ingest/partitions.py` began life as a one-off migration and was
+then wired into the cycle, where it re-partitioned the whole flat tape every fifteen minutes;
+`write_days()` never rewrites an existing part, so each run appended a complete fresh copy of
+every day it touched — 162 copies of each day, 43 GB of duplicate parquet against 333 MB of
+source. Nothing read wrong, because `read_days()` dedups on `(block, log_index)`, which is
+exactly why it ran unnoticed. It now keeps a cursor of the source parts it has consumed
+(`_partitioned.json` in each day tree) and writes only rows it has not seen, and the cycle
+merges a day once it has collected 24 parts.
+
+If you are looking at a volume that already filled this way, `ingest/partitions.py --compact`
+merges each day into a single deduped part and deletes the ones it replaces, preserving every
+row. It is safe to interrupt — the merged file is renamed into place before any original is
+removed — but it must not run while a cycle is mid-build, so stop the schedule first.
 
 **3. Three variables.**
 
